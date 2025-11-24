@@ -1211,7 +1211,11 @@ export function SettingsModal(props: SettingsModalProps) {
                     <div key={sc.id} className="flex items-center justify-between p-3 rounded border" style={{ borderColor: theme.colors.border, backgroundColor: theme.colors.bgMain }}>
                       <span className="text-sm font-medium" style={{ color: theme.colors.textMain }}>{sc.label}</span>
                       <button
-                        onClick={() => setRecordingId(sc.id)}
+                        onClick={(e) => {
+                          setRecordingId(sc.id);
+                          // Auto-focus the button so it immediately starts listening for keys
+                          e.currentTarget.focus();
+                        }}
                         onKeyDownCapture={(e) => {
                           if (recordingId === sc.id) {
                             // Prevent default in capture phase to catch all key combinations
