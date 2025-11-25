@@ -1104,12 +1104,16 @@ export default function MaestroConsole() {
   }, [shortcuts, activeFocus, activeRightTab, sessions, selectedSidebarIndex, activeSessionId, quickActionOpen, settingsModalOpen, shortcutsHelpOpen, newInstanceModalOpen, aboutModalOpen, processMonitorOpen, logViewerOpen, createGroupModalOpen, confirmModalOpen, renameInstanceModalOpen, renameGroupModalOpen, activeSession, previewFile, fileTreeFilter, fileTreeFilterOpen, gitDiffPreview, lightboxImage, hasOpenLayers, hasOpenModal, visibleSessions, sortedSessions, groups]);
 
   // Sync selectedSidebarIndex with activeSessionId
+  // IMPORTANT: Only sync when activeSessionId changes, NOT when sortedSessions changes
+  // This allows keyboard navigation to move the selector independently of the active session
+  // The sync happens when user clicks a session or presses Enter to activate
   useEffect(() => {
     const currentIndex = sortedSessions.findIndex(s => s.id === activeSessionId);
-    if (currentIndex !== -1 && currentIndex !== selectedSidebarIndex) {
+    if (currentIndex !== -1) {
       setSelectedSidebarIndex(currentIndex);
     }
-  }, [activeSessionId, sortedSessions]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSessionId]); // Intentionally excluding sortedSessions - see comment above
 
   // Auto-switch away from history tab when in terminal mode
   useEffect(() => {
