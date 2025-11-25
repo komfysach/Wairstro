@@ -27,6 +27,7 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { MainPanel } from './components/MainPanel';
 import { ProcessMonitor } from './components/ProcessMonitor';
 import { GitDiffViewer } from './components/GitDiffViewer';
+import { LayerStackDevTools } from './components/dev/LayerStackDevTools';
 
 // Import custom hooks
 import { useSettings, useSessionManager, useFileExplorer } from './hooks';
@@ -2332,6 +2333,9 @@ export default function MaestroConsole() {
         setMaxOutputLines={setMaxOutputLines}
         initialTab={settingsTab}
       />
+
+      {/* Dev Tools (only in development) */}
+      {process.env.NODE_ENV === 'development' && <LayerStackDevTools />}
       </div>
     </LayerStackProvider>
   );
