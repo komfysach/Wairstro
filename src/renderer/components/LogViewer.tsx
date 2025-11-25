@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Search, X, Trash2, Download, ChevronRight, ChevronDown } from 'lucide-react';
 import type { Theme } from '../types';
+import { useLayerStack } from '../hooks/useLayerStack';
+import { MODAL_PRIORITIES } from '../constants/modalPriorities';
 
 interface SystemLogEntry {
   timestamp: number;
@@ -25,6 +27,9 @@ export function LogViewer({ theme, onClose }: LogViewerProps) {
   const logsEndRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const layerIdRef = useRef<string>();
+
+  const { registerLayer, unregisterLayer, updateLayerHandler } = useLayerStack();
 
   const toggleDataExpanded = (index: number) => {
     setExpandedData(prev => {
@@ -64,6 +69,49 @@ export function LogViewer({ theme, onClose }: LogViewerProps) {
 
     setFilteredLogs(filtered);
   }, [logs, searchQuery, selectedLevel]);
+
+  // Register layer on mount
+  useEffect(() => {
+    layerIdRef.current = registerLayer({
+      type: 'overlay',
+      priority: MODAL_PRIORITIES.LOG_VIEWER,
+      blocksLowerLayers: true,
+      capturesFocus: true,
+      focusTrap: 'lenient',
+      ariaLabel: 'System Log Viewer',
+      onEscape: () => {
+        if (searchOpen) {
+          setSearchOpen(false);
+          setSearchQuery('');
+          containerRef.current?.focus();
+        } else {
+          onClose();
+        }
+      },
+      allowClickOutside: false
+    });
+
+    return () => {
+      if (layerIdRef.current) {
+        unregisterLayer(layerIdRef.current);
+      }
+    };
+  }, [registerLayer, unregisterLayer, onClose]);
+
+  // Update layer handler when dependencies change
+  useEffect(() => {
+    if (layerIdRef.current) {
+      updateLayerHandler(layerIdRef.current, () => {
+        if (searchOpen) {
+          setSearchOpen(false);
+          setSearchQuery('');
+          containerRef.current?.focus();
+        } else {
+          onClose();
+        }
+      });
+    }
+  }, [searchOpen, onClose, updateLayerHandler]);
 
   // Auto-focus container on mount for keyboard navigation
   useEffect(() => {
@@ -119,21 +167,7 @@ export function LogViewer({ theme, onClose }: LogViewerProps) {
       e.preventDefault();
       setSearchOpen(true);
     }
-    // Close search with Escape
-    else if (e.key === 'Escape' && searchOpen) {
-      e.preventDefault();
-      e.stopPropagation();
-      setSearchOpen(false);
-      setSearchQuery('');
-      containerRef.current?.focus();
-    }
-    // Close log viewer with Escape (when search is not open)
-    else if (e.key === 'Escape' && !searchOpen) {
-      e.preventDefault();
-      e.stopPropagation();
-      onClose();
-    }
-    // Scroll with arrow keys
+    // Scroll with arrow keys (only when search is not open)
     else if (e.key === 'ArrowUp' && !searchOpen) {
       e.preventDefault();
       containerRef.current?.scrollBy({ top: -100, behavior: 'smooth' });
@@ -182,7 +216,15 @@ export function LogViewer({ theme, onClose }: LogViewerProps) {
   };
 
   return (
-    <div className="flex flex-col h-full" onKeyDown={handleKeyDown}>
+    <div
+      className="flex flex-col h-full"
+      onKeyDown={handleKeyDown}
+      role="dialog"
+      aria-modal="true"
+      aria-label="System Log Viewer"
+      tabIndex={-1}
+      ref={(el) => el?.focus()}
+    >
       {/* Header */}
       <div
         className="px-4 py-3 border-b flex items-center justify-between sticky top-0 z-10"
@@ -292,14 +334,6 @@ export function LogViewer({ theme, onClose }: LogViewerProps) {
             style={{ color: theme.colors.textMain }}
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            onKeyDown={e => {
-              if (e.key === 'Escape') {
-                e.preventDefault();
-                setSearchOpen(false);
-                setSearchQuery('');
-                containerRef.current?.focus();
-              }
-            }}
           />
           <button
             onClick={() => {
