@@ -813,61 +813,8 @@ export default function MaestroConsole() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't intercept if modals are open
-      const modalOpen = quickActionOpen || settingsModalOpen || shortcutsHelpOpen || newInstanceModalOpen || aboutModalOpen || processMonitorOpen || logViewerOpen || createGroupModalOpen || confirmModalOpen || renameInstanceModalOpen || renameGroupModalOpen || gitDiffPreview !== null;
-
-      // If any modal is open, only handle Escape key here and let modals handle everything else
-      if (modalOpen) {
-        if (e.key === 'Escape') {
-          e.preventDefault();
-          e.stopPropagation();
-
-          // Close only the topmost modal (in z-index order, highest first)
-          if (confirmModalOpen) {
-            setConfirmModalOpen(false);
-          } else if (renameInstanceModalOpen) {
-            setRenameInstanceModalOpen(false);
-          } else if (renameGroupModalOpen) {
-            setRenameGroupModalOpen(false);
-          } else if (createGroupModalOpen) {
-            setCreateGroupModalOpen(false);
-          } else if (newInstanceModalOpen) {
-            setNewInstanceModalOpen(false);
-          } else if (quickActionOpen) {
-            setQuickActionOpen(false);
-          } else if (shortcutsHelpOpen) {
-            setShortcutsHelpOpen(false);
-          } else if (aboutModalOpen) {
-            setAboutModalOpen(false);
-          } else if (processMonitorOpen) {
-            setProcessMonitorOpen(false);
-          } else if (logViewerOpen) {
-            setLogViewerOpen(false);
-          } else if (settingsModalOpen) {
-            setSettingsModalOpen(false);
-          } else if (gitDiffPreview) {
-            setGitDiffPreview(null);
-          } else if (lightboxImage) {
-            setLightboxImage(null);
-          } else if (previewFile) {
-            setPreviewFile(null);
-          }
-        }
-        // For tabbed modals, handle Cmd+Shift+[ and ] for tab navigation
-        else if (settingsModalOpen && isShortcut(e, 'cyclePrev')) {
-          e.preventDefault();
-          // This will be handled in SettingsModal component
-        }
-        else if (settingsModalOpen && isShortcut(e, 'cycleNext')) {
-          e.preventDefault();
-          // This will be handled in SettingsModal component
-        }
-        // Don't process any other shortcuts when modals are open
-        return;
-      }
-
       // Sidebar navigation with arrow keys (works when sidebar has focus)
-      if (activeFocus === 'sidebar' && (e.key === 'ArrowUp' || e.key === 'ArrowDown') && !modalOpen) {
+      if (activeFocus === 'sidebar' && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
         e.preventDefault();
         const totalSessions = sortedSessions.length;
         if (totalSessions === 0) return;
@@ -897,7 +844,7 @@ export default function MaestroConsole() {
       }
 
       // Enter to load selected session from sidebar
-      if (activeFocus === 'sidebar' && e.key === 'Enter' && !modalOpen) {
+      if (activeFocus === 'sidebar' && e.key === 'Enter') {
         e.preventDefault();
         if (sortedSessions[selectedSidebarIndex]) {
           setActiveSessionId(sortedSessions[selectedSidebarIndex].id);
@@ -1013,14 +960,6 @@ export default function MaestroConsole() {
       if (e.key === '/' && activeFocus === 'right' && activeRightTab === 'files') {
         e.preventDefault();
         setFileTreeFilterOpen(true);
-      }
-
-      // Escape key for non-modal elements (preview, lightbox, file tree filter)
-      if (e.key === 'Escape' && !modalOpen) {
-        setLightboxImage(null);
-        setPreviewFile(null);
-        setFileTreeFilterOpen(false);
-        setFileTreeFilter('');
       }
     };
     window.addEventListener('keydown', handleKeyDown);
