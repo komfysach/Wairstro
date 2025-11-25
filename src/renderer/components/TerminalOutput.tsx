@@ -292,14 +292,13 @@ export const TerminalOutput = forwardRef<HTMLDivElement, TerminalOutputProps>((p
     );
   }, [activeLogs, outputSearchQuery]);
 
-  // Auto-scroll to bottom when new logs are added
+  // Auto-scroll to bottom when new logs are added (including user commands with no output)
   const prevLogCountRef = useRef(filteredLogs.length);
   useEffect(() => {
     if (filteredLogs.length > prevLogCountRef.current) {
-      // New logs were added, scroll to bottom
+      // New logs were added, scroll to bottom instantly
       virtuosoRef.current?.scrollToIndex({
         index: filteredLogs.length - 1,
-        behavior: 'smooth',
         align: 'end'
       });
     }
@@ -690,27 +689,44 @@ export const TerminalOutput = forwardRef<HTMLDivElement, TerminalOutputProps>((p
           setActiveFocus('main');
           return;
         }
-        // Arrow key scrolling
-        if (e.key === 'ArrowUp' && !e.metaKey && !e.ctrlKey) {
+        // Arrow key scrolling via Virtuoso (instant, no smooth behavior)
+        // Plain arrow keys: scroll by ~100px
+        if (e.key === 'ArrowUp' && !e.metaKey && !e.ctrlKey && !e.altKey) {
           e.preventDefault();
-          terminalOutputRef.current?.scrollBy({ top: -40, behavior: 'smooth' });
+          virtuosoRef.current?.scrollBy({ top: -100 });
           return;
         }
-        if (e.key === 'ArrowDown' && !e.metaKey && !e.ctrlKey) {
+        if (e.key === 'ArrowDown' && !e.metaKey && !e.ctrlKey && !e.altKey) {
           e.preventDefault();
-          terminalOutputRef.current?.scrollBy({ top: 40, behavior: 'smooth' });
+          virtuosoRef.current?.scrollBy({ top: 100 });
+          return;
+        }
+        // Option/Alt+Up: page up
+        if (e.key === 'ArrowUp' && e.altKey && !e.metaKey && !e.ctrlKey) {
+          e.preventDefault();
+          const height = terminalOutputRef.current?.clientHeight || 400;
+          virtuosoRef.current?.scrollBy({ top: -height });
+          return;
+        }
+        // Option/Alt+Down: page down
+        if (e.key === 'ArrowDown' && e.altKey && !e.metaKey && !e.ctrlKey) {
+          e.preventDefault();
+          const height = terminalOutputRef.current?.clientHeight || 400;
+          virtuosoRef.current?.scrollBy({ top: height });
           return;
         }
         // Cmd+Up to jump to top
-        if (e.key === 'ArrowUp' && (e.metaKey || e.ctrlKey)) {
+        if (e.key === 'ArrowUp' && (e.metaKey || e.ctrlKey) && !e.altKey) {
           e.preventDefault();
-          terminalOutputRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+          virtuosoRef.current?.scrollToIndex({ index: 0, align: 'start' });
           return;
         }
         // Cmd+Down to jump to bottom
-        if (e.key === 'ArrowDown' && (e.metaKey || e.ctrlKey)) {
+        if (e.key === 'ArrowDown' && (e.metaKey || e.ctrlKey) && !e.altKey) {
           e.preventDefault();
-          terminalOutputRef.current?.scrollTo({ top: terminalOutputRef.current.scrollHeight, behavior: 'smooth' });
+          if (filteredLogs.length > 0) {
+            virtuosoRef.current?.scrollToIndex({ index: filteredLogs.length - 1, align: 'end' });
+          }
           return;
         }
       }}

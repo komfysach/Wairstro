@@ -97,6 +97,7 @@ Each session shows a color-coded status indicator:
 | Focus Input | `Esc` while in output |
 | Open Output Search | `/` while in output |
 | Scroll Output | `Up/Down Arrow` while in output |
+| Page Up/Down | `Alt+Up/Down Arrow` while in output |
 | Jump to Top/Bottom | `Cmd+Up/Down Arrow` while in output |
 
 ### Navigation & Search

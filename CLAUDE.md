@@ -651,7 +651,8 @@ The app is keyboard-first with these patterns:
 
 **Output Window:**
 - `/` → Open search/filter
-- Arrow Up/Down → Scroll output
+- Arrow Up/Down → Scroll output (~100px)
+- Option/Alt + Arrow Up/Down → Page up/down (viewport height)
 - Cmd/Ctrl + Arrow Up/Down → Jump to top/bottom
 - Escape → Close search (if open) or return to input
 
