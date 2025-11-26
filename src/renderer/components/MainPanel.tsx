@@ -155,7 +155,6 @@ export function MainPanel(props: MainPanelProps) {
           activeSession={activeSession || undefined}
           activeClaudeSessionId={activeClaudeSessionId}
           onClose={() => setAgentSessionsOpen(false)}
-          onSelectSession={setActiveClaudeSessionId}
           onResumeSession={onResumeClaudeSession}
           onNewSession={onNewClaudeSession}
         />

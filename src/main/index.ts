@@ -258,6 +258,7 @@ function setupIpcHandlers() {
     args: string[];
     prompt?: string;
     shell?: string;
+    images?: string[]; // Base64 data URLs for images
   }) => {
     if (!processManager) throw new Error('Process manager not initialized');
     if (!agentDetector) throw new Error('Agent detector not initialized');

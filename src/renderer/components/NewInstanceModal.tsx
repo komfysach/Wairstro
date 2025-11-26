@@ -22,6 +22,7 @@ export function NewInstanceModal({ isOpen, onClose, onCreate, theme, defaultAgen
   // Layer stack integration
   const { registerLayer, unregisterLayer, updateLayerHandler } = useLayerStack();
   const layerIdRef = useRef<string>();
+  const modalRef = useRef<HTMLDivElement>(null);
 
   // Define handlers first before they're used in effects
   const loadAgents = async () => {
@@ -100,6 +101,13 @@ export function NewInstanceModal({ isOpen, onClose, onCreate, theme, defaultAgen
     }
   }, [isOpen, onClose, updateLayerHandler]);
 
+  // Focus modal on open (only once, not on every render)
+  useEffect(() => {
+    if (isOpen && modalRef.current) {
+      modalRef.current.focus();
+    }
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   return (
@@ -109,7 +117,7 @@ export function NewInstanceModal({ isOpen, onClose, onCreate, theme, defaultAgen
       aria-modal="true"
       aria-label="Create New Agent"
       tabIndex={-1}
-      ref={(el) => el?.focus()}
+      ref={modalRef}
       onKeyDown={(e) => {
         // Handle Cmd+O for folder picker before stopping propagation
         if ((e.key === 'o' || e.key === 'O') && (e.metaKey || e.ctrlKey)) {

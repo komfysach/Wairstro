@@ -43,7 +43,7 @@ export const slashCommands: SlashCommand[] = [
     command: '/jump',
     description: 'Jump to CWD in file tree',
     execute: (context: SlashCommandContext) => {
-      const { activeSessionId, sessions, setSessions, setRightPanelOpen, setActiveRightTab, setActiveFocus, setSelectedFileIndex } = context;
+      const { activeSessionId, sessions, setSessions, setRightPanelOpen, setActiveRightTab, setActiveFocus } = context;
 
       // Use fallback to first session if activeSessionId is empty
       const actualActiveId = activeSessionId || (sessions.length > 0 ? sessions[0].id : '');
@@ -59,14 +59,16 @@ export const slashCommands: SlashCommand[] = [
       if (setRightPanelOpen) setRightPanelOpen(true);
       if (setActiveRightTab) setActiveRightTab('files');
       if (setActiveFocus) setActiveFocus('right');
-      if (setSelectedFileIndex) setSelectedFileIndex(0);
 
-      // Expand all parent folders in the path (using relative paths to match file tree)
+      // Calculate the relative path from session cwd to target directory
+      const relativePath = targetDir.replace(activeSession.cwd, '').replace(/^\//, '');
+
+      // Expand all parent folders in the path and set pendingJumpPath
       setSessions(prev => prev.map(s => {
         if (s.id !== actualActiveId) return s;
 
         // Build list of relative parent paths to expand
-        const pathParts = targetDir.replace(s.cwd, '').split('/').filter(Boolean);
+        const pathParts = relativePath.split('/').filter(Boolean);
         const expandPaths: string[] = [];
 
         let currentPath = '';
@@ -80,7 +82,9 @@ export const slashCommands: SlashCommand[] = [
 
         return {
           ...s,
-          fileExplorerExpanded: Array.from(newExpanded)
+          fileExplorerExpanded: Array.from(newExpanded),
+          // Set pending jump path - will be processed by App.tsx once flatFileList updates
+          pendingJumpPath: relativePath || ''
         };
       }));
     }

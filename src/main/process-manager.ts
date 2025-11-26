@@ -12,6 +12,7 @@ interface ProcessConfig {
   requiresPty?: boolean; // Whether this agent needs a pseudo-terminal
   prompt?: string; // For batch mode agents like Claude (passed as CLI argument)
   shell?: string; // Shell to use for terminal sessions (e.g., 'zsh', 'bash', 'fish')
+  images?: string[]; // Base64 data URLs for images (passed via stream-json input)
 }
 
 interface ManagedProcess {
@@ -23,8 +24,66 @@ interface ManagedProcess {
   pid: number;
   isTerminal: boolean;
   isBatchMode?: boolean; // True for agents that run in batch mode (exit after response)
+  isStreamJsonMode?: boolean; // True when using stream-json input/output (for images)
   jsonBuffer?: string; // Buffer for accumulating JSON output in batch mode
   lastCommand?: string; // Last command sent to terminal (for filtering command echoes)
+}
+
+/**
+ * Parse a data URL and extract base64 data and media type
+ */
+function parseDataUrl(dataUrl: string): { base64: string; mediaType: string } | null {
+  // Format: data:image/png;base64,iVBORw0KGgo...
+  const match = dataUrl.match(/^data:(image\/[^;]+);base64,(.+)$/);
+  if (!match) return null;
+  return {
+    mediaType: match[1],
+    base64: match[2],
+  };
+}
+
+/**
+ * Build a stream-json message for Claude Code with images and text
+ */
+function buildStreamJsonMessage(prompt: string, images: string[]): string {
+  // Build content array with images first, then text
+  const content: Array<{
+    type: 'image' | 'text';
+    text?: string;
+    source?: { type: 'base64'; media_type: string; data: string };
+  }> = [];
+
+  // Add images
+  for (const dataUrl of images) {
+    const parsed = parseDataUrl(dataUrl);
+    if (parsed) {
+      content.push({
+        type: 'image',
+        source: {
+          type: 'base64',
+          media_type: parsed.mediaType,
+          data: parsed.base64,
+        },
+      });
+    }
+  }
+
+  // Add text prompt
+  content.push({
+    type: 'text',
+    text: prompt,
+  });
+
+  // Build the stream-json message
+  const message = {
+    type: 'user',
+    message: {
+      role: 'user',
+      content,
+    },
+  };
+
+  return JSON.stringify(message);
 }
 
 export class ProcessManager extends EventEmitter {
@@ -34,16 +93,29 @@ export class ProcessManager extends EventEmitter {
    * Spawn a new process for a session
    */
   spawn(config: ProcessConfig): { pid: number; success: boolean } {
-    const { sessionId, toolType, cwd, command, args, requiresPty, prompt, shell } = config;
+    const { sessionId, toolType, cwd, command, args, requiresPty, prompt, shell, images } = config;
 
-    // For batch mode with prompt, append prompt to args with -- separator
-    // The -- ensures prompt is treated as positional arg, not a flag (even if it starts with --)
-    const finalArgs = prompt ? [...args, '--', prompt] : args;
+    // For batch mode with images, use stream-json mode and send message via stdin
+    // For batch mode without images, append prompt to args with -- separator
+    const hasImages = images && images.length > 0;
+    let finalArgs: string[];
+
+    if (hasImages && prompt) {
+      // Use stream-json mode for images - prompt will be sent via stdin
+      finalArgs = [...args, '--input-format', 'stream-json', '--output-format', 'stream-json', '-p'];
+    } else if (prompt) {
+      // Regular batch mode - prompt as CLI arg
+      // The -- ensures prompt is treated as positional arg, not a flag (even if it starts with --)
+      finalArgs = [...args, '--', prompt];
+    } else {
+      finalArgs = args;
+    }
 
     console.log('[ProcessManager] spawn() config:', {
       sessionId,
       toolType,
       hasPrompt: !!prompt,
+      hasImages,
       promptValue: prompt,
       baseArgs: args,
       finalArgs
@@ -128,13 +200,47 @@ export class ProcessManager extends EventEmitter {
         return { pid: ptyProcess.pid, success: true };
       } else {
         // Use regular child_process for AI tools (including batch mode)
+
+        // Fix PATH for Electron environment
+        // Electron's main process may have a limited PATH that doesn't include
+        // user-installed binaries like node, which is needed for #!/usr/bin/env node scripts
+        const env = { ...process.env };
+        const standardPaths = '/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin';
+        if (env.PATH) {
+          // Prepend standard paths if not already present
+          if (!env.PATH.includes('/opt/homebrew/bin')) {
+            env.PATH = `${standardPaths}:${env.PATH}`;
+          }
+        } else {
+          env.PATH = standardPaths;
+        }
+
+        console.log('[ProcessManager] About to spawn child process:', {
+          command,
+          finalArgs,
+          cwd,
+          PATH: env.PATH?.substring(0, 150),
+          hasStdio: 'default (pipe)'
+        });
+
         const childProcess = spawn(command, finalArgs, {
           cwd,
-          env: process.env,
+          env,
           shell: false, // Explicitly disable shell to prevent injection
+          stdio: ['pipe', 'pipe', 'pipe'], // Explicitly set stdio to pipe
+        });
+
+        console.log('[ProcessManager] Child process spawned:', {
+          pid: childProcess.pid,
+          hasStdout: !!childProcess.stdout,
+          hasStderr: !!childProcess.stderr,
+          hasStdin: !!childProcess.stdin,
+          killed: childProcess.killed,
+          exitCode: childProcess.exitCode
         });
 
         const isBatchMode = !!prompt;
+        const isStreamJsonMode = hasImages && !!prompt;
 
         const managedProcess: ManagedProcess = {
           sessionId,
@@ -144,41 +250,111 @@ export class ProcessManager extends EventEmitter {
           pid: childProcess.pid || -1,
           isTerminal: false,
           isBatchMode,
+          isStreamJsonMode,
           jsonBuffer: isBatchMode ? '' : undefined,
         };
 
         this.processes.set(sessionId, managedProcess);
 
+        console.log('[ProcessManager] Setting up stdout/stderr/exit handlers for session:', sessionId);
+        console.log('[ProcessManager] childProcess.stdout:', childProcess.stdout ? 'exists' : 'null');
+        console.log('[ProcessManager] childProcess.stderr:', childProcess.stderr ? 'exists' : 'null');
+
         // Handle stdout
-        childProcess.stdout?.on('data', (data: Buffer) => {
+        if (childProcess.stdout) {
+          console.log('[ProcessManager] Attaching stdout data listener...');
+          childProcess.stdout.setEncoding('utf8'); // Ensure proper encoding
+          childProcess.stdout.on('error', (err) => {
+            console.error('[ProcessManager] stdout error:', err);
+          });
+          childProcess.stdout.on('data', (data: Buffer | string) => {
+            console.log('[ProcessManager] >>> STDOUT EVENT FIRED <<<');
+            console.log('[ProcessManager] stdout event fired for session:', sessionId);
           const output = data.toString();
 
           console.log('[ProcessManager] stdout data received:', {
             sessionId,
             isBatchMode,
+            isStreamJsonMode,
             dataLength: output.length,
             dataPreview: output.substring(0, 200)
           });
 
-          if (isBatchMode) {
-            // In batch mode, accumulate JSON output
+          if (isStreamJsonMode) {
+            // In stream-json mode, each line is a JSONL message
+            // Accumulate and process complete lines
+            managedProcess.jsonBuffer = (managedProcess.jsonBuffer || '') + output;
+
+            // Process complete lines
+            const lines = managedProcess.jsonBuffer.split('\n');
+            // Keep the last incomplete line in the buffer
+            managedProcess.jsonBuffer = lines.pop() || '';
+
+            for (const line of lines) {
+              if (!line.trim()) continue;
+              try {
+                const msg = JSON.parse(line);
+                // Handle different message types from stream-json output
+                if (msg.type === 'assistant' && msg.message?.content) {
+                  // Extract text from content blocks
+                  const textContent = msg.message.content
+                    .filter((block: any) => block.type === 'text')
+                    .map((block: any) => block.text)
+                    .join('');
+                  if (textContent) {
+                    this.emit('data', sessionId, textContent);
+                  }
+                } else if (msg.type === 'result' && msg.result) {
+                  this.emit('data', sessionId, msg.result);
+                }
+                // Capture session_id from any message type
+                if (msg.session_id) {
+                  this.emit('session-id', sessionId, msg.session_id);
+                }
+              } catch (e) {
+                // If it's not valid JSON, emit as raw text
+                console.log('[ProcessManager] Non-JSON line in stream-json mode:', line.substring(0, 100));
+                this.emit('data', sessionId, line);
+              }
+            }
+          } else if (isBatchMode) {
+            // In regular batch mode, accumulate JSON output
             managedProcess.jsonBuffer = (managedProcess.jsonBuffer || '') + output;
             console.log('[ProcessManager] Accumulated JSON buffer length:', managedProcess.jsonBuffer.length);
           } else {
             // In interactive mode, emit data immediately
             this.emit('data', sessionId, output);
           }
-        });
+          });
+        } else {
+          console.log('[ProcessManager] WARNING: childProcess.stdout is null!');
+        }
 
         // Handle stderr
-        childProcess.stderr?.on('data', (data: Buffer) => {
-          this.emit('data', sessionId, `[stderr] ${data.toString()}`);
-        });
+        if (childProcess.stderr) {
+          console.log('[ProcessManager] Attaching stderr data listener...');
+          childProcess.stderr.setEncoding('utf8');
+          childProcess.stderr.on('error', (err) => {
+            console.error('[ProcessManager] stderr error:', err);
+          });
+          childProcess.stderr.on('data', (data: Buffer | string) => {
+            console.log('[ProcessManager] >>> STDERR EVENT FIRED <<<', data.toString().substring(0, 100));
+            this.emit('data', sessionId, `[stderr] ${data.toString()}`);
+          });
+        }
 
         // Handle exit
         childProcess.on('exit', (code) => {
-          if (isBatchMode && managedProcess.jsonBuffer) {
-            // Parse JSON response from batch mode
+          console.log('[ProcessManager] Child process exit event:', {
+            sessionId,
+            code,
+            isBatchMode,
+            isStreamJsonMode,
+            jsonBufferLength: managedProcess.jsonBuffer?.length || 0,
+            jsonBufferPreview: managedProcess.jsonBuffer?.substring(0, 200)
+          });
+          if (isBatchMode && !isStreamJsonMode && managedProcess.jsonBuffer) {
+            // Parse JSON response from regular batch mode (not stream-json)
             try {
               const jsonResponse = JSON.parse(managedProcess.jsonBuffer);
 
@@ -214,6 +390,24 @@ export class ProcessManager extends EventEmitter {
           this.emit('data', sessionId, `[error] ${error.message}`);
           this.processes.delete(sessionId);
         });
+
+        // Handle stdin for batch mode
+        if (isStreamJsonMode && prompt && images) {
+          // Stream-json mode with images: send the message via stdin
+          const streamJsonMessage = buildStreamJsonMessage(prompt, images);
+          console.log('[ProcessManager] Sending stream-json message with images:', {
+            sessionId,
+            messageLength: streamJsonMessage.length,
+            imageCount: images.length
+          });
+          childProcess.stdin?.write(streamJsonMessage + '\n');
+          childProcess.stdin?.end(); // Signal end of input
+        } else if (isBatchMode) {
+          // Regular batch mode: close stdin immediately since prompt is passed as CLI arg
+          // Some CLIs wait for stdin to close before processing
+          console.log('[ProcessManager] Closing stdin for batch mode (prompt passed as CLI arg)');
+          childProcess.stdin?.end();
+        }
 
         return { pid: childProcess.pid || -1, success: true };
       }

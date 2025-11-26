@@ -98,6 +98,8 @@ export interface Session {
   scratchPadMode?: 'edit' | 'preview';
   // Claude Code session ID for conversation continuity
   claudeSessionId?: string;
+  // Pending jump path for /jump command (relative path within file tree)
+  pendingJumpPath?: string;
 }
 
 export interface Group {

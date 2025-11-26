@@ -9,6 +9,7 @@ interface ProcessConfig {
   args: string[];
   prompt?: string;
   shell?: string;
+  images?: string[]; // Base64 data URLs for images
 }
 
 interface AgentConfig {

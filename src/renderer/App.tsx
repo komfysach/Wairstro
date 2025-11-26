@@ -234,21 +234,23 @@ export default function MaestroConsole() {
 
       if (!isClaudeBatchMode) {
         // Only spawn for non-batch-mode agents
+        // Use agent.path (full path) if available for better cross-environment compatibility
         aiSpawnResult = await window.maestro.process.spawn({
           sessionId: `${correctedSession.id}-ai`,
           toolType: aiAgentType,
           cwd: correctedSession.cwd,
-          command: agent.command,
+          command: agent.path || agent.command,
           args: agent.args || []
         });
       }
 
       // 2. Spawn terminal process
+      // Use terminalAgent.path (full path) if available
       const terminalSpawnResult = await window.maestro.process.spawn({
         sessionId: `${correctedSession.id}-terminal`,
         toolType: 'terminal',
         cwd: correctedSession.cwd,
-        command: terminalAgent.command,
+        command: terminalAgent.path || terminalAgent.command,
         args: terminalAgent.args || []
       });
 
@@ -1145,11 +1147,12 @@ export default function MaestroConsole() {
     // Spawn BOTH processes - this is the dual-process architecture
     try {
       // 1. Spawn AI agent process
+      // Use agent.path (full path) if available for better cross-environment compatibility
       const aiSpawnResult = await window.maestro.process.spawn({
         sessionId: `${newId}-ai`,
         toolType: agentId,
         cwd: workingDir,
-        command: agent.command,
+        command: agent.path || agent.command,
         args: agent.args || []
       });
 
@@ -1158,11 +1161,12 @@ export default function MaestroConsole() {
       }
 
       // 2. Spawn terminal process
+      // Use terminalAgent.path (full path) if available
       const terminalSpawnResult = await window.maestro.process.spawn({
         sessionId: `${newId}-terminal`,
         toolType: 'terminal',
         cwd: workingDir,
-        command: terminalAgent.command,
+        command: terminalAgent.path || terminalAgent.command,
         args: terminalAgent.args || []
       });
 
@@ -1449,8 +1453,9 @@ export default function MaestroConsole() {
       })();
     }
 
-    // Capture input value before clearing (needed for async batch mode spawn)
+    // Capture input value and images before clearing (needed for async batch mode spawn)
     const capturedInputValue = inputValue;
+    const capturedImages = [...stagedImages];
 
     setInputValue('');
     setStagedImages([]);
@@ -1500,13 +1505,18 @@ export default function MaestroConsole() {
           }
 
           // Spawn Claude with prompt as argument (use captured value)
+          // If images are present, they will be passed via stream-json input format
+          // Use agent.path (full path) if available, otherwise fall back to agent.command
+          const commandToUse = agent.path || agent.command;
+          console.log('[processInput] Spawning Claude:', { command: commandToUse, path: agent.path, fallback: agent.command });
           await window.maestro.process.spawn({
             sessionId: targetSessionId,
             toolType: 'claude-code',
             cwd: activeSession.cwd,
-            command: agent.command,
+            command: commandToUse,
             args: spawnArgs,
-            prompt: capturedInputValue
+            prompt: capturedInputValue,
+            images: capturedImages.length > 0 ? capturedImages : undefined
           });
         } catch (error) {
           console.error('Failed to spawn Claude batch process:', error);
@@ -1897,6 +1907,46 @@ export default function MaestroConsole() {
     setFlatFileList(flattenTree(filteredFileTree, expandedSet));
   }, [activeSession?.fileExplorerExpanded, filteredFileTree]);
 
+  // Handle pending jump path from /jump command
+  useEffect(() => {
+    if (!activeSession || activeSession.pendingJumpPath === undefined || flatFileList.length === 0) return;
+
+    const jumpPath = activeSession.pendingJumpPath;
+
+    // Find the target index
+    let targetIndex = 0;
+
+    if (jumpPath === '') {
+      // Jump to root - select first item
+      targetIndex = 0;
+    } else {
+      // Find the folder in the flat list, then select its first child
+      const folderIndex = flatFileList.findIndex(item => item.fullPath === jumpPath && item.isFolder);
+
+      if (folderIndex !== -1 && folderIndex + 1 < flatFileList.length) {
+        // Check if the next item is a child of this folder
+        const nextItem = flatFileList[folderIndex + 1];
+        if (nextItem.fullPath.startsWith(jumpPath + '/')) {
+          // Select the first child
+          targetIndex = folderIndex + 1;
+        } else {
+          // Folder has no visible children, select the folder itself
+          targetIndex = folderIndex;
+        }
+      } else if (folderIndex !== -1) {
+        // Folder found but no children, select the folder
+        targetIndex = folderIndex;
+      }
+      // If folder not found, stay at 0
+    }
+
+    setSelectedFileIndex(targetIndex);
+
+    // Clear the pending jump path
+    setSessions(prev => prev.map(s =>
+      s.id === activeSession.id ? { ...s, pendingJumpPath: undefined } : s
+    ));
+  }, [activeSession?.pendingJumpPath, flatFileList, activeSession?.id]);
 
   // Scroll to selected file item when selection changes
   useEffect(() => {
@@ -2218,9 +2268,10 @@ export default function MaestroConsole() {
         onResumeClaudeSession={(claudeSessionId: string, messages: LogEntry[]) => {
           // Update the active session with the selected Claude session ID and load messages
           // Also reset state to 'idle' since we're just loading historical messages
+          // Switch to AI mode since we're resuming an AI session
           if (activeSession) {
             setSessions(prev => prev.map(s =>
-              s.id === activeSession.id ? { ...s, claudeSessionId, aiLogs: messages, state: 'idle' } : s
+              s.id === activeSession.id ? { ...s, claudeSessionId, aiLogs: messages, state: 'idle', inputMode: 'ai' } : s
             ));
             setActiveClaudeSessionId(claudeSessionId);
           }

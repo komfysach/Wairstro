@@ -35,7 +35,6 @@ interface AgentSessionsBrowserProps {
   activeSession: Session | undefined;
   activeClaudeSessionId: string | null;
   onClose: () => void;
-  onSelectSession: (claudeSessionId: string) => void;
   onResumeSession: (claudeSessionId: string, messages: LogEntry[]) => void;
   onNewSession: () => void;
 }
@@ -45,7 +44,6 @@ export function AgentSessionsBrowser({
   activeSession,
   activeClaudeSessionId,
   onClose,
-  onSelectSession,
   onResumeSession,
   onNewSession,
 }: AgentSessionsBrowserProps) {
@@ -171,6 +169,13 @@ export function AgentSessionsBrowser({
 
       if (offset === 0) {
         setMessages(result.messages);
+        // Scroll to bottom after initial load and focus the container for keyboard nav
+        requestAnimationFrame(() => {
+          if (messagesContainerRef.current) {
+            messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+            messagesContainerRef.current.focus();
+          }
+        });
       } else {
         // Prepend older messages
         setMessages(prev => [...result.messages, ...prev]);
@@ -272,6 +277,10 @@ export function AgentSessionsBrowser({
         e.preventDefault();
         setViewingSession(null);
         setMessages([]);
+      } else if (e.key === 'Enter') {
+        // Enter in session details view resumes the session
+        e.preventDefault();
+        handleResume();
       }
       return;
     }
@@ -294,14 +303,7 @@ export function AgentSessionsBrowser({
     }
   };
 
-  // Handle selecting/resuming a session
-  const handleSelect = useCallback(() => {
-    if (viewingSession) {
-      onSelectSession(viewingSession.sessionId);
-      onClose();
-    }
-  }, [viewingSession, onSelectSession, onClose]);
-
+  // Handle resuming a session
   const handleResume = useCallback(() => {
     if (viewingSession) {
       // Convert messages to LogEntry format for AI terminal
@@ -388,30 +390,17 @@ export function AgentSessionsBrowser({
 
         <div className="flex items-center gap-2">
           {viewingSession ? (
-            <>
-              <button
-                onClick={handleSelect}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors hover:opacity-80"
-                style={{
-                  backgroundColor: theme.colors.bgActivity,
-                  color: theme.colors.textMain,
-                  border: `1px solid ${theme.colors.border}`,
-                }}
-              >
-                Select
-              </button>
-              <button
-                onClick={handleResume}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors hover:opacity-80"
-                style={{
-                  backgroundColor: theme.colors.accent,
-                  color: theme.colors.accentText,
-                }}
-              >
-                <Play className="w-4 h-4" />
-                Resume
-              </button>
-            </>
+            <button
+              onClick={handleResume}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors hover:opacity-80"
+              style={{
+                backgroundColor: theme.colors.accent,
+                color: theme.colors.accentText,
+              }}
+            >
+              <Play className="w-4 h-4" />
+              Resume
+            </button>
           ) : (
             <button
               onClick={onNewSession}
@@ -439,8 +428,10 @@ export function AgentSessionsBrowser({
       {viewingSession ? (
         <div
           ref={messagesContainerRef}
-          className="flex-1 overflow-y-auto p-6 space-y-4"
+          className="flex-1 overflow-y-auto p-6 space-y-4 outline-none"
           onScroll={handleMessagesScroll}
+          onKeyDown={handleKeyDown}
+          tabIndex={0}
         >
           {/* Load more indicator */}
           {hasMoreMessages && (
