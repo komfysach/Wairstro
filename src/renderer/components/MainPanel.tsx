@@ -534,13 +534,11 @@ export function MainPanel(props: MainPanelProps) {
 
                       <div className="border-t pt-2 mt-2" style={{ borderColor: theme.colors.border }}>
                         <div className="flex justify-between items-center">
-                          <span className="text-xs font-bold" style={{ color: theme.colors.textDim }}>Total Tokens</span>
+                          <span className="text-xs font-bold" style={{ color: theme.colors.textDim }}>Context Tokens</span>
                           <span className="text-xs font-mono font-bold" style={{ color: theme.colors.accent }}>
                             {(
                               activeSession.usageStats.inputTokens +
-                              activeSession.usageStats.outputTokens +
-                              activeSession.usageStats.cacheReadInputTokens +
-                              activeSession.usageStats.cacheCreationInputTokens
+                              activeSession.usageStats.outputTokens
                             ).toLocaleString()}
                           </span>
                         </div>

@@ -714,10 +714,14 @@ export default function MaestroConsole() {
       setSessions(prev => prev.map(s => {
         if (s.id !== actualSessionId) return s;
 
-        // Calculate total tokens used for context percentage
-        const totalTokens = usageStats.inputTokens + usageStats.outputTokens +
-                          usageStats.cacheReadInputTokens + usageStats.cacheCreationInputTokens;
-        const contextPercentage = Math.min(Math.round((totalTokens / usageStats.contextWindow) * 100), 100);
+        // Calculate context window usage percentage
+        // For a conversation, context contains all inputs and outputs
+        // inputTokens = full input token count (already includes cache hits)
+        // outputTokens = response tokens (become part of context in follow-up turns)
+        // Note: cache tokens are about billing optimization, not context size
+        // The actual context footprint is input + output tokens
+        const contextTokens = usageStats.inputTokens + usageStats.outputTokens;
+        const contextPercentage = Math.min(Math.round((contextTokens / usageStats.contextWindow) * 100), 100);
 
         // Accumulate cost if there's already usage stats
         const existingCost = s.usageStats?.totalCostUsd || 0;
