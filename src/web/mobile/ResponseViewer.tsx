@@ -9,6 +9,7 @@
  * - Copy button for each code block with visual feedback (task 1.34)
  * - Monospace font for code readability
  * - Swipe down to dismiss (task 1.35)
+ * - Swipe left/right to navigate between responses (task 1.36)
  * - Share/copy functionality (task 1.31)
  * - Scroll to read long responses
  *
@@ -24,13 +25,31 @@ import type { LastResponsePreview } from '../hooks/useSessions';
 import { triggerHaptic, HAPTIC_PATTERNS } from './index';
 
 /**
+ * Represents a response item that can be navigated to
+ */
+export interface ResponseItem {
+  /** The response preview data */
+  response: LastResponsePreview;
+  /** Session ID this response belongs to */
+  sessionId: string;
+  /** Session name for display */
+  sessionName: string;
+}
+
+/**
  * Props for ResponseViewer component
  */
 export interface ResponseViewerProps {
   /** Whether the viewer is currently open */
   isOpen: boolean;
-  /** The response data to display (preview data) */
+  /** The response data to display (preview data) - used for single response mode */
   response: LastResponsePreview | null;
+  /** All responses available for navigation (optional - enables swipe navigation) */
+  allResponses?: ResponseItem[];
+  /** Index of the currently selected response in allResponses array */
+  currentIndex?: number;
+  /** Callback when navigating to a different response */
+  onNavigate?: (index: number) => void;
   /** The full response text (fetched from server) */
   fullText?: string | null;
   /** Whether full text is currently loading */
@@ -195,11 +214,14 @@ function parseTextWithCodeBlocks(text: string): TextSegment[] {
  * ResponseViewer component
  *
  * Renders a full-screen modal overlay for viewing complete AI responses.
- * Supports swipe-down gesture to dismiss.
+ * Supports swipe-down gesture to dismiss and swipe left/right to navigate.
  */
 export function ResponseViewer({
   isOpen,
   response,
+  allResponses,
+  currentIndex = 0,
+  onNavigate,
   fullText,
   isLoading = false,
   onClose,
@@ -208,11 +230,38 @@ export function ResponseViewer({
   const colors = useThemeColors();
   const { isDark } = useTheme();
   const contentRef = useRef<HTMLDivElement>(null);
-  const [touchStart, setTouchStart] = useState<number | null>(null);
-  const [touchDelta, setTouchDelta] = useState(0);
-  const [isDragging, setIsDragging] = useState(false);
+  // Vertical swipe state (for dismiss)
+  const [touchStartY, setTouchStartY] = useState<number | null>(null);
+  const [touchDeltaY, setTouchDeltaY] = useState(0);
+  const [isDraggingY, setIsDraggingY] = useState(false);
+  // Horizontal swipe state (for navigation)
+  const [touchStartX, setTouchStartX] = useState<number | null>(null);
+  const [touchDeltaX, setTouchDeltaX] = useState(0);
+  const [isDraggingX, setIsDraggingX] = useState(false);
+  const [swipeDirection, setSwipeDirection] = useState<'horizontal' | 'vertical' | null>(null);
   // Track which code block was recently copied (by index) for visual feedback
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+
+  // Determine if navigation is enabled
+  const canNavigate = allResponses && allResponses.length > 1 && onNavigate;
+  const canGoLeft = canNavigate && currentIndex > 0;
+  const canGoRight = canNavigate && currentIndex < allResponses.length - 1;
+
+  // Get the active response (from allResponses if available, otherwise from response prop)
+  const activeResponse = useMemo(() => {
+    if (allResponses && allResponses.length > 0 && currentIndex >= 0 && currentIndex < allResponses.length) {
+      return allResponses[currentIndex].response;
+    }
+    return response;
+  }, [allResponses, currentIndex, response]);
+
+  // Get the active session name
+  const activeSessionName = useMemo(() => {
+    if (allResponses && allResponses.length > 0 && currentIndex >= 0 && currentIndex < allResponses.length) {
+      return allResponses[currentIndex].sessionName;
+    }
+    return sessionName;
+  }, [allResponses, currentIndex, sessionName]);
 
   // Copy code block content to clipboard
   const copyCodeBlock = useCallback(async (content: string, index: number) => {
@@ -235,49 +284,117 @@ export function ResponseViewer({
 
   // Threshold for swipe-to-dismiss (pixels)
   const DISMISS_THRESHOLD = 100;
+  // Threshold for swipe navigation (pixels)
+  const NAVIGATE_THRESHOLD = 80;
+  // Minimum movement to determine swipe direction
+  const DIRECTION_THRESHOLD = 10;
 
-  // Handle touch start for swipe-to-dismiss
+  // Handle touch start for swipe gestures
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    // Only track swipe if at the top of the content
+    const touch = e.touches[0];
+    setTouchStartX(touch.clientX);
+    setTouchStartY(touch.clientY);
+    setSwipeDirection(null);
+
+    // Only enable vertical dismiss if at top of content
     if (contentRef.current && contentRef.current.scrollTop === 0) {
-      setTouchStart(e.touches[0].clientY);
-      setIsDragging(true);
+      setIsDraggingY(true);
     }
-  }, []);
 
-  // Handle touch move for swipe-to-dismiss
+    // Always enable horizontal navigation if available
+    if (canNavigate) {
+      setIsDraggingX(true);
+    }
+  }, [canNavigate]);
+
+  // Handle touch move for swipe gestures
   const handleTouchMove = useCallback((e: React.TouchEvent) => {
-    if (touchStart === null || !isDragging) return;
+    if (touchStartX === null || touchStartY === null) return;
 
-    const currentY = e.touches[0].clientY;
-    const delta = currentY - touchStart;
+    const touch = e.touches[0];
+    const deltaX = touch.clientX - touchStartX;
+    const deltaY = touch.clientY - touchStartY;
 
-    // Only allow downward swipe
-    if (delta > 0) {
-      setTouchDelta(delta);
-      // Prevent scroll while swiping
+    // Determine swipe direction if not already set
+    if (swipeDirection === null) {
+      const absX = Math.abs(deltaX);
+      const absY = Math.abs(deltaY);
+
+      if (absX > DIRECTION_THRESHOLD || absY > DIRECTION_THRESHOLD) {
+        if (absX > absY && isDraggingX && canNavigate) {
+          setSwipeDirection('horizontal');
+          setIsDraggingY(false);
+        } else if (absY > absX && isDraggingY) {
+          setSwipeDirection('vertical');
+          setIsDraggingX(false);
+        }
+      }
+    }
+
+    // Handle horizontal swipe for navigation
+    if (swipeDirection === 'horizontal' && isDraggingX) {
+      // Limit swipe if can't go in that direction
+      let constrainedDeltaX = deltaX;
+      if (deltaX > 0 && !canGoLeft) {
+        constrainedDeltaX = Math.min(deltaX, 50); // Elastic resistance
+      } else if (deltaX < 0 && !canGoRight) {
+        constrainedDeltaX = Math.max(deltaX, -50); // Elastic resistance
+      }
+      setTouchDeltaX(constrainedDeltaX);
       e.preventDefault();
     }
-  }, [touchStart, isDragging]);
 
-  // Handle touch end for swipe-to-dismiss
+    // Handle vertical swipe for dismiss
+    if (swipeDirection === 'vertical' && isDraggingY && deltaY > 0) {
+      setTouchDeltaY(deltaY);
+      e.preventDefault();
+    }
+  }, [touchStartX, touchStartY, swipeDirection, isDraggingX, isDraggingY, canNavigate, canGoLeft, canGoRight]);
+
+  // Handle touch end for swipe gestures
   const handleTouchEnd = useCallback(() => {
-    if (touchDelta > DISMISS_THRESHOLD) {
-      // Dismiss the viewer
+    // Handle vertical swipe (dismiss)
+    if (swipeDirection === 'vertical' && touchDeltaY > DISMISS_THRESHOLD) {
       triggerHaptic(HAPTIC_PATTERNS.tap);
       onClose();
     }
-    // Reset touch state
-    setTouchStart(null);
-    setTouchDelta(0);
-    setIsDragging(false);
-  }, [touchDelta, onClose]);
 
-  // Handle escape key to close
+    // Handle horizontal swipe (navigation)
+    if (swipeDirection === 'horizontal' && canNavigate && onNavigate) {
+      if (touchDeltaX > NAVIGATE_THRESHOLD && canGoLeft) {
+        // Swipe right to go to previous response
+        triggerHaptic(HAPTIC_PATTERNS.tap);
+        onNavigate(currentIndex - 1);
+      } else if (touchDeltaX < -NAVIGATE_THRESHOLD && canGoRight) {
+        // Swipe left to go to next response
+        triggerHaptic(HAPTIC_PATTERNS.tap);
+        onNavigate(currentIndex + 1);
+      }
+    }
+
+    // Reset all touch state
+    setTouchStartX(null);
+    setTouchStartY(null);
+    setTouchDeltaX(0);
+    setTouchDeltaY(0);
+    setIsDraggingX(false);
+    setIsDraggingY(false);
+    setSwipeDirection(null);
+  }, [swipeDirection, touchDeltaY, touchDeltaX, onClose, canNavigate, onNavigate, currentIndex, canGoLeft, canGoRight]);
+
+  // Handle keyboard navigation (Escape to close, Arrow keys to navigate)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen) {
+      if (!isOpen) return;
+
+      if (e.key === 'Escape') {
         onClose();
+      } else if (e.key === 'ArrowLeft' && canGoLeft && onNavigate) {
+        triggerHaptic(HAPTIC_PATTERNS.tap);
+        onNavigate(currentIndex - 1);
+      } else if (e.key === 'ArrowRight' && canGoRight && onNavigate) {
+        triggerHaptic(HAPTIC_PATTERNS.tap);
+        onNavigate(currentIndex + 1);
       }
     };
 
@@ -291,24 +408,33 @@ export function ResponseViewer({
       document.removeEventListener('keydown', handleKeyDown);
       document.body.style.overflow = '';
     };
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, canGoLeft, canGoRight, onNavigate, currentIndex]);
 
   // Don't render if not open
-  if (!isOpen || !response) {
+  if (!isOpen || (!response && !activeResponse)) {
+    return null;
+  }
+
+  // Use the active response for display
+  const displayResponse = activeResponse || response;
+  if (!displayResponse) {
     return null;
   }
 
   // Display text - use full text if available, otherwise preview
-  const displayText = fullText || response.text;
-  const hasMoreContent = !fullText && response.fullLength > response.text.length;
+  const displayText = fullText || displayResponse.text;
+  const hasMoreContent = !fullText && displayResponse.fullLength > displayResponse.text.length;
 
   // Parse the display text to extract code blocks for syntax highlighting
-  const parsedSegments = useMemo(() => {
-    return parseTextWithCodeBlocks(displayText);
-  }, [displayText]);
+  const parsedSegments = parseTextWithCodeBlocks(displayText);
 
-  // Calculate opacity based on swipe progress
-  const backdropOpacity = Math.max(0, 1 - touchDelta / (DISMISS_THRESHOLD * 2));
+  // Calculate opacity based on swipe progress (vertical for dismiss)
+  const backdropOpacity = Math.max(0, 1 - touchDeltaY / (DISMISS_THRESHOLD * 2));
+
+  // Determine if currently swiping
+  const isSwipingVertical = swipeDirection === 'vertical' && isDraggingY;
+  const isSwipingHorizontal = swipeDirection === 'horizontal' && isDraggingX;
+  const isAnySwipe = isSwipingVertical || isSwipingHorizontal;
 
   return (
     <div
@@ -322,8 +448,8 @@ export function ResponseViewer({
         display: 'flex',
         flexDirection: 'column',
         backgroundColor: `rgba(0, 0, 0, ${0.9 * backdropOpacity})`,
-        transform: `translateY(${touchDelta}px)`,
-        transition: isDragging ? 'none' : 'transform 0.3s ease-out, background-color 0.3s ease-out',
+        transform: `translate(${touchDeltaX}px, ${touchDeltaY}px)`,
+        transition: isAnySwipe ? 'none' : 'transform 0.3s ease-out, background-color 0.3s ease-out',
       }}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
@@ -371,7 +497,7 @@ export function ResponseViewer({
               gap: '8px',
             }}
           >
-            {sessionName && (
+            {activeSessionName && (
               <span
                 style={{
                   overflow: 'hidden',
@@ -379,11 +505,11 @@ export function ResponseViewer({
                   whiteSpace: 'nowrap',
                 }}
               >
-                {sessionName}
+                {activeSessionName}
               </span>
             )}
             <span style={{ opacity: 0.7 }}>
-              {formatTimestamp(response.timestamp)}
+              {formatTimestamp(displayResponse.timestamp)}
             </span>
           </div>
         </div>
@@ -612,7 +738,7 @@ export function ResponseViewer({
                   textAlign: 'center',
                 }}
               >
-                Showing preview ({response.text.length} of {response.fullLength} characters).
+                Showing preview ({displayResponse.text.length} of {displayResponse.fullLength} characters).
                 <br />
                 Full response loading not available.
               </div>
@@ -629,18 +755,61 @@ export function ResponseViewer({
           backgroundColor: colors.bgSidebar,
           borderTop: `1px solid ${colors.border}`,
           display: 'flex',
-          justifyContent: 'center',
-          gap: '12px',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '8px',
           flexShrink: 0,
         }}
       >
+        {/* Pagination dots when navigation is available */}
+        {canNavigate && allResponses && (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
+            }}
+            aria-label={`Response ${currentIndex + 1} of ${allResponses.length}`}
+          >
+            {allResponses.map((_, index) => (
+              <button
+                key={index}
+                onClick={() => {
+                  if (onNavigate) {
+                    triggerHaptic(HAPTIC_PATTERNS.tap);
+                    onNavigate(index);
+                  }
+                }}
+                style={{
+                  width: index === currentIndex ? '16px' : '8px',
+                  height: '8px',
+                  borderRadius: '4px',
+                  backgroundColor: index === currentIndex
+                    ? colors.accent
+                    : `${colors.textDim}40`,
+                  border: 'none',
+                  padding: 0,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                }}
+                aria-label={`Go to response ${index + 1}`}
+                aria-current={index === currentIndex ? 'true' : undefined}
+              />
+            ))}
+          </div>
+        )}
+
+        {/* Navigation hint text */}
         <span
           style={{
             fontSize: '11px',
             color: colors.textDim,
           }}
         >
-          Swipe down to dismiss
+          {canNavigate
+            ? 'Swipe left/right to navigate • Swipe down to dismiss'
+            : 'Swipe down to dismiss'}
         </span>
       </footer>
     </div>

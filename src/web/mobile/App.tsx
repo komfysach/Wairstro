@@ -7,7 +7,7 @@
  * Phase 1 implementation will expand this component.
  */
 
-import React, { useEffect, useCallback, useState } from 'react';
+import React, { useEffect, useCallback, useState, useMemo } from 'react';
 import { useThemeColors } from '../components/ThemeProvider';
 import { useWebSocket, type WebSocketState } from '../hooks/useWebSocket';
 import { useCommandHistory } from '../hooks/useCommandHistory';
@@ -22,7 +22,7 @@ import { CommandInputBar, type InputMode } from './CommandInputBar';
 import { CommandHistoryDrawer } from './CommandHistoryDrawer';
 import { RecentCommandChips } from './RecentCommandChips';
 import { SessionStatusBanner } from './SessionStatusBanner';
-import { ResponseViewer } from './ResponseViewer';
+import { ResponseViewer, type ResponseItem } from './ResponseViewer';
 import type { Session, LastResponsePreview } from '../hooks/useSessions';
 
 /**
@@ -144,6 +144,7 @@ export default function MobileApp() {
   const [showHistoryDrawer, setShowHistoryDrawer] = useState(false);
   const [showResponseViewer, setShowResponseViewer] = useState(false);
   const [selectedResponse, setSelectedResponse] = useState<LastResponsePreview | null>(null);
+  const [responseIndex, setResponseIndex] = useState(0);
 
   // Command history hook
   const {
@@ -358,13 +359,42 @@ export default function MobileApp() {
     // Haptic feedback is provided by the drawer
   }, []);
 
+  // Collect all responses from sessions for navigation
+  const allResponses = useMemo((): ResponseItem[] => {
+    return sessions
+      .filter(s => (s as any).lastResponse)
+      .map(s => ({
+        response: (s as any).lastResponse as LastResponsePreview,
+        sessionId: s.id,
+        sessionName: s.name,
+      }))
+      // Sort by timestamp (most recent first)
+      .sort((a, b) => b.response.timestamp - a.response.timestamp);
+  }, [sessions]);
+
   // Handle expanding response to full-screen viewer
   const handleExpandResponse = useCallback((response: LastResponsePreview) => {
     setSelectedResponse(response);
+
+    // Find the index of this response in allResponses
+    const index = allResponses.findIndex(
+      item => item.response.timestamp === response.timestamp
+    );
+    setResponseIndex(index >= 0 ? index : 0);
+
     setShowResponseViewer(true);
     triggerHaptic(HAPTIC_PATTERNS.tap);
-    console.log('[Mobile] Opening response viewer');
-  }, []);
+    console.log('[Mobile] Opening response viewer at index:', index);
+  }, [allResponses]);
+
+  // Handle navigating between responses in the viewer
+  const handleNavigateResponse = useCallback((index: number) => {
+    if (index >= 0 && index < allResponses.length) {
+      setResponseIndex(index);
+      setSelectedResponse(allResponses[index].response);
+      console.log('[Mobile] Navigating to response index:', index);
+    }
+  }, [allResponses]);
 
   // Handle closing response viewer
   const handleCloseResponseViewer = useCallback(() => {
@@ -640,6 +670,9 @@ export default function MobileApp() {
       <ResponseViewer
         isOpen={showResponseViewer}
         response={selectedResponse}
+        allResponses={allResponses.length > 1 ? allResponses : undefined}
+        currentIndex={responseIndex}
+        onNavigate={handleNavigateResponse}
         onClose={handleCloseResponseViewer}
         sessionName={activeSession?.name}
       />
