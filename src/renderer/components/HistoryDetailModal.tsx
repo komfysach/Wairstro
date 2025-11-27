@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { X, Bot, User, ExternalLink, Copy, Check, CheckCircle, XCircle } from 'lucide-react';
+import { X, Bot, User, ExternalLink, Copy, Check, CheckCircle, XCircle, Trash2 } from 'lucide-react';
 import type { Theme, HistoryEntry } from '../types';
 import { useLayerStack } from '../contexts/LayerStackContext';
 import { MODAL_PRIORITIES } from '../constants/modalPriorities';
@@ -9,6 +9,7 @@ interface HistoryDetailModalProps {
   entry: HistoryEntry;
   onClose: () => void;
   onJumpToClaudeSession?: (claudeSessionId: string) => void;
+  onDelete?: (entryId: string) => void;
 }
 
 // Get context bar color based on usage percentage
@@ -22,13 +23,15 @@ export function HistoryDetailModal({
   theme,
   entry,
   onClose,
-  onJumpToClaudeSession
+  onJumpToClaudeSession,
+  onDelete
 }: HistoryDetailModalProps) {
   const { registerLayer, unregisterLayer, updateLayerHandler } = useLayerStack();
   const layerIdRef = useRef<string>();
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
   const [copiedSessionId, setCopiedSessionId] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // Register layer on mount
   useEffect(() => {
@@ -237,9 +240,24 @@ export function HistoryDetailModal({
 
         {/* Footer */}
         <div
-          className="flex justify-end px-6 py-4 border-t shrink-0"
+          className="flex justify-between px-6 py-4 border-t shrink-0"
           style={{ borderColor: theme.colors.border }}
         >
+          {/* Delete button */}
+          <button
+            onClick={() => setShowDeleteConfirm(true)}
+            className="flex items-center gap-2 px-3 py-2 rounded text-sm font-medium transition-colors hover:opacity-90"
+            style={{
+              backgroundColor: theme.colors.error + '20',
+              color: theme.colors.error,
+              border: `1px solid ${theme.colors.error}40`
+            }}
+            title="Delete this history entry"
+          >
+            <Trash2 className="w-4 h-4" />
+            Delete
+          </button>
+
           <button
             onClick={onClose}
             className="px-4 py-2 rounded text-sm font-medium transition-colors hover:opacity-90"
@@ -252,6 +270,66 @@ export function HistoryDetailModal({
           </button>
         </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div
+          className="fixed inset-0 flex items-center justify-center z-[10001]"
+          onClick={() => setShowDeleteConfirm(false)}
+        >
+          <div className="absolute inset-0 bg-black/60" />
+          <div
+            className="relative w-[400px] border rounded-lg shadow-2xl overflow-hidden"
+            style={{
+              backgroundColor: theme.colors.bgSidebar,
+              borderColor: theme.colors.border
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              className="p-4 border-b flex items-center justify-between"
+              style={{ borderColor: theme.colors.border }}
+            >
+              <h2 className="text-sm font-bold" style={{ color: theme.colors.textMain }}>
+                Delete History Entry
+              </h2>
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                style={{ color: theme.colors.textDim }}
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-6">
+              <p className="text-sm leading-relaxed" style={{ color: theme.colors.textMain }}>
+                Are you sure you want to delete this {entry.type === 'AUTO' ? 'auto' : 'user'} history entry? This action cannot be undone.
+              </p>
+              <div className="mt-6 flex justify-end gap-2">
+                <button
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className="px-4 py-2 rounded border hover:bg-white/5 transition-colors"
+                  style={{ borderColor: theme.colors.border, color: theme.colors.textMain }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    if (onDelete) {
+                      onDelete(entry.id);
+                    }
+                    setShowDeleteConfirm(false);
+                    onClose();
+                  }}
+                  className="px-4 py-2 rounded text-white"
+                  style={{ backgroundColor: theme.colors.error }}
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

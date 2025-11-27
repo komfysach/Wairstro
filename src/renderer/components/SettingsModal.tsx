@@ -521,7 +521,7 @@ export function SettingsModal(props: SettingsModalProps) {
       aria-modal="true"
       aria-label="Settings"
     >
-      <div className="w-[600px] h-[500px] rounded-xl border shadow-2xl overflow-hidden flex flex-col"
+      <div className="w-[800px] h-[600px] rounded-xl border shadow-2xl overflow-hidden flex flex-col"
            style={{ backgroundColor: theme.colors.bgSidebar, borderColor: theme.colors.border }}>
 
         <div className="flex border-b" style={{ borderColor: theme.colors.border }}>
@@ -1430,7 +1430,7 @@ export function SettingsModal(props: SettingsModalProps) {
                       style={{ borderColor: theme.colors.border, color: theme.colors.textMain }}
                     />
                     <button
-                      onClick={() => window.maestro.notification.speak('Howdy from Maestro', props.audioFeedbackCommand)}
+                      onClick={() => window.maestro.notification.speak("Howdy, I'm Maestro, here to conduct your agentic tools into a well-tuned symphony.", props.audioFeedbackCommand)}
                       className="px-3 py-2 rounded text-xs font-medium transition-all"
                       style={{
                         backgroundColor: theme.colors.bgActivity,

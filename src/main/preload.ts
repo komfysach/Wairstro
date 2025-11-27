@@ -135,6 +135,13 @@ contextBridge.exposeInMainWorld('maestro', {
     getUrl: () => ipcRenderer.invoke('webserver:getUrl'),
   },
 
+  // Tunnel API - per-session local web server
+  tunnel: {
+    start: (sessionId: string) => ipcRenderer.invoke('tunnel:start', sessionId),
+    stop: (sessionId: string) => ipcRenderer.invoke('tunnel:stop', sessionId),
+    getStatus: (sessionId: string) => ipcRenderer.invoke('tunnel:getStatus', sessionId),
+  },
+
   // Agent API
   agents: {
     detect: () => ipcRenderer.invoke('agents:detect'),
@@ -222,6 +229,8 @@ contextBridge.exposeInMainWorld('maestro', {
       ipcRenderer.invoke('history:add', entry),
     clear: (projectPath?: string) =>
       ipcRenderer.invoke('history:clear', projectPath),
+    delete: (entryId: string) =>
+      ipcRenderer.invoke('history:delete', entryId),
   },
 
   // Notification API
@@ -302,6 +311,11 @@ export interface MaestroAPI {
   };
   webserver: {
     getUrl: () => Promise<string>;
+  };
+  tunnel: {
+    start: (sessionId: string) => Promise<{ port: number; uuid: string; url: string }>;
+    stop: (sessionId: string) => Promise<boolean>;
+    getStatus: (sessionId: string) => Promise<{ active: boolean; port?: number; uuid?: string; url?: string }>;
   };
   agents: {
     detect: () => Promise<AgentConfig[]>;
@@ -401,6 +415,7 @@ export interface MaestroAPI {
       sessionId?: string;
     }) => Promise<boolean>;
     clear: (projectPath?: string) => Promise<boolean>;
+    delete: (entryId: string) => Promise<boolean>;
   };
   notification: {
     show: (title: string, body: string) => Promise<{ success: boolean; error?: string }>;

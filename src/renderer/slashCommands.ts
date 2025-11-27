@@ -143,7 +143,6 @@ export const slashCommands: SlashCommand[] = [
                   group: groupName,
                   project: projectName,
                   taskDuration: duration,
-                  duration: 6000,
                 });
               }
             }

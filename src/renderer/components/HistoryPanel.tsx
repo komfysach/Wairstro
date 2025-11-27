@@ -373,6 +373,21 @@ export const HistoryPanel = React.memo(forwardRef<HistoryPanelHandle, HistoryPan
     listRef.current?.focus();
   }, []);
 
+  // Delete a history entry
+  const handleDeleteEntry = useCallback(async (entryId: string) => {
+    try {
+      const success = await window.maestro.history.delete(entryId);
+      if (success) {
+        // Remove from local state
+        setHistoryEntries(prev => prev.filter(entry => entry.id !== entryId));
+        // Reset selection if needed
+        setSelectedIndex(-1);
+      }
+    } catch (error) {
+      console.error('Failed to delete history entry:', error);
+    }
+  }, []);
+
   // Format timestamp
   const formatTime = (timestamp: number) => {
     const date = new Date(timestamp);
@@ -606,6 +621,7 @@ export const HistoryPanel = React.memo(forwardRef<HistoryPanelHandle, HistoryPan
           entry={detailModalEntry}
           onClose={closeDetailModal}
           onJumpToClaudeSession={onJumpToClaudeSession}
+          onDelete={handleDeleteEntry}
         />
       )}
     </div>

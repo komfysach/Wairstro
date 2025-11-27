@@ -134,6 +134,8 @@ export interface Session {
   port: number;
   tunnelActive: boolean;
   tunnelUrl?: string;
+  tunnelPort?: number;
+  tunnelUuid?: string;
   changedFiles: FileArtifact[];
   isGitRepo: boolean;
   // File Explorer per-session state

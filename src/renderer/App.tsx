@@ -575,7 +575,6 @@ export default function MaestroConsole() {
               group: groupName,
               project: projectName,
               taskDuration: duration,
-              duration: 6000,
             });
           }, 0);
 
@@ -1615,12 +1614,15 @@ export default function MaestroConsole() {
 
   // --- ACTIONS ---
   const cycleSession = (dir: 'next' | 'prev') => {
-    // Only cycle through visible sessions (not in collapsed groups)
-    const visibleSessions = sortedSessions.filter(session => {
-      if (!session.groupId) return true; // Ungrouped sessions are always visible
-      const group = groups.find(g => g.id === session.groupId);
-      return group && !group.collapsed; // Only include if group is not collapsed
-    });
+    // When left sidebar is collapsed, cycle through ALL sessions (groups not visible)
+    // When left sidebar is open, only cycle through visible sessions (not in collapsed groups)
+    const visibleSessions = leftSidebarOpen
+      ? sortedSessions.filter(session => {
+          if (!session.groupId) return true; // Ungrouped sessions are always visible
+          const group = groups.find(g => g.id === session.groupId);
+          return group && !group.collapsed; // Only include if group is not collapsed
+        })
+      : sortedSessions; // All sessions when sidebar is collapsed
 
     if (visibleSessions.length === 0) return;
 
@@ -1771,16 +1773,45 @@ export default function MaestroConsole() {
     }));
   };
 
-  const toggleTunnel = (sessId: string) => {
-    setSessions(prev => prev.map(s => {
-       if (s.id !== sessId) return s;
-       const isActive = !s.tunnelActive;
-       return {
-         ...s,
-         tunnelActive: isActive,
-         tunnelUrl: isActive ? `https://${generateId()}.${tunnelProvider === 'ngrok' ? 'ngrok.io' : 'trycloudflare.com'}` : undefined
-       };
-    }));
+  const toggleTunnel = async (sessId: string) => {
+    const session = sessions.find(s => s.id === sessId);
+    if (!session) return;
+
+    if (session.tunnelActive) {
+      // Stop the tunnel
+      try {
+        await window.maestro.tunnel.stop(sessId);
+        setSessions(prev => prev.map(s => {
+          if (s.id !== sessId) return s;
+          return {
+            ...s,
+            tunnelActive: false,
+            tunnelUrl: undefined,
+            tunnelPort: undefined,
+            tunnelUuid: undefined
+          };
+        }));
+      } catch (error) {
+        console.error('Failed to stop tunnel:', error);
+      }
+    } else {
+      // Start the tunnel
+      try {
+        const result = await window.maestro.tunnel.start(sessId);
+        setSessions(prev => prev.map(s => {
+          if (s.id !== sessId) return s;
+          return {
+            ...s,
+            tunnelActive: true,
+            tunnelUrl: result.url,
+            tunnelPort: result.port,
+            tunnelUuid: result.uuid
+          };
+        }));
+      } catch (error) {
+        console.error('Failed to start tunnel:', error);
+      }
+    }
   };
 
   const handleViewGitDiff = async () => {

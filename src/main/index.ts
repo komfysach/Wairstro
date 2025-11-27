@@ -3,6 +3,7 @@ import path from 'path';
 import fs from 'fs/promises';
 import { ProcessManager } from './process-manager';
 import { WebServer } from './web-server';
+import { SessionWebServerManager } from './session-web-server';
 import { AgentDetector } from './agent-detector';
 import { execFileNoThrow } from './utils/execFile';
 import { logger } from './utils/logger';
@@ -115,6 +116,7 @@ const historyStore = new Store<HistoryData>({
 let mainWindow: BrowserWindow | null = null;
 let processManager: ProcessManager | null = null;
 let webServer: WebServer | null = null;
+let sessionWebServerManager: SessionWebServerManager | null = null;
 let agentDetector: AgentDetector | null = null;
 
 function createWindow() {
@@ -200,6 +202,31 @@ app.whenReady().then(() => {
   processManager = new ProcessManager();
   webServer = new WebServer(8000);
   agentDetector = new AgentDetector();
+
+  // Initialize session web server manager with callbacks
+  sessionWebServerManager = new SessionWebServerManager(
+    // getSessionData callback - fetch session from store
+    (sessionId: string) => {
+      const sessions = sessionsStore.get('sessions', []);
+      const session = sessions.find((s: any) => s.id === sessionId);
+      if (!session) return null;
+      return {
+        id: session.id,
+        name: session.name,
+        toolType: session.toolType,
+        state: session.state,
+        inputMode: session.inputMode,
+        cwd: session.cwd,
+        aiLogs: session.aiLogs || [],
+        shellLogs: session.shellLogs || [],
+      };
+    },
+    // writeToSession callback - write to process
+    (sessionId: string, data: string) => {
+      if (!processManager) return false;
+      return processManager.write(sessionId, data);
+    }
+  );
   logger.info('Core services initialized', 'Startup');
 
   // Set up IPC handlers
@@ -231,11 +258,13 @@ app.on('window-all-closed', () => {
   }
 });
 
-app.on('before-quit', () => {
+app.on('before-quit', async () => {
   logger.info('Application shutting down', 'Shutdown');
   // Clean up all running processes
   logger.info('Killing all running processes', 'Shutdown');
   processManager?.killAll();
+  logger.info('Stopping session web servers', 'Shutdown');
+  await sessionWebServerManager?.stopAll();
   logger.info('Stopping web server', 'Shutdown');
   webServer?.stop();
   logger.info('Shutdown complete', 'Shutdown');
@@ -544,10 +573,33 @@ function setupIpcHandlers() {
     }
   });
 
-  // Tunnel management
-  // NOTE: Tunnel feature is planned for Phase 6 (see PRD.md and CLAUDE.md:385)
-  // When implemented, will support ngrok/cloudflare for remote access
-  // Remove this comment when implementing the feature
+  // Tunnel management - per-session local web server
+  ipcMain.handle('tunnel:start', async (_, sessionId: string) => {
+    if (!sessionWebServerManager) {
+      throw new Error('Session web server manager not initialized');
+    }
+    logger.info(`Starting tunnel for session ${sessionId}`, 'Tunnel');
+    const result = await sessionWebServerManager.startServer(sessionId);
+    logger.info(`Tunnel started for session ${sessionId}: ${result.url}`, 'Tunnel');
+    return result;
+  });
+
+  ipcMain.handle('tunnel:stop', async (_, sessionId: string) => {
+    if (!sessionWebServerManager) {
+      throw new Error('Session web server manager not initialized');
+    }
+    logger.info(`Stopping tunnel for session ${sessionId}`, 'Tunnel');
+    await sessionWebServerManager.stopServer(sessionId);
+    logger.info(`Tunnel stopped for session ${sessionId}`, 'Tunnel');
+    return true;
+  });
+
+  ipcMain.handle('tunnel:getStatus', async (_, sessionId: string) => {
+    if (!sessionWebServerManager) {
+      return { active: false };
+    }
+    return sessionWebServerManager.getStatus(sessionId);
+  });
 
   // Web server management
   ipcMain.handle('webserver:getUrl', async () => {
@@ -1352,6 +1404,18 @@ function setupIpcHandlers() {
       historyStore.set('entries', []);
       logger.info('Cleared all history', 'History');
     }
+    return true;
+  });
+
+  ipcMain.handle('history:delete', async (_event, entryId: string) => {
+    const entries = historyStore.get('entries', []);
+    const filtered = entries.filter(entry => entry.id !== entryId);
+    if (filtered.length === entries.length) {
+      logger.warn(`History entry not found: ${entryId}`, 'History');
+      return false;
+    }
+    historyStore.set('entries', filtered);
+    logger.info(`Deleted history entry: ${entryId}`, 'History');
     return true;
   });
 
