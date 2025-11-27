@@ -14,7 +14,7 @@ import './index.css';
 // Using webpackChunkName magic comments for Vite compatibility
 // This creates separate bundles that are only loaded based on device type
 const MobileApp = lazy(() =>
-  import(/* webpackChunkName: "mobile" */ './mobile/App').catch(() => ({
+  import(/* webpackChunkName: "mobile" */ './mobile').catch(() => ({
     default: () => <PlaceholderApp type="mobile" />,
   }))
 );
