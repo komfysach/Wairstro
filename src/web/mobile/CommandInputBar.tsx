@@ -25,6 +25,9 @@ const MIN_INPUT_HEIGHT = 48;
 /** Line height for text calculations */
 const LINE_HEIGHT = 22;
 
+/** Input mode type - AI assistant or terminal */
+export type InputMode = 'ai' | 'terminal';
+
 export interface CommandInputBarProps {
   /** Whether the device is offline */
   isOffline: boolean;
@@ -40,6 +43,10 @@ export interface CommandInputBarProps {
   value?: string;
   /** Whether the input is disabled */
   disabled?: boolean;
+  /** Current input mode (AI or terminal) */
+  inputMode?: InputMode;
+  /** Callback when input mode is toggled */
+  onModeToggle?: (mode: InputMode) => void;
 }
 
 /**
@@ -56,6 +63,8 @@ export function CommandInputBar({
   onChange,
   value: controlledValue,
   disabled: externalDisabled,
+  inputMode = 'ai',
+  onModeToggle,
 }: CommandInputBarProps) {
   const colors = useThemeColors();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -173,6 +182,14 @@ export function CommandInputBar({
     [handleSubmit]
   );
 
+  /**
+   * Handle mode toggle between AI and Terminal
+   */
+  const handleModeToggle = useCallback(() => {
+    const newMode = inputMode === 'ai' ? 'terminal' : 'ai';
+    onModeToggle?.(newMode);
+  }, [inputMode, onModeToggle]);
+
   return (
     <div
       ref={containerRef}
@@ -197,12 +214,96 @@ export function CommandInputBar({
         onSubmit={handleSubmit}
         style={{
           display: 'flex',
-          gap: '12px',
+          gap: '8px',
           alignItems: 'flex-end', // Align to bottom for multi-line textarea
           paddingLeft: '16px',
           paddingRight: '16px',
         }}
       >
+        {/* Mode toggle button - AI / Terminal */}
+        <button
+          type="button"
+          onClick={handleModeToggle}
+          disabled={isDisabled}
+          style={{
+            padding: '10px',
+            borderRadius: '12px',
+            backgroundColor: inputMode === 'ai' ? `${colors.accent}20` : `${colors.textDim}20`,
+            border: `2px solid ${inputMode === 'ai' ? colors.accent : colors.textDim}`,
+            cursor: isDisabled ? 'default' : 'pointer',
+            opacity: isDisabled ? 0.5 : 1,
+            // Touch-friendly size - meets Apple HIG 44pt minimum
+            width: `${MIN_TOUCH_TARGET + 4}px`,
+            height: `${MIN_INPUT_HEIGHT}px`,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '2px',
+            // Smooth transitions
+            transition: 'all 150ms ease',
+            // Prevent button from shrinking
+            flexShrink: 0,
+            // Active state feedback
+            WebkitTapHighlightColor: 'transparent',
+          }}
+          onTouchStart={(e) => {
+            if (!isDisabled) {
+              e.currentTarget.style.transform = 'scale(0.95)';
+            }
+          }}
+          onTouchEnd={(e) => {
+            e.currentTarget.style.transform = 'scale(1)';
+          }}
+          aria-label={`Switch to ${inputMode === 'ai' ? 'terminal' : 'AI'} mode. Currently in ${inputMode === 'ai' ? 'AI' : 'terminal'} mode.`}
+          aria-pressed={inputMode === 'ai'}
+        >
+          {/* Mode icon - AI sparkle or Terminal prompt */}
+          {inputMode === 'ai' ? (
+            // AI sparkle icon
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke={colors.accent}
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M12 3v2M12 19v2M5.64 5.64l1.42 1.42M16.95 16.95l1.41 1.41M3 12h2M19 12h2M5.64 18.36l1.42-1.42M16.95 7.05l1.41-1.41" />
+              <circle cx="12" cy="12" r="4" />
+            </svg>
+          ) : (
+            // Terminal prompt icon
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke={colors.textDim}
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <polyline points="4 17 10 11 4 5" />
+              <line x1="12" y1="19" x2="20" y2="19" />
+            </svg>
+          )}
+          {/* Mode label */}
+          <span
+            style={{
+              fontSize: '9px',
+              fontWeight: 600,
+              color: inputMode === 'ai' ? colors.accent : colors.textDim,
+              textTransform: 'uppercase',
+              letterSpacing: '0.5px',
+            }}
+          >
+            {inputMode === 'ai' ? 'AI' : 'CLI'}
+          </span>
+        </button>
+
         {/* Large touch-friendly command textarea */}
         <textarea
           ref={textareaRef}

@@ -17,7 +17,7 @@ import { useOfflineStatus } from '../main';
 import { triggerHaptic, HAPTIC_PATTERNS } from './index';
 import { SessionPillBar } from './SessionPillBar';
 import { AllSessionsView } from './AllSessionsView';
-import { CommandInputBar } from './CommandInputBar';
+import { CommandInputBar, type InputMode } from './CommandInputBar';
 import type { Session } from '../hooks/useSessions';
 
 /**
@@ -264,6 +264,33 @@ export default function MobileApp() {
     setCommandInput(value);
   }, []);
 
+  // Handle mode toggle between AI and Terminal
+  const handleModeToggle = useCallback((mode: InputMode) => {
+    if (!activeSessionId) return;
+
+    // Provide haptic feedback
+    triggerHaptic(HAPTIC_PATTERNS.tap);
+
+    // Send mode switch command via WebSocket
+    send({
+      type: 'switch_mode',
+      sessionId: activeSessionId,
+      mode,
+    });
+
+    // Optimistically update local session state
+    setSessions(prev => prev.map(s =>
+      s.id === activeSessionId
+        ? { ...s, inputMode: mode }
+        : s
+    ));
+
+    console.log('[Mobile] Mode switched to:', mode, 'for session:', activeSessionId);
+  }, [activeSessionId, send]);
+
+  // Get active session for input mode
+  const activeSession = sessions.find(s => s.id === activeSessionId);
+
   // Determine content based on connection state
   const renderContent = () => {
     // Show offline state when device has no network connectivity
@@ -495,6 +522,8 @@ export default function MobileApp() {
         onSubmit={handleCommandSubmit}
         placeholder={activeSessionId ? 'Enter command...' : 'Select a session first...'}
         disabled={!activeSessionId}
+        inputMode={(activeSession?.inputMode as InputMode) || 'ai'}
+        onModeToggle={handleModeToggle}
       />
     </div>
   );
