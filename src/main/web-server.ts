@@ -1,6 +1,7 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import websocket from '@fastify/websocket';
+import rateLimit from '@fastify/rate-limit';
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { WebSocket } from 'ws';
 import crypto from 'crypto';
@@ -23,6 +24,18 @@ interface WebClient {
 export interface WebAuthConfig {
   enabled: boolean;
   token: string | null;
+}
+
+// Rate limiting configuration
+export interface RateLimitConfig {
+  // Maximum requests per time window
+  max: number;
+  // Time window in milliseconds
+  timeWindow: number;
+  // Maximum requests for POST endpoints (typically lower)
+  maxPost: number;
+  // Enable/disable rate limiting
+  enabled: boolean;
 }
 
 /**
@@ -81,6 +94,14 @@ export interface WebTheme {
 // Callback type for fetching current theme
 export type GetThemeCallback = () => WebTheme | null;
 
+// Default rate limit configuration
+const DEFAULT_RATE_LIMIT_CONFIG: RateLimitConfig = {
+  max: 100,           // 100 requests per minute for GET endpoints
+  timeWindow: 60000,  // 1 minute in milliseconds
+  maxPost: 30,        // 30 requests per minute for POST endpoints (more restrictive)
+  enabled: true,
+};
+
 export class WebServer {
   private server: FastifyInstance;
   private port: number;
@@ -88,6 +109,7 @@ export class WebServer {
   private webClients: Map<string, WebClient> = new Map();
   private clientIdCounter: number = 0;
   private authConfig: WebAuthConfig = { enabled: false, token: null };
+  private rateLimitConfig: RateLimitConfig = { ...DEFAULT_RATE_LIMIT_CONFIG };
   private getSessionsCallback: GetSessionsCallback | null = null;
   private getThemeCallback: GetThemeCallback | null = null;
 
@@ -132,6 +154,21 @@ export class WebServer {
    */
   getAuthConfig(): WebAuthConfig {
     return { ...this.authConfig };
+  }
+
+  /**
+   * Set the rate limiting configuration
+   */
+  setRateLimitConfig(config: Partial<RateLimitConfig>) {
+    this.rateLimitConfig = { ...this.rateLimitConfig, ...config };
+    console.log(`Web server rate limiting ${this.rateLimitConfig.enabled ? 'enabled' : 'disabled'} (max: ${this.rateLimitConfig.max}/min, maxPost: ${this.rateLimitConfig.maxPost}/min)`);
+  }
+
+  /**
+   * Get the current rate limiting configuration
+   */
+  getRateLimitConfig(): RateLimitConfig {
+    return { ...this.rateLimitConfig };
   }
 
   /**
@@ -198,6 +235,44 @@ export class WebServer {
 
     // Enable WebSocket support
     await this.server.register(websocket);
+
+    // Enable rate limiting for web interface endpoints to prevent abuse
+    // Rate limiting is applied globally but can be overridden per-route
+    await this.server.register(rateLimit, {
+      global: false, // Don't apply to all routes by default (we'll apply selectively)
+      max: this.rateLimitConfig.max,
+      timeWindow: this.rateLimitConfig.timeWindow,
+      // Custom error response
+      errorResponseBuilder: (
+        _request: FastifyRequest,
+        context: { statusCode: number; ban: boolean; after: string; max: number; ttl: number }
+      ) => {
+        return {
+          statusCode: 429,
+          error: 'Too Many Requests',
+          message: `Rate limit exceeded. You can make ${context.max} requests per ${context.after}. Try again later.`,
+          retryAfter: context.after,
+        };
+      },
+      // Allow list function to skip rate limiting for certain requests
+      allowList: (request: FastifyRequest) => {
+        // Skip rate limiting if disabled
+        if (!this.rateLimitConfig.enabled) return true;
+        // Allow health checks without rate limiting
+        if (request.url === '/health') return true;
+        return false;
+      },
+      // Use IP address as the rate limit key
+      keyGenerator: (request: FastifyRequest) => {
+        // Use X-Forwarded-For if available (for proxied requests), otherwise use IP
+        const forwarded = request.headers['x-forwarded-for'];
+        if (forwarded) {
+          const ip = Array.isArray(forwarded) ? forwarded[0] : forwarded.split(',')[0].trim();
+          return ip;
+        }
+        return request.ip;
+      },
+    });
   }
 
   private setupRoutes() {
@@ -267,10 +342,32 @@ export class WebServer {
    * - /web/mobile - Mobile web interface entry point
    * - /web/api/* - REST API endpoints for web clients
    * - /ws/web - WebSocket endpoint for real-time updates to web clients
+   *
+   * Rate limiting is applied to all web interface endpoints to prevent abuse.
    */
   private setupWebInterfaceRoutes() {
+    // Rate limit configuration for GET endpoints
+    const getRateLimitConfig = {
+      config: {
+        rateLimit: {
+          max: this.rateLimitConfig.max,
+          timeWindow: this.rateLimitConfig.timeWindow,
+        },
+      },
+    };
+
+    // Rate limit configuration for POST endpoints (more restrictive)
+    const postRateLimitConfig = {
+      config: {
+        rateLimit: {
+          max: this.rateLimitConfig.maxPost,
+          timeWindow: this.rateLimitConfig.timeWindow,
+        },
+      },
+    };
+
     // Web interface root - returns info about available interfaces
-    this.server.get('/web', async () => {
+    this.server.get('/web', getRateLimitConfig, async () => {
       return {
         name: 'Maestro Web Interface',
         version: '1.0.0',
@@ -285,7 +382,7 @@ export class WebServer {
     });
 
     // Desktop web interface entry point (placeholder)
-    this.server.get('/web/desktop', async () => {
+    this.server.get('/web/desktop', getRateLimitConfig, async () => {
       return {
         message: 'Desktop web interface - Coming soon',
         description: 'Full-featured collaborative interface for hackathons/team coding',
@@ -293,7 +390,7 @@ export class WebServer {
     });
 
     // Desktop web interface with wildcard for client-side routing
-    this.server.get('/web/desktop/*', async () => {
+    this.server.get('/web/desktop/*', getRateLimitConfig, async () => {
       return {
         message: 'Desktop web interface - Coming soon',
         description: 'Full-featured collaborative interface for hackathons/team coding',
@@ -301,7 +398,7 @@ export class WebServer {
     });
 
     // Mobile web interface entry point (placeholder)
-    this.server.get('/web/mobile', async () => {
+    this.server.get('/web/mobile', getRateLimitConfig, async () => {
       return {
         message: 'Mobile web interface - Coming soon',
         description: 'Lightweight remote control for sending commands from your phone',
@@ -309,7 +406,7 @@ export class WebServer {
     });
 
     // Mobile web interface with wildcard for client-side routing
-    this.server.get('/web/mobile/*', async () => {
+    this.server.get('/web/mobile/*', getRateLimitConfig, async () => {
       return {
         message: 'Mobile web interface - Coming soon',
         description: 'Lightweight remote control for sending commands from your phone',
@@ -317,13 +414,34 @@ export class WebServer {
     });
 
     // Web API namespace root
-    this.server.get('/web/api', async () => {
+    this.server.get('/web/api', getRateLimitConfig, async () => {
       return {
         name: 'Maestro Web API',
         version: '1.0.0',
         endpoints: {
           sessions: '/web/api/sessions',
           theme: '/web/api/theme',
+          rateLimit: '/web/api/rate-limit',
+        },
+        timestamp: Date.now(),
+      };
+    });
+
+    // Rate limit status endpoint - allows clients to check current limits
+    this.server.get('/web/api/rate-limit', getRateLimitConfig, async () => {
+      return {
+        enabled: this.rateLimitConfig.enabled,
+        limits: {
+          get: {
+            max: this.rateLimitConfig.max,
+            timeWindowMs: this.rateLimitConfig.timeWindow,
+            timeWindowDescription: `${this.rateLimitConfig.timeWindow / 1000} seconds`,
+          },
+          post: {
+            max: this.rateLimitConfig.maxPost,
+            timeWindowMs: this.rateLimitConfig.timeWindow,
+            timeWindowDescription: `${this.rateLimitConfig.timeWindow / 1000} seconds`,
+          },
         },
         timestamp: Date.now(),
       };
@@ -477,7 +595,7 @@ export class WebServer {
     });
 
     // Authentication status endpoint - allows checking if auth is enabled
-    this.server.get('/web/api/auth/status', async () => {
+    this.server.get('/web/api/auth/status', getRateLimitConfig, async () => {
       return {
         enabled: this.authConfig.enabled,
         timestamp: Date.now(),
@@ -485,7 +603,8 @@ export class WebServer {
     });
 
     // Authentication verification endpoint - checks if a token is valid
-    this.server.post('/web/api/auth/verify', async (request) => {
+    // Uses more restrictive POST rate limit to prevent brute force attacks
+    this.server.post('/web/api/auth/verify', postRateLimitConfig, async (request) => {
       const body = request.body as { token?: string } | undefined;
       const token = body?.token;
 
