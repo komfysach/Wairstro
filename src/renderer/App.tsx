@@ -1507,16 +1507,22 @@ export default function MaestroConsole() {
         if (e.key === 'Tab') return;
 
         const isCycleShortcut = (e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === '[' || e.key === ']');
+        // Allow sidebar toggle shortcuts (Alt+Cmd+Arrow) even when modals are open
+        const isLayoutShortcut = e.altKey && (e.metaKey || e.ctrlKey) && (e.key === 'ArrowLeft' || e.key === 'ArrowRight');
 
         if (hasOpenModal()) {
-          // TRUE MODAL is open - block ALL shortcuts from App.tsx
+          // TRUE MODAL is open - block most shortcuts from App.tsx
           // The modal's own handler will handle Cmd+Shift+[] if it supports it
-          return;
+          // BUT allow layout shortcuts (sidebar toggles) to work
+          if (!isLayoutShortcut) {
+            return;
+          }
+          // Fall through to handle layout shortcuts below
         } else {
           // Only OVERLAYS are open (FilePreview, LogViewer, etc.)
           // Allow Cmd+Shift+[] to fall through to App.tsx handler
           // (which will cycle right panel tabs when previewFile is set)
-          if (!isCycleShortcut) {
+          if (!isCycleShortcut && !isLayoutShortcut) {
             return;
           }
           // Fall through to cyclePrev/cycleNext logic below
