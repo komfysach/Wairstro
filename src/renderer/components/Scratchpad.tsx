@@ -1,9 +1,9 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { Eye, Edit, Play, Square, HelpCircle, Loader2 } from 'lucide-react';
+import { Eye, Edit, Play, Square, HelpCircle, Loader2, Image, X } from 'lucide-react';
 import type { BatchRunState, SessionState } from '../types';
 import { AutoRunnerHelpModal } from './AutoRunnerHelpModal';
 import { MermaidRenderer } from './MermaidRenderer';
@@ -12,6 +12,7 @@ interface ScratchpadProps {
   content: string;
   onChange: (content: string) => void;
   theme: any;
+  sessionId: string; // Maestro session ID for per-session attachment storage
   initialMode?: 'edit' | 'preview';
   initialCursorPosition?: number;
   initialEditScrollPos?: number;
@@ -30,10 +31,163 @@ interface ScratchpadProps {
   sessionState?: SessionState;
 }
 
+// Cache for loaded images to avoid repeated IPC calls
+const imageCache = new Map<string, string>();
+
+// Custom image component that loads attachments from the session storage
+function AttachmentImage({
+  src,
+  alt,
+  sessionId,
+  theme,
+  onImageClick
+}: {
+  src?: string;
+  alt?: string;
+  sessionId: string;
+  theme: any;
+  onImageClick?: (dataUrl: string) => void;
+}) {
+  const [dataUrl, setDataUrl] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!src) {
+      setLoading(false);
+      return;
+    }
+
+    // Check if this is an attachment reference (maestro-attachment://filename)
+    if (src.startsWith('maestro-attachment://')) {
+      const filename = src.replace('maestro-attachment://', '');
+      const cacheKey = `${sessionId}:${filename}`;
+
+      // Check cache first
+      if (imageCache.has(cacheKey)) {
+        setDataUrl(imageCache.get(cacheKey)!);
+        setLoading(false);
+        return;
+      }
+
+      // Load from attachment storage
+      window.maestro.attachments.load(sessionId, filename).then(result => {
+        if (result.success && result.dataUrl) {
+          imageCache.set(cacheKey, result.dataUrl);
+          setDataUrl(result.dataUrl);
+        } else {
+          setError(result.error || 'Failed to load image');
+        }
+        setLoading(false);
+      });
+    } else if (src.startsWith('data:')) {
+      // Already a data URL
+      setDataUrl(src);
+      setLoading(false);
+    } else {
+      // External URL - just use it directly
+      setDataUrl(src);
+      setLoading(false);
+    }
+  }, [src, sessionId]);
+
+  if (loading) {
+    return (
+      <div
+        className="inline-flex items-center gap-2 px-3 py-2 rounded"
+        style={{ backgroundColor: theme.colors.bgActivity }}
+      >
+        <Loader2 className="w-4 h-4 animate-spin" style={{ color: theme.colors.textDim }} />
+        <span className="text-xs" style={{ color: theme.colors.textDim }}>Loading image...</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div
+        className="inline-flex items-center gap-2 px-3 py-2 rounded"
+        style={{ backgroundColor: theme.colors.bgActivity, borderColor: theme.colors.error, border: '1px solid' }}
+      >
+        <Image className="w-4 h-4" style={{ color: theme.colors.error }} />
+        <span className="text-xs" style={{ color: theme.colors.error }}>{error}</span>
+      </div>
+    );
+  }
+
+  if (!dataUrl) {
+    return null;
+  }
+
+  return (
+    <img
+      src={dataUrl}
+      alt={alt || ''}
+      className="max-w-full h-auto rounded my-2 cursor-pointer hover:opacity-90 transition-opacity"
+      style={{ maxHeight: '400px', objectFit: 'contain' }}
+      onClick={() => onImageClick?.(dataUrl)}
+    />
+  );
+}
+
+// Image preview thumbnail for staged images in edit mode
+function ImagePreview({
+  src,
+  filename,
+  theme,
+  onRemove,
+  onImageClick
+}: {
+  src: string;
+  filename: string;
+  theme: any;
+  onRemove: () => void;
+  onImageClick: (dataUrl: string) => void;
+}) {
+  return (
+    <div
+      className="relative inline-block group"
+      style={{ margin: '4px' }}
+    >
+      <img
+        src={src}
+        alt={filename}
+        className="w-20 h-20 object-cover rounded cursor-pointer hover:opacity-80 transition-opacity"
+        style={{ border: `1px solid ${theme.colors.border}` }}
+        onClick={() => onImageClick(src)}
+      />
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          onRemove();
+        }}
+        className="absolute -top-2 -right-2 w-5 h-5 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+        style={{
+          backgroundColor: theme.colors.error,
+          color: 'white'
+        }}
+        title="Remove image"
+      >
+        <X className="w-3 h-3" />
+      </button>
+      <div
+        className="absolute bottom-0 left-0 right-0 px-1 py-0.5 text-[9px] truncate rounded-b"
+        style={{
+          backgroundColor: 'rgba(0,0,0,0.6)',
+          color: 'white'
+        }}
+      >
+        {filename}
+      </div>
+    </div>
+  );
+}
+
 export function Scratchpad({
   content,
   onChange,
   theme,
+  sessionId,
   initialMode = 'edit',
   initialCursorPosition = 0,
   initialEditScrollPos = 0,
@@ -49,9 +203,32 @@ export function Scratchpad({
   const isStopping = batchRunState?.isStopping || false;
   const [mode, setMode] = useState<'edit' | 'preview'>(initialMode);
   const [helpModalOpen, setHelpModalOpen] = useState(false);
+  const [lightboxImage, setLightboxImage] = useState<string | null>(null);
+  const [attachmentsList, setAttachmentsList] = useState<string[]>([]);
+  const [attachmentPreviews, setAttachmentPreviews] = useState<Map<string, string>>(new Map());
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Load existing attachments for this session
+  useEffect(() => {
+    if (sessionId) {
+      window.maestro.attachments.list(sessionId).then(result => {
+        if (result.success) {
+          setAttachmentsList(result.files);
+          // Load previews for existing attachments
+          result.files.forEach(filename => {
+            window.maestro.attachments.load(sessionId, filename).then(loadResult => {
+              if (loadResult.success && loadResult.dataUrl) {
+                setAttachmentPreviews(prev => new Map(prev).set(filename, loadResult.dataUrl!));
+              }
+            });
+          });
+        }
+      });
+    }
+  }, [sessionId]);
 
   // Restore cursor and scroll positions when component mounts
   useEffect(() => {
@@ -110,6 +287,125 @@ export function Scratchpad({
       });
     }
   };
+
+  // Handle image paste
+  const handlePaste = useCallback(async (e: React.ClipboardEvent) => {
+    if (isLocked || !sessionId) return;
+
+    const items = e.clipboardData?.items;
+    if (!items) return;
+
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (item.type.startsWith('image/')) {
+        e.preventDefault();
+
+        const file = item.getAsFile();
+        if (!file) continue;
+
+        // Read as base64
+        const reader = new FileReader();
+        reader.onload = async (event) => {
+          const base64Data = event.target?.result as string;
+          if (!base64Data) return;
+
+          // Generate unique filename
+          const timestamp = Date.now();
+          const extension = item.type.split('/')[1] || 'png';
+          const filename = `image_${timestamp}.${extension}`;
+
+          // Save to attachments
+          const result = await window.maestro.attachments.save(sessionId, base64Data, filename);
+          if (result.success && result.filename) {
+            // Update attachments list
+            setAttachmentsList(prev => [...prev, result.filename!]);
+            setAttachmentPreviews(prev => new Map(prev).set(result.filename!, base64Data));
+
+            // Insert markdown reference at cursor position
+            const textarea = textareaRef.current;
+            if (textarea) {
+              const cursorPos = textarea.selectionStart;
+              const textBefore = content.substring(0, cursorPos);
+              const textAfter = content.substring(cursorPos);
+              const imageMarkdown = `![${result.filename}](maestro-attachment://${result.filename})`;
+
+              // Add newlines if not at start of line
+              let prefix = '';
+              let suffix = '';
+              if (textBefore.length > 0 && !textBefore.endsWith('\n')) {
+                prefix = '\n';
+              }
+              if (textAfter.length > 0 && !textAfter.startsWith('\n')) {
+                suffix = '\n';
+              }
+
+              const newContent = textBefore + prefix + imageMarkdown + suffix + textAfter;
+              onChange(newContent);
+
+              // Move cursor after the inserted markdown
+              const newCursorPos = cursorPos + prefix.length + imageMarkdown.length + suffix.length;
+              setTimeout(() => {
+                textarea.setSelectionRange(newCursorPos, newCursorPos);
+                textarea.focus();
+              }, 0);
+            }
+          }
+        };
+        reader.readAsDataURL(file);
+        break; // Only handle first image
+      }
+    }
+  }, [content, isLocked, onChange, sessionId]);
+
+  // Handle file input for manual image upload
+  const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !sessionId) return;
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const base64Data = event.target?.result as string;
+      if (!base64Data) return;
+
+      const timestamp = Date.now();
+      const extension = file.name.split('.').pop() || 'png';
+      const filename = `image_${timestamp}.${extension}`;
+
+      const result = await window.maestro.attachments.save(sessionId, base64Data, filename);
+      if (result.success && result.filename) {
+        setAttachmentsList(prev => [...prev, result.filename!]);
+        setAttachmentPreviews(prev => new Map(prev).set(result.filename!, base64Data));
+
+        // Insert at end of content
+        const imageMarkdown = `\n![${result.filename}](maestro-attachment://${result.filename})\n`;
+        onChange(content + imageMarkdown);
+      }
+    };
+    reader.readAsDataURL(file);
+
+    // Reset input so same file can be selected again
+    e.target.value = '';
+  }, [content, onChange, sessionId]);
+
+  // Handle removing an attachment
+  const handleRemoveAttachment = useCallback(async (filename: string) => {
+    if (!sessionId) return;
+
+    await window.maestro.attachments.delete(sessionId, filename);
+    setAttachmentsList(prev => prev.filter(f => f !== filename));
+    setAttachmentPreviews(prev => {
+      const newMap = new Map(prev);
+      newMap.delete(filename);
+      return newMap;
+    });
+
+    // Remove the markdown reference from content
+    const regex = new RegExp(`!\\[${filename}\\]\\(maestro-attachment://${filename}\\)\\n?`, 'g');
+    onChange(content.replace(regex, ''));
+
+    // Clear from cache
+    imageCache.delete(`${sessionId}:${filename}`);
+  }, [content, onChange, sessionId]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     // Command-E to toggle between edit and preview
@@ -255,6 +551,28 @@ export function Scratchpad({
           <Eye className="w-3.5 h-3.5" />
           Preview
         </button>
+        {/* Image upload button (edit mode only) */}
+        {mode === 'edit' && !isLocked && (
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="flex items-center gap-2 px-3 py-1.5 rounded text-xs transition-colors hover:opacity-80"
+            style={{
+              backgroundColor: 'transparent',
+              color: theme.colors.textDim,
+              border: `1px solid ${theme.colors.border}`
+            }}
+            title="Add image (or paste from clipboard)"
+          >
+            <Image className="w-3.5 h-3.5" />
+          </button>
+        )}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          onChange={handleFileSelect}
+          className="hidden"
+        />
         {/* Help button */}
         <button
           onClick={() => setHelpModalOpen(true)}
@@ -302,6 +620,31 @@ export function Scratchpad({
         )}
       </div>
 
+      {/* Attached Images Preview (edit mode) */}
+      {mode === 'edit' && attachmentsList.length > 0 && (
+        <div
+          className="flex flex-wrap gap-1 px-2 py-2 mx-2 mb-2 rounded"
+          style={{ backgroundColor: theme.colors.bgActivity }}
+        >
+          <div
+            className="w-full text-[10px] uppercase font-semibold mb-1"
+            style={{ color: theme.colors.textDim }}
+          >
+            Attached Images ({attachmentsList.length})
+          </div>
+          {attachmentsList.map(filename => (
+            <ImagePreview
+              key={filename}
+              src={attachmentPreviews.get(filename) || ''}
+              filename={filename}
+              theme={theme}
+              onRemove={() => handleRemoveAttachment(filename)}
+              onImageClick={setLightboxImage}
+            />
+          ))}
+        </div>
+      )}
+
       {/* Content Area */}
       <div className="flex-1 overflow-hidden">
         {mode === 'edit' ? (
@@ -313,7 +656,8 @@ export function Scratchpad({
             onKeyUp={handleCursorOrScrollChange}
             onClick={handleCursorOrScrollChange}
             onScroll={handleCursorOrScrollChange}
-            placeholder="Write your notes in markdown..."
+            onPaste={handlePaste}
+            placeholder="Write your notes in markdown... (paste images from clipboard)"
             readOnly={isLocked}
             className={`w-full h-full border rounded p-4 bg-transparent outline-none resize-none font-mono text-sm ${isLocked ? 'cursor-not-allowed opacity-70' : ''}`}
             style={{
@@ -350,7 +694,10 @@ export function Scratchpad({
               .prose h6 { color: ${theme.colors.textMain}; font-size: 0.67em; font-weight: bold; margin: 1.33em 0; }
               .prose p { color: ${theme.colors.textMain}; margin: 0.5em 0; }
               .prose ul, .prose ol { color: ${theme.colors.textMain}; margin: 0.5em 0; padding-left: 1.5em; }
-              .prose li { margin: 0.25em 0; }
+              .prose ul { list-style-type: disc; }
+              .prose ol { list-style-type: decimal; }
+              .prose li { margin: 0.25em 0; display: list-item; }
+              .prose li::marker { color: ${theme.colors.textMain}; }
               .prose code { background-color: ${theme.colors.bgActivity}; color: ${theme.colors.textMain}; padding: 0.2em 0.4em; border-radius: 3px; font-size: 0.9em; }
               .prose pre { background-color: ${theme.colors.bgActivity}; color: ${theme.colors.textMain}; padding: 1em; border-radius: 6px; overflow-x: auto; }
               .prose pre code { background: none; padding: 0; }
@@ -432,7 +779,17 @@ export function Scratchpad({
                       {children}
                     </code>
                   );
-                }
+                },
+                img: ({ src, alt, ...props }: any) => (
+                  <AttachmentImage
+                    src={src}
+                    alt={alt}
+                    sessionId={sessionId}
+                    theme={theme}
+                    onImageClick={setLightboxImage}
+                    {...props}
+                  />
+                )
               }}
             >
               {content || '*No content yet. Switch to Edit mode to start writing.*'}
@@ -447,6 +804,29 @@ export function Scratchpad({
           theme={theme}
           onClose={() => setHelpModalOpen(false)}
         />
+      )}
+
+      {/* Lightbox for viewing images */}
+      {lightboxImage && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80"
+          onClick={() => setLightboxImage(null)}
+        >
+          <div className="relative max-w-[90vw] max-h-[90vh]">
+            <img
+              src={lightboxImage}
+              alt="Preview"
+              className="max-w-full max-h-[90vh] object-contain rounded-lg"
+            />
+            <button
+              onClick={() => setLightboxImage(null)}
+              className="absolute top-4 right-4 w-8 h-8 rounded-full flex items-center justify-center bg-black/50 hover:bg-black/70 transition-colors"
+              style={{ color: 'white' }}
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );

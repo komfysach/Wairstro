@@ -288,6 +288,20 @@ contextBridge.exposeInMainWorld('maestro', {
     speak: (text: string, command?: string) =>
       ipcRenderer.invoke('notification:speak', text, command),
   },
+
+  // Attachments API (per-session image storage for scratchpad)
+  attachments: {
+    save: (sessionId: string, base64Data: string, filename: string) =>
+      ipcRenderer.invoke('attachments:save', sessionId, base64Data, filename),
+    load: (sessionId: string, filename: string) =>
+      ipcRenderer.invoke('attachments:load', sessionId, filename),
+    delete: (sessionId: string, filename: string) =>
+      ipcRenderer.invoke('attachments:delete', sessionId, filename),
+    list: (sessionId: string) =>
+      ipcRenderer.invoke('attachments:list', sessionId),
+    getPath: (sessionId: string) =>
+      ipcRenderer.invoke('attachments:getPath', sessionId),
+  },
 });
 
 // Type definitions for TypeScript
@@ -494,6 +508,13 @@ export interface MaestroAPI {
   notification: {
     show: (title: string, body: string) => Promise<{ success: boolean; error?: string }>;
     speak: (text: string, command?: string) => Promise<{ success: boolean; error?: string }>;
+  };
+  attachments: {
+    save: (sessionId: string, base64Data: string, filename: string) => Promise<{ success: boolean; path?: string; filename?: string; error?: string }>;
+    load: (sessionId: string, filename: string) => Promise<{ success: boolean; dataUrl?: string; error?: string }>;
+    delete: (sessionId: string, filename: string) => Promise<{ success: boolean; error?: string }>;
+    list: (sessionId: string) => Promise<{ success: boolean; files: string[]; error?: string }>;
+    getPath: (sessionId: string) => Promise<{ success: boolean; path: string }>;
   };
 }
 

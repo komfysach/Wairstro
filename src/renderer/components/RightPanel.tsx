@@ -226,6 +226,7 @@ export const RightPanel = forwardRef<RightPanelHandle, RightPanelProps>(function
             content={session.scratchPadContent}
             onChange={updateScratchPad}
             theme={theme}
+            sessionId={session.id}
             initialMode={session.scratchPadMode || 'edit'}
             initialCursorPosition={session.scratchPadCursorPosition || 0}
             initialEditScrollPos={session.scratchPadEditScrollPos || 0}

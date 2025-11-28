@@ -2020,6 +2020,115 @@ function setupIpcHandlers() {
       return { success: false, error: String(error) };
     }
   });
+
+  // Attachments API - store images per Maestro session
+  // Images are stored in userData/attachments/{sessionId}/{filename}
+  ipcMain.handle('attachments:save', async (_event, sessionId: string, base64Data: string, filename: string) => {
+    try {
+      const userDataPath = app.getPath('userData');
+      const attachmentsDir = path.join(userDataPath, 'attachments', sessionId);
+
+      // Ensure the attachments directory exists
+      await fs.mkdir(attachmentsDir, { recursive: true });
+
+      // Extract the base64 content (remove data:image/...;base64, prefix if present)
+      const base64Match = base64Data.match(/^data:image\/([a-zA-Z]+);base64,(.+)$/);
+      let buffer: Buffer;
+      let finalFilename = filename;
+
+      if (base64Match) {
+        const extension = base64Match[1];
+        buffer = Buffer.from(base64Match[2], 'base64');
+        // Update filename with correct extension if not already present
+        if (!filename.includes('.')) {
+          finalFilename = `${filename}.${extension}`;
+        }
+      } else {
+        // Assume raw base64
+        buffer = Buffer.from(base64Data, 'base64');
+      }
+
+      const filePath = path.join(attachmentsDir, finalFilename);
+      await fs.writeFile(filePath, buffer);
+
+      logger.info(`Saved attachment: ${filePath}`, 'Attachments', { sessionId, filename: finalFilename, size: buffer.length });
+      return { success: true, path: filePath, filename: finalFilename };
+    } catch (error) {
+      logger.error('Error saving attachment', 'Attachments', error);
+      return { success: false, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('attachments:load', async (_event, sessionId: string, filename: string) => {
+    try {
+      const userDataPath = app.getPath('userData');
+      const filePath = path.join(userDataPath, 'attachments', sessionId, filename);
+
+      const buffer = await fs.readFile(filePath);
+      const base64 = buffer.toString('base64');
+
+      // Determine MIME type from extension
+      const ext = path.extname(filename).toLowerCase().slice(1);
+      const mimeTypes: Record<string, string> = {
+        'png': 'image/png',
+        'jpg': 'image/jpeg',
+        'jpeg': 'image/jpeg',
+        'gif': 'image/gif',
+        'webp': 'image/webp',
+        'svg': 'image/svg+xml',
+      };
+      const mimeType = mimeTypes[ext] || 'image/png';
+
+      logger.debug(`Loaded attachment: ${filePath}`, 'Attachments', { sessionId, filename, size: buffer.length });
+      return { success: true, dataUrl: `data:${mimeType};base64,${base64}` };
+    } catch (error) {
+      logger.error('Error loading attachment', 'Attachments', error);
+      return { success: false, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('attachments:delete', async (_event, sessionId: string, filename: string) => {
+    try {
+      const userDataPath = app.getPath('userData');
+      const filePath = path.join(userDataPath, 'attachments', sessionId, filename);
+
+      await fs.unlink(filePath);
+      logger.info(`Deleted attachment: ${filePath}`, 'Attachments', { sessionId, filename });
+      return { success: true };
+    } catch (error) {
+      logger.error('Error deleting attachment', 'Attachments', error);
+      return { success: false, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('attachments:list', async (_event, sessionId: string) => {
+    try {
+      const userDataPath = app.getPath('userData');
+      const attachmentsDir = path.join(userDataPath, 'attachments', sessionId);
+
+      try {
+        const files = await fs.readdir(attachmentsDir);
+        const imageFiles = files.filter(f => /\.(png|jpg|jpeg|gif|webp|svg)$/i.test(f));
+        logger.debug(`Listed attachments for session: ${sessionId}`, 'Attachments', { count: imageFiles.length });
+        return { success: true, files: imageFiles };
+      } catch (err: any) {
+        if (err.code === 'ENOENT') {
+          // Directory doesn't exist yet - no attachments
+          return { success: true, files: [] };
+        }
+        throw err;
+      }
+    } catch (error) {
+      logger.error('Error listing attachments', 'Attachments', error);
+      return { success: false, error: String(error), files: [] };
+    }
+  });
+
+  ipcMain.handle('attachments:getPath', async (_event, sessionId: string) => {
+    const userDataPath = app.getPath('userData');
+    const attachmentsDir = path.join(userDataPath, 'attachments', sessionId);
+    return { success: true, path: attachmentsDir };
+  });
 }
 
 // Handle process output streaming (set up after initialization)
