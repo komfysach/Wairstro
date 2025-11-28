@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useMemo, forwardRef, useState, useCallback } from 'react';
+import React, { useRef, useEffect, useMemo, forwardRef, useState, useCallback, memo } from 'react';
 import { Activity, X, ChevronDown, ChevronUp, Filter, PlusCircle, MinusCircle, Trash2, Copy, Volume2, Check } from 'lucide-react';
 import type { Session, Theme, LogEntry } from '../types';
 import Convert from 'ansi-to-html';
@@ -6,6 +6,40 @@ import DOMPurify from 'dompurify';
 import { useLayerStack } from '../contexts/LayerStackContext';
 import { MODAL_PRIORITIES } from '../constants/modalPriorities';
 import { Virtuoso, VirtuosoHandle } from 'react-virtuoso';
+
+// Separate component for elapsed time to prevent re-renders of the entire list
+const ElapsedTimeDisplay = memo(({ thinkingStartTime, textColor }: { thinkingStartTime: number; textColor: string }) => {
+  const [elapsedSeconds, setElapsedSeconds] = useState(
+    Math.floor((Date.now() - thinkingStartTime) / 1000)
+  );
+
+  useEffect(() => {
+    // Update every second
+    const interval = setInterval(() => {
+      setElapsedSeconds(Math.floor((Date.now() - thinkingStartTime) / 1000));
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [thinkingStartTime]);
+
+  // Format elapsed time as mm:ss or hh:mm:ss
+  const formatElapsedTime = (seconds: number): string => {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+
+    if (hours > 0) {
+      return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
+    return `${minutes}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  return (
+    <span className="text-sm font-mono" style={{ color: textColor }}>
+      {formatElapsedTime(elapsedSeconds)}
+    </span>
+  );
+});
 
 interface TerminalOutputProps {
   session: Session;
@@ -40,6 +74,10 @@ export const TerminalOutput = forwardRef<HTMLDivElement, TerminalOutputProps>((p
 
   // Virtuoso ref for programmatic scrolling
   const virtuosoRef = useRef<VirtuosoHandle>(null);
+
+  // Track if user is at the bottom of the scroll - only auto-scroll if true
+  // Initialize to true so new sessions auto-scroll, but once user scrolls up, we respect that
+  const isAtBottomRef = useRef(true);
 
   // Track which log entries are expanded (by log ID)
   const [expandedLogs, setExpandedLogs] = useState<Set<string>>(new Set());
@@ -106,38 +144,6 @@ export const TerminalOutput = forwardRef<HTMLDivElement, TerminalOutputProps>((p
       console.error('[TTS] Failed to speak text:', err);
     }
   }, [audioFeedbackCommand]);
-
-  // Elapsed time for thinking indicator (in seconds)
-  const [elapsedSeconds, setElapsedSeconds] = useState(0);
-
-  // Update elapsed time when session is busy
-  useEffect(() => {
-    if (session.state === 'busy' && session.thinkingStartTime) {
-      // Set initial elapsed time
-      setElapsedSeconds(Math.floor((Date.now() - session.thinkingStartTime) / 1000));
-
-      // Update every second
-      const interval = setInterval(() => {
-        setElapsedSeconds(Math.floor((Date.now() - session.thinkingStartTime!) / 1000));
-      }, 1000);
-
-      return () => clearInterval(interval);
-    } else {
-      setElapsedSeconds(0);
-    }
-  }, [session.state, session.thinkingStartTime]);
-
-  // Format elapsed time as mm:ss or hh:mm:ss
-  const formatElapsedTime = (seconds: number): string => {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-
-    if (hours > 0) {
-      return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-    }
-    return `${minutes}:${secs.toString().padStart(2, '0')}`;
-  };
 
   // Layer stack integration for search overlay
   const { registerLayer, unregisterLayer, updateLayerHandler } = useLayerStack();
@@ -453,8 +459,8 @@ export const TerminalOutput = forwardRef<HTMLDivElement, TerminalOutputProps>((p
   // Initialize to 0 so that on first load with existing logs, we scroll to bottom
   const prevLogCountRef = useRef(0);
   useEffect(() => {
-    // Don't auto-scroll if user has expanded logs (viewing full content)
-    if (hasExpandedLogs) {
+    // Don't auto-scroll if user has scrolled away from bottom or has expanded logs
+    if (!isAtBottomRef.current || hasExpandedLogs) {
       prevLogCountRef.current = filteredLogs.length;
       return;
     }
@@ -475,8 +481,8 @@ export const TerminalOutput = forwardRef<HTMLDivElement, TerminalOutputProps>((p
   // Auto-scroll to bottom when session becomes busy to show thinking indicator
   const prevBusyStateRef = useRef(session.state === 'busy');
   useEffect(() => {
-    // Don't auto-scroll if user has expanded logs (viewing full content)
-    if (hasExpandedLogs) {
+    // Don't auto-scroll if user has scrolled away from bottom or has expanded logs
+    if (!isAtBottomRef.current || hasExpandedLogs) {
       prevBusyStateRef.current = session.state === 'busy';
       return;
     }
@@ -498,8 +504,8 @@ export const TerminalOutput = forwardRef<HTMLDivElement, TerminalOutputProps>((p
   // Auto-scroll to bottom when message queue changes
   const prevQueueLengthRef = useRef(session.messageQueue?.length || 0);
   useEffect(() => {
-    // Don't auto-scroll if user has expanded logs (viewing full content)
-    if (hasExpandedLogs) {
+    // Don't auto-scroll if user has scrolled away from bottom or has expanded logs
+    if (!isAtBottomRef.current || hasExpandedLogs) {
       prevQueueLengthRef.current = session.messageQueue?.length || 0;
       return;
     }
@@ -778,7 +784,7 @@ export const TerminalOutput = forwardRef<HTMLDivElement, TerminalOutputProps>((p
             </div>
           )}
           {log.images && log.images.length > 0 && (
-            <div className="flex gap-2 mb-2 overflow-x-auto scrollbar-thin">
+            <div className="flex gap-2 mb-2 overflow-x-auto scrollbar-thin" style={{ overscrollBehavior: 'contain' }}>
               {log.images.map((img, imgIdx) => (
                 <img key={imgIdx} src={img} className="h-20 rounded border cursor-zoom-in" onClick={() => setLightboxImage(img, log.images)} />
               ))}
@@ -838,6 +844,7 @@ export const TerminalOutput = forwardRef<HTMLDivElement, TerminalOutputProps>((p
                 style={{
                   maxHeight: '600px',
                   overflow: 'auto',
+                  overscrollBehavior: 'contain',
                   color: theme.colors.textMain,
                   fontFamily
                 }}
@@ -892,8 +899,9 @@ export const TerminalOutput = forwardRef<HTMLDivElement, TerminalOutputProps>((p
               {isTerminal && log.source !== 'user' ? (
                 <div
                   className="whitespace-pre-wrap text-sm overflow-x-auto scrollbar-thin"
+                  style={{ color: theme.colors.textMain, fontFamily, overscrollBehavior: 'contain' }}
+                  // Content is sanitized with DOMPurify before being set
                   dangerouslySetInnerHTML={{ __html: displayHtmlContent }}
-                  style={{ color: theme.colors.textMain, fontFamily }}
                 />
               ) : log.source === 'user' && isTerminal ? (
                 <div className="whitespace-pre-wrap text-sm" style={{ color: theme.colors.textMain, fontFamily }}>
@@ -1061,13 +1069,17 @@ export const TerminalOutput = forwardRef<HTMLDivElement, TerminalOutputProps>((p
         data={filteredLogs}
         className="flex-1"
         increaseViewportBy={{ top: 200, bottom: 200 }}
+        atBottomStateChange={(atBottom) => {
+          // Track when user scrolls away from bottom to prevent auto-scroll hijacking
+          isAtBottomRef.current = atBottom;
+        }}
         followOutput={() => {
           // Don't auto-scroll if user has expanded logs (viewing full content)
           if (hasExpandedLogs) return false;
           // Don't follow output - we handle scrolling manually
           return false;
         }}
-        computeItemKey={(index, log) => log.id}
+        computeItemKey={(index, log) => `${log.id}-${expandedLogs.has(log.id) ? 'expanded' : 'collapsed'}`}
         itemContent={(index, log) => <LogItem index={index} log={log} />}
         components={{
           Footer: () => (
@@ -1089,12 +1101,12 @@ export const TerminalOutput = forwardRef<HTMLDivElement, TerminalOutputProps>((p
                     <span className="text-sm" style={{ color: theme.colors.textMain }}>
                       {session.statusMessage || (session.inputMode === 'ai' ? 'Claude is thinking...' : 'Executing command...')}
                     </span>
-                    <span
-                      className="text-sm font-mono"
-                      style={{ color: theme.colors.textDim }}
-                    >
-                      {formatElapsedTime(elapsedSeconds)}
-                    </span>
+                    {session.thinkingStartTime && (
+                      <ElapsedTimeDisplay
+                        thinkingStartTime={session.thinkingStartTime}
+                        textColor={theme.colors.textDim}
+                      />
+                    )}
                   </div>
                   {session.inputMode === 'ai' && session.usageStats && (
                     <div className="flex items-center gap-4 mt-1 text-xs" style={{ color: theme.colors.textDim }}>
