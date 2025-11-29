@@ -41,7 +41,7 @@ import { THEMES } from './constants/themes';
 import { generateId } from './utils/ids';
 import { getContextColor } from './utils/theme';
 import { fuzzyMatch } from './utils/search';
-import { setActiveTab, createTab, closeTab } from './utils/tabHelpers';
+import { setActiveTab, createTab, closeTab, getActiveTab } from './utils/tabHelpers';
 import { shouldOpenExternally, loadFileTree, getAllFolderPaths, flattenTree } from './utils/fileExplorer';
 import { substituteTemplateVariables } from './utils/templateVariables';
 
@@ -119,8 +119,7 @@ export default function MaestroConsole() {
     setActiveSessionIdInternal(id);
   }, []);
 
-  // Input State - separate for AI and terminal modes
-  const [aiInputValue, setAiInputValue] = useState('');
+  // Input State - terminal mode uses local state, AI mode uses active tab's inputValue
   const [terminalInputValue, setTerminalInputValue] = useState('');
   const [slashCommandOpen, setSlashCommandOpen] = useState(false);
   const [selectedSlashCommandIndex, setSelectedSlashCommandIndex] = useState(0);
@@ -1217,7 +1216,32 @@ export default function MaestroConsole() {
   }, [customAICommands]);
 
   // Derive current input value and setter based on active session mode
+  // For AI mode: use active tab's inputValue (stored per-tab)
+  // For terminal mode: use local state (shared across tabs)
   const isAiMode = activeSession?.inputMode === 'ai';
+  const activeTab = activeSession ? getActiveTab(activeSession) : undefined;
+
+  // AI input value is derived from active tab's inputValue
+  const aiInputValue = activeTab?.inputValue ?? '';
+
+  // Setter for AI input value - updates the active tab's inputValue in session state
+  const setAiInputValue = useCallback((value: string) => {
+    if (!activeSession) return;
+    setSessions(prev => prev.map(s => {
+      if (s.id !== activeSession.id) return s;
+      const currentActiveTab = getActiveTab(s);
+      if (!currentActiveTab) return s;
+      return {
+        ...s,
+        aiTabs: s.aiTabs.map(tab =>
+          tab.id === currentActiveTab.id
+            ? { ...tab, inputValue: value }
+            : tab
+        )
+      };
+    }));
+  }, [activeSession]);
+
   const inputValue = isAiMode ? aiInputValue : terminalInputValue;
   const setInputValue = isAiMode ? setAiInputValue : setTerminalInputValue;
   // Images are only used in AI mode
