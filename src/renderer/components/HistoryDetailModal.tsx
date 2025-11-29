@@ -310,7 +310,7 @@ export function HistoryDetailModal({
               {/* Cost */}
               {entry.usageStats && entry.usageStats.totalCostUsd > 0 && (
                 <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-full border border-green-500/30 text-green-500 bg-green-500/10">
-                  ${entry.usageStats.totalCostUsd.toFixed(4)}
+                  ${entry.usageStats.totalCostUsd.toFixed(2)}
                 </span>
               )}
             </div>

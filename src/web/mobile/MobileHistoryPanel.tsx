@@ -269,7 +269,7 @@ function HistoryCard({ entry, onSelect }: HistoryCardProps) {
                 fontFamily: 'monospace',
               }}
             >
-              ${entry.usageStats.totalCostUsd.toFixed(4)}
+              ${entry.usageStats.totalCostUsd.toFixed(2)}
             </span>
           )}
         </div>
@@ -505,7 +505,7 @@ function HistoryDetailView({ entry, onClose }: HistoryDetailViewProps) {
                 borderRadius: '4px',
               }}
             >
-              ${entry.usageStats.totalCostUsd.toFixed(4)}
+              ${entry.usageStats.totalCostUsd.toFixed(2)}
             </span>
           )}
 
