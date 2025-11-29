@@ -65,6 +65,7 @@ interface RightPanelProps {
   onStopBatchRun?: () => void;
   onJumpToClaudeSession?: (claudeSessionId: string) => void;
   onResumeSession?: (claudeSessionId: string) => void;
+  onOpenSessionAsTab?: (claudeSessionId: string) => void;
 }
 
 export const RightPanel = forwardRef<RightPanelHandle, RightPanelProps>(function RightPanel(props, ref) {
@@ -75,7 +76,8 @@ export const RightPanel = forwardRef<RightPanelHandle, RightPanelProps>(function
     filteredFileTree, selectedFileIndex, setSelectedFileIndex, previewFile, fileTreeContainerRef,
     fileTreeFilterInputRef, toggleFolder, handleFileClick, expandAllFolders, collapseAllFolders,
     updateSessionWorkingDirectory, refreshFileTree, setSessions, updateScratchPad, updateScratchPadState,
-    batchRunState, onOpenBatchRunner, onStopBatchRun, onJumpToClaudeSession, onResumeSession
+    batchRunState, onOpenBatchRunner, onStopBatchRun, onJumpToClaudeSession, onResumeSession,
+    onOpenSessionAsTab
   } = props;
 
   const historyPanelRef = useRef<HistoryPanelHandle>(null);
@@ -221,6 +223,7 @@ export const RightPanel = forwardRef<RightPanelHandle, RightPanelProps>(function
             theme={theme}
             onJumpToClaudeSession={onJumpToClaudeSession}
             onResumeSession={onResumeSession}
+            onOpenSessionAsTab={onOpenSessionAsTab}
           />
         )}
 

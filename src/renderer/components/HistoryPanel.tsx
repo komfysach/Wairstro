@@ -229,6 +229,7 @@ interface HistoryPanelProps {
   theme: Theme;
   onJumpToClaudeSession?: (claudeSessionId: string) => void;
   onResumeSession?: (claudeSessionId: string) => void;
+  onOpenSessionAsTab?: (claudeSessionId: string) => void;
 }
 
 export interface HistoryPanelHandle {
@@ -241,7 +242,7 @@ const MAX_HISTORY_IN_MEMORY = 500;  // Maximum entries to keep in memory
 const INITIAL_DISPLAY_COUNT = 50;   // Initial entries to render
 const LOAD_MORE_COUNT = 50;         // Entries to add when scrolling
 
-export const HistoryPanel = React.memo(forwardRef<HistoryPanelHandle, HistoryPanelProps>(function HistoryPanel({ session, theme, onJumpToClaudeSession, onResumeSession }, ref) {
+export const HistoryPanel = React.memo(forwardRef<HistoryPanelHandle, HistoryPanelProps>(function HistoryPanel({ session, theme, onJumpToClaudeSession, onResumeSession, onOpenSessionAsTab }, ref) {
   const [historyEntries, setHistoryEntries] = useState<HistoryEntry[]>([]);
   const [activeFilters, setActiveFilters] = useState<Set<HistoryEntryType>>(new Set(['AUTO', 'USER']));
   const [isLoading, setIsLoading] = useState(true);
@@ -628,12 +629,12 @@ export const HistoryPanel = React.memo(forwardRef<HistoryPanelHandle, HistoryPan
                       {entry.type}
                     </span>
 
-                    {/* Session ID Octet (clickable) */}
+                    {/* Session ID Octet (clickable) - opens session as new tab */}
                     {entry.claudeSessionId && (
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          onJumpToClaudeSession?.(entry.claudeSessionId!);
+                          onOpenSessionAsTab?.(entry.claudeSessionId!);
                         }}
                         className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase transition-colors hover:opacity-80"
                         style={{
@@ -641,7 +642,7 @@ export const HistoryPanel = React.memo(forwardRef<HistoryPanelHandle, HistoryPan
                           color: theme.colors.accent,
                           border: `1px solid ${theme.colors.accent}40`
                         }}
-                        title={`Jump to session ${entry.claudeSessionId}`}
+                        title={`Open session ${entry.claudeSessionId.split('-')[0]} as new tab`}
                       >
                         {entry.claudeSessionId.split('-')[0].toUpperCase()}
                         <ExternalLink className="w-2.5 h-2.5" />

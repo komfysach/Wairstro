@@ -4558,6 +4558,7 @@ export default function MaestroConsole() {
             onStopBatchRun={handleStopBatchRun}
             onJumpToClaudeSession={handleJumpToClaudeSession}
             onResumeSession={handleResumeSession}
+            onOpenSessionAsTab={handleResumeSession}
           />
         </ErrorBoundary>
       )}
