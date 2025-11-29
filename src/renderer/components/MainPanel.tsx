@@ -7,6 +7,7 @@ import { FilePreview } from './FilePreview';
 import { ErrorBoundary } from './ErrorBoundary';
 import { GitStatusWidget } from './GitStatusWidget';
 import { AgentSessionsBrowser } from './AgentSessionsBrowser';
+import { ThinkingStatusPill } from './ThinkingStatusPill';
 import { gitService } from '../services/git';
 import { formatActiveTime } from '../utils/theme';
 import type { Session, Theme, Shortcut, FocusArea, BatchRunState, RecentClaudeSession } from '../types';
@@ -22,6 +23,7 @@ interface MainPanelProps {
   agentSessionsOpen: boolean;
   activeClaudeSessionId: string | null;
   activeSession: Session | null;
+  sessions: Session[]; // All sessions for ThinkingStatusPill
   theme: Theme;
   fontFamily: string;
   isMobileLandscape?: boolean;
@@ -114,7 +116,7 @@ interface MainPanelProps {
 
 export function MainPanel(props: MainPanelProps) {
   const {
-    logViewerOpen, agentSessionsOpen, activeClaudeSessionId, activeSession, theme, activeFocus, outputSearchOpen, outputSearchQuery,
+    logViewerOpen, agentSessionsOpen, activeClaudeSessionId, activeSession, sessions, theme, activeFocus, outputSearchOpen, outputSearchQuery,
     inputValue, enterToSendAI, enterToSendTerminal, stagedImages, commandHistoryOpen, commandHistoryFilter,
     commandHistorySelectedIndex, slashCommandOpen, slashCommands, selectedSlashCommandIndex,
     tabCompletionOpen, tabCompletionSuggestions, selectedTabCompletionIndex,
@@ -1122,6 +1124,15 @@ export function MainPanel(props: MainPanelProps) {
                 onInterrupt={handleInterrupt}
                 audioFeedbackCommand={props.audioFeedbackCommand}
               />
+
+              {/* Thinking Status Pill - shows above input when any session is thinking */}
+              {!isMobileLandscape && (
+                <ThinkingStatusPill
+                  sessions={sessions}
+                  theme={theme}
+                  onSessionClick={setActiveSessionId}
+                />
+              )}
 
               {/* Input Area (hidden in mobile landscape for focused reading) */}
               {!isMobileLandscape && (

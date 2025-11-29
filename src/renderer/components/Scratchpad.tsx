@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect, useCallback, memo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
@@ -267,7 +267,8 @@ function ImagePreview({
   );
 }
 
-export function Scratchpad({
+// Inner implementation component
+function ScratchpadInner({
   content,
   onChange,
   theme,
@@ -308,6 +309,9 @@ export function Scratchpad({
   const previewRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // Track scroll positions in refs to preserve across re-renders
+  const previewScrollPosRef = useRef(initialPreviewScrollPos);
+  const editScrollPosRef = useRef(initialEditScrollPos);
 
   // Load existing attachments for this session
   useEffect(() => {
@@ -354,6 +358,19 @@ export function Scratchpad({
     }
   }, []);
 
+  // Restore scroll position after content changes cause ReactMarkdown to rebuild DOM
+  // useLayoutEffect runs synchronously after DOM mutations but before paint
+  useLayoutEffect(() => {
+    if (mode === 'preview' && previewRef.current && previewScrollPosRef.current > 0) {
+      // Use requestAnimationFrame to ensure DOM is fully updated
+      requestAnimationFrame(() => {
+        if (previewRef.current) {
+          previewRef.current.scrollTop = previewScrollPosRef.current;
+        }
+      });
+    }
+  }, [content, mode, searchOpen, searchQuery]);
+
   // Notify parent when mode changes
   const toggleMode = () => {
     const newMode = mode === 'edit' ? 'preview' : 'edit';
@@ -380,24 +397,32 @@ export function Scratchpad({
 
   // Save cursor position and scroll position when they change
   const handleCursorOrScrollChange = () => {
-    if (onStateChange && textareaRef.current) {
-      onStateChange({
-        mode,
-        cursorPosition: textareaRef.current.selectionStart,
-        editScrollPos: textareaRef.current.scrollTop,
-        previewScrollPos: previewRef.current?.scrollTop || 0
-      });
+    if (textareaRef.current) {
+      // Save to ref for persistence across re-renders
+      editScrollPosRef.current = textareaRef.current.scrollTop;
+      if (onStateChange) {
+        onStateChange({
+          mode,
+          cursorPosition: textareaRef.current.selectionStart,
+          editScrollPos: textareaRef.current.scrollTop,
+          previewScrollPos: previewRef.current?.scrollTop || 0
+        });
+      }
     }
   };
 
   const handlePreviewScroll = () => {
-    if (onStateChange && previewRef.current) {
-      onStateChange({
-        mode,
-        cursorPosition: textareaRef.current?.selectionStart || 0,
-        editScrollPos: textareaRef.current?.scrollTop || 0,
-        previewScrollPos: previewRef.current.scrollTop
-      });
+    if (previewRef.current) {
+      // Save to ref for persistence across re-renders
+      previewScrollPosRef.current = previewRef.current.scrollTop;
+      if (onStateChange) {
+        onStateChange({
+          mode,
+          cursorPosition: textareaRef.current?.selectionStart || 0,
+          editScrollPos: textareaRef.current?.scrollTop || 0,
+          previewScrollPos: previewRef.current.scrollTop
+        });
+      }
     }
   };
 
@@ -1321,3 +1346,28 @@ export function Scratchpad({
     </div>
   );
 }
+
+// Memoized Scratchpad component with custom comparison to prevent unnecessary re-renders
+export const Scratchpad = memo(ScratchpadInner, (prevProps, nextProps) => {
+  // Only re-render when these specific props actually change
+  return (
+    prevProps.content === nextProps.content &&
+    prevProps.sessionId === nextProps.sessionId &&
+    prevProps.initialMode === nextProps.initialMode &&
+    prevProps.theme === nextProps.theme &&
+    // Compare batch run state values, not object reference
+    prevProps.batchRunState?.isRunning === nextProps.batchRunState?.isRunning &&
+    prevProps.batchRunState?.isStopping === nextProps.batchRunState?.isStopping &&
+    prevProps.batchRunState?.currentTaskIndex === nextProps.batchRunState?.currentTaskIndex &&
+    prevProps.batchRunState?.totalTasks === nextProps.batchRunState?.totalTasks &&
+    // Session state affects UI (busy disables Run button)
+    prevProps.sessionState === nextProps.sessionState &&
+    // Callbacks are typically stable, but check identity
+    prevProps.onChange === nextProps.onChange &&
+    prevProps.onStateChange === nextProps.onStateChange &&
+    prevProps.onOpenBatchRunner === nextProps.onOpenBatchRunner &&
+    prevProps.onStopBatchRun === nextProps.onStopBatchRun
+    // Note: initialCursorPosition, initialEditScrollPos, initialPreviewScrollPos
+    // are intentionally NOT compared - they're only used on mount
+  );
+});

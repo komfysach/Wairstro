@@ -1541,7 +1541,7 @@ export default function MaestroConsole() {
         };
         const filtered = existingRecent.filter(r => r.sessionId !== claudeSessionId);
         const updatedRecent = [recentSession ? { ...recentSession, timestamp: new Date().toISOString() } : newRecentEntry, ...filtered].slice(0, 10);
-        return { ...s, claudeSessionId, aiLogs: messages, state: 'idle', inputMode: 'ai', recentClaudeSessions: updatedRecent };
+        return { ...s, claudeSessionId, aiLogs: messages, state: 'idle', inputMode: 'ai', recentClaudeSessions: updatedRecent, usageStats: undefined, contextUsage: 0, activeTimeMs: 0 };
       }));
       setActiveClaudeSessionId(claudeSessionId);
     } catch (error) {
@@ -4031,6 +4031,7 @@ export default function MaestroConsole() {
         agentSessionsOpen={agentSessionsOpen}
         activeClaudeSessionId={activeClaudeSessionId}
         activeSession={activeSession}
+        sessions={sessions}
         theme={theme}
         fontFamily={fontFamily}
         isMobileLandscape={isMobileLandscape}
@@ -4082,7 +4083,7 @@ export default function MaestroConsole() {
                 const existingRecent = s.recentClaudeSessions || [];
                 const filtered = existingRecent.filter(r => r.sessionId !== claudeSessionId);
                 const updatedRecent = [newRecentSession, ...filtered].slice(0, 10);
-                return { ...s, claudeSessionId, aiLogs: messages, state: 'idle', inputMode: 'ai', recentClaudeSessions: updatedRecent };
+                return { ...s, claudeSessionId, aiLogs: messages, state: 'idle', inputMode: 'ai', recentClaudeSessions: updatedRecent, usageStats: undefined, contextUsage: 0, activeTimeMs: 0 };
               });
               const updatedSession = updated.find(s => s.id === activeSession.id);
               console.log('[onResumeClaudeSession] Updated session claudeSessionId:', updatedSession?.claudeSessionId);
@@ -4111,7 +4112,7 @@ export default function MaestroConsole() {
               return;
             }
             setSessions(prev => prev.map(s =>
-              s.id === activeSession.id ? { ...s, claudeSessionId: undefined, aiLogs: [], state: 'idle' } : s
+              s.id === activeSession.id ? { ...s, claudeSessionId: undefined, aiLogs: [], state: 'idle', usageStats: undefined, contextUsage: 0, activeTimeMs: 0 } : s
             ));
             setActiveClaudeSessionId(null);
           }

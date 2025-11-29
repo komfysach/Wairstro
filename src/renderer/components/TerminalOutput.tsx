@@ -1,10 +1,669 @@
 import React, { useRef, useEffect, useMemo, forwardRef, useState, useCallback, memo } from 'react';
-import { Activity, X, ChevronDown, ChevronUp, Filter, PlusCircle, MinusCircle, Trash2, Copy, Volume2, Square, Check } from 'lucide-react';
+import { Activity, X, ChevronDown, ChevronUp, Filter, PlusCircle, MinusCircle, Trash2, Copy, Volume2, Square, Check, ArrowDown } from 'lucide-react';
 import type { Session, Theme, LogEntry } from '../types';
 import Convert from 'ansi-to-html';
 import DOMPurify from 'dompurify';
 import { useLayerStack } from '../contexts/LayerStackContext';
 import { MODAL_PRIORITIES } from '../constants/modalPriorities';
+
+// ============================================================================
+// Pure helper functions (moved outside component to prevent recreation)
+// ============================================================================
+
+// Process carriage returns to simulate terminal line overwrites
+const processCarriageReturns = (text: string): string => {
+  const lines = text.split('\n');
+  const processedLines = lines.map(line => {
+    if (line.includes('\r')) {
+      const segments = line.split('\r');
+      for (let i = segments.length - 1; i >= 0; i--) {
+        if (segments[i].trim()) {
+          return segments[i];
+        }
+      }
+      return '';
+    }
+    return line;
+  });
+  return processedLines.join('\n');
+};
+
+// Filter out bash prompt lines and apply processing
+const processLogTextHelper = (text: string, isTerminal: boolean): string => {
+  let processed = processCarriageReturns(text);
+  if (!isTerminal) return processed;
+
+  const lines = processed.split('\n');
+  const filteredLines = lines.filter(line => {
+    const trimmed = line.trim();
+    if (!trimmed) return false;
+    if (/^(bash-\d+\.\d+\$|zsh[%#]|\$|#)\s*$/.test(trimmed)) return false;
+    return true;
+  });
+
+  return filteredLines.join('\n');
+};
+
+// Filter text by lines containing the query (local filter)
+const filterTextByLinesHelper = (text: string, query: string, mode: 'include' | 'exclude', useRegex: boolean): string => {
+  if (!query) return text;
+
+  const lines = text.split('\n');
+
+  try {
+    if (useRegex) {
+      const regex = new RegExp(query, 'i');
+      const filteredLines = lines.filter(line => {
+        const matches = regex.test(line);
+        return mode === 'include' ? matches : !matches;
+      });
+      return filteredLines.join('\n');
+    } else {
+      const lowerQuery = query.toLowerCase();
+      const filteredLines = lines.filter(line => {
+        const matches = line.toLowerCase().includes(lowerQuery);
+        return mode === 'include' ? matches : !matches;
+      });
+      return filteredLines.join('\n');
+    }
+  } catch (error) {
+    const lowerQuery = query.toLowerCase();
+    const filteredLines = lines.filter(line => {
+      const matches = line.toLowerCase().includes(lowerQuery);
+      return mode === 'include' ? matches : !matches;
+    });
+    return filteredLines.join('\n');
+  }
+};
+
+// ============================================================================
+// LogItem - Memoized component for individual log entries
+// ============================================================================
+
+interface LogItemProps {
+  log: LogEntry;
+  index: number;
+  isTerminal: boolean;
+  isAIMode: boolean;
+  theme: Theme;
+  fontFamily: string;
+  maxOutputLines: number;
+  outputSearchQuery: string;
+  lastUserCommand?: string;
+  // Expansion state
+  isExpanded: boolean;
+  onToggleExpanded: (logId: string) => void;
+  // Local filter state
+  localFilterQuery: string;
+  filterMode: { mode: 'include' | 'exclude'; regex: boolean };
+  activeLocalFilter: string | null;
+  onToggleLocalFilter: (logId: string) => void;
+  onSetLocalFilterQuery: (logId: string, query: string) => void;
+  onSetFilterMode: (logId: string, update: (current: { mode: 'include' | 'exclude'; regex: boolean }) => { mode: 'include' | 'exclude'; regex: boolean }) => void;
+  onClearLocalFilter: (logId: string) => void;
+  // Delete state
+  deleteConfirmLogId: string | null;
+  onDeleteLog?: (logId: string) => number | null;
+  onSetDeleteConfirmLogId: (logId: string | null) => void;
+  scrollContainerRef: React.RefObject<HTMLDivElement>;
+  // Other callbacks
+  setLightboxImage: (image: string | null, contextImages?: string[]) => void;
+  copyToClipboard: (text: string) => void;
+  speakText?: (text: string, logId: string) => void;
+  stopSpeaking?: () => void;
+  speakingLogId: string | null;
+  audioFeedbackCommand?: string;
+  // ANSI converter
+  ansiConverter: Convert;
+}
+
+const LogItemComponent = memo(({
+  log,
+  index,
+  isTerminal,
+  isAIMode,
+  theme,
+  fontFamily,
+  maxOutputLines,
+  outputSearchQuery,
+  lastUserCommand,
+  isExpanded,
+  onToggleExpanded,
+  localFilterQuery,
+  filterMode,
+  activeLocalFilter,
+  onToggleLocalFilter,
+  onSetLocalFilterQuery,
+  onSetFilterMode,
+  onClearLocalFilter,
+  deleteConfirmLogId,
+  onDeleteLog,
+  onSetDeleteConfirmLogId,
+  scrollContainerRef,
+  setLightboxImage,
+  copyToClipboard,
+  speakText,
+  stopSpeaking,
+  speakingLogId,
+  audioFeedbackCommand,
+  ansiConverter,
+}: LogItemProps) => {
+  // Helper function to highlight search matches in text
+  const highlightMatches = (text: string, query: string): React.ReactNode => {
+    if (!query) return text;
+
+    const parts: React.ReactNode[] = [];
+    let lastIndex = 0;
+    const lowerText = text.toLowerCase();
+    const lowerQuery = query.toLowerCase();
+    let searchIndex = 0;
+
+    while (searchIndex < lowerText.length) {
+      const idx = lowerText.indexOf(lowerQuery, searchIndex);
+      if (idx === -1) break;
+
+      if (idx > lastIndex) {
+        parts.push(text.substring(lastIndex, idx));
+      }
+
+      parts.push(
+        <span
+          key={`match-${idx}`}
+          style={{
+            backgroundColor: theme.colors.warning,
+            color: theme.mode === 'light' ? '#fff' : '#000',
+            padding: '1px 2px',
+            borderRadius: '2px'
+          }}
+        >
+          {text.substring(idx, idx + query.length)}
+        </span>
+      );
+
+      lastIndex = idx + query.length;
+      searchIndex = lastIndex;
+    }
+
+    if (lastIndex < text.length) {
+      parts.push(text.substring(lastIndex));
+    }
+
+    return parts.length > 0 ? parts : text;
+  };
+
+  // Helper function to add search highlighting markers to text (before ANSI conversion)
+  const addHighlightMarkers = (text: string, query: string): string => {
+    if (!query) return text;
+
+    let result = '';
+    let lastIndex = 0;
+    const lowerText = text.toLowerCase();
+    const lowerQuery = query.toLowerCase();
+    let searchIndex = 0;
+
+    while (searchIndex < lowerText.length) {
+      const idx = lowerText.indexOf(lowerQuery, searchIndex);
+      if (idx === -1) break;
+
+      result += text.substring(lastIndex, idx);
+      result += `<mark style="background-color: ${theme.colors.warning}; color: ${theme.mode === 'light' ? '#fff' : '#000'}; padding: 1px 2px; border-radius: 2px;">`;
+      result += text.substring(idx, idx + query.length);
+      result += '</mark>';
+
+      lastIndex = idx + query.length;
+      searchIndex = lastIndex;
+    }
+
+    result += text.substring(lastIndex);
+    return result;
+  };
+
+  // Strip command echo from terminal output
+  let textToProcess = log.text;
+  if (isTerminal && log.source !== 'user' && lastUserCommand) {
+    if (textToProcess.startsWith(lastUserCommand)) {
+      textToProcess = textToProcess.slice(lastUserCommand.length);
+      if (textToProcess.startsWith('\r\n')) {
+        textToProcess = textToProcess.slice(2);
+      } else if (textToProcess.startsWith('\n') || textToProcess.startsWith('\r')) {
+        textToProcess = textToProcess.slice(1);
+      }
+    }
+  }
+
+  const processedText = processLogTextHelper(textToProcess, isTerminal && log.source !== 'user');
+
+  // Skip rendering stderr entries that have no actual content
+  if (log.source === 'stderr' && !processedText.trim()) {
+    return null;
+  }
+
+  // Separate stdout and stderr for terminal output
+  const separated = log.source === 'stderr'
+    ? { stdout: '', stderr: processedText }
+    : { stdout: processedText, stderr: '' };
+
+  // Apply local filter if active for this log entry
+  const filteredStdout = localFilterQuery && log.source !== 'user'
+    ? filterTextByLinesHelper(separated.stdout, localFilterQuery, filterMode.mode, filterMode.regex)
+    : separated.stdout;
+  const filteredStderr = localFilterQuery && log.source !== 'user'
+    ? filterTextByLinesHelper(separated.stderr, localFilterQuery, filterMode.mode, filterMode.regex)
+    : separated.stderr;
+
+  // Check if filter returned no results
+  const hasNoMatches = localFilterQuery && !filteredStdout.trim() && !filteredStderr.trim() && log.source !== 'user';
+
+  // Apply search highlighting before ANSI conversion for terminal output
+  const stdoutWithHighlights = isTerminal && log.source !== 'user' && outputSearchQuery
+    ? addHighlightMarkers(filteredStdout, outputSearchQuery)
+    : filteredStdout;
+
+  // Convert ANSI codes to HTML for terminal output and sanitize with DOMPurify
+  const stdoutHtmlContent = isTerminal && log.source !== 'user'
+    ? DOMPurify.sanitize(ansiConverter.toHtml(stdoutWithHighlights))
+    : filteredStdout;
+
+  const htmlContent = stdoutHtmlContent;
+  const filteredText = filteredStdout;
+
+  // Count lines in the filtered text
+  const lineCount = filteredText.split('\n').length;
+  const shouldCollapse = lineCount > maxOutputLines && maxOutputLines !== Infinity;
+
+  // Truncate text if collapsed
+  const displayText = shouldCollapse && !isExpanded
+    ? filteredText.split('\n').slice(0, maxOutputLines).join('\n')
+    : filteredText;
+
+  // Apply highlighting to truncated text as well
+  const displayTextWithHighlights = shouldCollapse && !isExpanded && isTerminal && log.source !== 'user' && outputSearchQuery
+    ? addHighlightMarkers(displayText, outputSearchQuery)
+    : displayText;
+
+  // Sanitize with DOMPurify before rendering
+  const displayHtmlContent = shouldCollapse && !isExpanded && isTerminal && log.source !== 'user'
+    ? DOMPurify.sanitize(ansiConverter.toHtml(displayTextWithHighlights))
+    : htmlContent;
+
+  const isUserMessage = log.source === 'user';
+
+  return (
+    <div className={`flex gap-4 group ${isUserMessage ? 'flex-row-reverse' : ''} px-6 py-2`} data-log-index={index}>
+      <div className={`w-12 shrink-0 text-[10px] pt-2 ${isUserMessage ? 'text-right' : 'text-left'}`}
+           style={{ fontFamily, color: theme.colors.textDim, opacity: 0.6 }}>
+        {new Date(log.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
+      </div>
+      <div className={`flex-1 p-4 rounded-xl border ${isUserMessage ? 'rounded-tr-none' : 'rounded-tl-none'} relative`}
+           style={{
+             backgroundColor: isUserMessage
+               ? isAIMode
+                 ? `color-mix(in srgb, ${theme.colors.accent} 20%, ${theme.colors.bgSidebar})`
+                 : `color-mix(in srgb, ${theme.colors.accent} 15%, ${theme.colors.bgActivity})`
+               : log.source === 'stderr'
+                 ? `color-mix(in srgb, ${theme.colors.error} 8%, ${theme.colors.bgActivity})`
+                 : isAIMode ? theme.colors.bgActivity : 'transparent',
+             borderColor: isUserMessage && isAIMode
+               ? theme.colors.accent + '40'
+               : log.source === 'stderr' ? theme.colors.error : theme.colors.border
+           }}>
+        {/* Local filter icon for system output only */}
+        {log.source !== 'user' && isTerminal && (
+          <div className="absolute top-2 right-2 flex items-center gap-2">
+            {activeLocalFilter === log.id || localFilterQuery ? (
+              <div className="flex items-center gap-2 p-2 rounded border" style={{ backgroundColor: theme.colors.bgSidebar, borderColor: theme.colors.border }}>
+                <button
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => {
+                    onSetFilterMode(log.id, (current) => ({ ...current, mode: current.mode === 'include' ? 'exclude' : 'include' }));
+                  }}
+                  className="p-1 rounded hover:opacity-70 transition-opacity"
+                  style={{ color: filterMode.mode === 'include' ? theme.colors.success : theme.colors.error }}
+                  title={filterMode.mode === 'include' ? 'Include matching lines' : 'Exclude matching lines'}
+                >
+                  {filterMode.mode === 'include' ? <PlusCircle className="w-3.5 h-3.5" /> : <MinusCircle className="w-3.5 h-3.5" />}
+                </button>
+                <button
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => {
+                    onSetFilterMode(log.id, (current) => ({ ...current, regex: !current.regex }));
+                  }}
+                  className="px-2 py-1 rounded hover:opacity-70 transition-opacity text-xs font-bold"
+                  style={{ fontFamily, color: filterMode.regex ? theme.colors.accent : theme.colors.textDim }}
+                  title={filterMode.regex ? 'Using regex' : 'Using plain text'}
+                >
+                  {filterMode.regex ? '.*' : 'Aa'}
+                </button>
+                <input
+                  type="text"
+                  value={localFilterQuery}
+                  onChange={(e) => onSetLocalFilterQuery(log.id, e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Escape') {
+                      e.stopPropagation();
+                      onClearLocalFilter(log.id);
+                    }
+                  }}
+                  onBlur={() => {
+                    if (!localFilterQuery) {
+                      onToggleLocalFilter(log.id);
+                    }
+                  }}
+                  placeholder={
+                    filterMode.mode === 'include'
+                      ? (filterMode.regex ? "Include by RegEx" : "Include by keyword")
+                      : (filterMode.regex ? "Exclude by RegEx" : "Exclude by keyword")
+                  }
+                  className="w-40 px-2 py-1 text-xs rounded border bg-transparent outline-none"
+                  style={{
+                    borderColor: theme.colors.accent,
+                    color: theme.colors.textMain,
+                    backgroundColor: theme.colors.bgMain
+                  }}
+                  autoFocus={activeLocalFilter === log.id}
+                />
+                <button
+                  onClick={() => onClearLocalFilter(log.id)}
+                  className="p-1 rounded hover:opacity-70 transition-opacity"
+                  style={{ color: theme.colors.textDim }}
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => onToggleLocalFilter(log.id)}
+                className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-opacity-10 transition-opacity"
+                style={{
+                  color: localFilterQuery ? theme.colors.accent : theme.colors.textDim,
+                  backgroundColor: localFilterQuery ? theme.colors.bgActivity : 'transparent'
+                }}
+                title="Filter this output"
+              >
+                <Filter className="w-3 h-3" />
+              </button>
+            )}
+          </div>
+        )}
+        {log.images && log.images.length > 0 && (
+          <div className="flex gap-2 mb-2 overflow-x-auto scrollbar-thin" style={{ overscrollBehavior: 'contain' }}>
+            {log.images.map((img, imgIdx) => (
+              <img key={imgIdx} src={img} className="h-20 rounded border cursor-zoom-in" onClick={() => setLightboxImage(img, log.images)} />
+            ))}
+          </div>
+        )}
+        {log.source === 'stderr' && (
+          <div className="mb-2">
+            <span
+              className="px-2 py-1 rounded text-xs font-bold uppercase tracking-wide"
+              style={{
+                backgroundColor: theme.colors.error,
+                color: '#fff'
+              }}
+            >
+              STDERR
+            </span>
+          </div>
+        )}
+        {hasNoMatches ? (
+          <div className="flex items-center justify-center py-8 text-sm" style={{ color: theme.colors.textDim }}>
+            <span>No matches found for filter</span>
+          </div>
+        ) : shouldCollapse && !isExpanded ? (
+          <div>
+            <div
+              className={`${isTerminal && log.source !== 'user' ? 'whitespace-pre-wrap text-sm overflow-x-auto' : 'whitespace-pre-wrap text-sm'}`}
+              style={{
+                maxHeight: `${maxOutputLines * 1.5}em`,
+                overflow: 'hidden',
+                color: theme.colors.textMain,
+                fontFamily
+              }}
+            >
+              {isTerminal && log.source !== 'user' ? (
+                // Content sanitized with DOMPurify above
+                <div dangerouslySetInnerHTML={{ __html: displayHtmlContent }} />
+              ) : (
+                displayText
+              )}
+            </div>
+            <button
+              onClick={() => onToggleExpanded(log.id)}
+              className="flex items-center gap-2 mt-2 text-xs px-3 py-1.5 rounded border hover:opacity-70 transition-opacity"
+              style={{
+                borderColor: theme.colors.border,
+                backgroundColor: theme.colors.bgActivity,
+                color: theme.colors.accent
+              }}
+            >
+              <ChevronDown className="w-3 h-3" />
+              Show all {lineCount} lines
+            </button>
+          </div>
+        ) : shouldCollapse && isExpanded ? (
+          <div>
+            <div
+              className={`${isTerminal && log.source !== 'user' ? 'whitespace-pre-wrap text-sm overflow-x-auto scrollbar-thin' : 'whitespace-pre-wrap text-sm'}`}
+              style={{
+                maxHeight: '600px',
+                overflow: 'auto',
+                overscrollBehavior: 'contain',
+                color: theme.colors.textMain,
+                fontFamily
+              }}
+              onWheel={(e) => {
+                // Prevent scroll from propagating to parent when this container can scroll
+                const el = e.currentTarget;
+                const { scrollTop, scrollHeight, clientHeight } = el;
+                const atTop = scrollTop <= 0;
+                const atBottom = scrollTop + clientHeight >= scrollHeight - 1;
+
+                // Only stop propagation if we're not at the boundary we're scrolling towards
+                if ((e.deltaY < 0 && !atTop) || (e.deltaY > 0 && !atBottom)) {
+                  e.stopPropagation();
+                }
+              }}
+            >
+              {isTerminal && log.source !== 'user' ? (
+                // Content sanitized with DOMPurify above
+                <div dangerouslySetInnerHTML={{ __html: displayHtmlContent }} />
+              ) : log.source === 'user' && isTerminal ? (
+                <div style={{ fontFamily }}>
+                  <span style={{ color: theme.colors.accent }}>$ </span>
+                  {highlightMatches(filteredText, outputSearchQuery)}
+                </div>
+              ) : log.aiCommand ? (
+                <div className="space-y-3">
+                  <div
+                    className="flex items-center gap-2 px-3 py-2 rounded-lg border"
+                    style={{
+                      backgroundColor: theme.colors.accent + '15',
+                      borderColor: theme.colors.accent + '30'
+                    }}
+                  >
+                    <span className="font-mono font-bold text-sm" style={{ color: theme.colors.accent }}>
+                      {log.aiCommand.command}:
+                    </span>
+                    <span className="text-sm" style={{ color: theme.colors.textMain }}>
+                      {log.aiCommand.description}
+                    </span>
+                  </div>
+                  <div>{highlightMatches(filteredText, outputSearchQuery)}</div>
+                </div>
+              ) : (
+                <div>{highlightMatches(filteredText, outputSearchQuery)}</div>
+              )}
+            </div>
+            <button
+              onClick={() => onToggleExpanded(log.id)}
+              className="flex items-center gap-2 mt-2 text-xs px-3 py-1.5 rounded border hover:opacity-70 transition-opacity"
+              style={{
+                borderColor: theme.colors.border,
+                backgroundColor: theme.colors.bgActivity,
+                color: theme.colors.accent
+              }}
+            >
+              <ChevronUp className="w-3 h-3" />
+              Show less
+            </button>
+          </div>
+        ) : (
+          <>
+            {isTerminal && log.source !== 'user' ? (
+              // Content sanitized with DOMPurify above
+              <div
+                className="whitespace-pre-wrap text-sm overflow-x-auto scrollbar-thin"
+                style={{ color: theme.colors.textMain, fontFamily, overscrollBehavior: 'contain' }}
+                dangerouslySetInnerHTML={{ __html: displayHtmlContent }}
+              />
+            ) : log.source === 'user' && isTerminal ? (
+              <div className="whitespace-pre-wrap text-sm" style={{ color: theme.colors.textMain, fontFamily }}>
+                <span style={{ color: theme.colors.accent }}>$ </span>
+                {highlightMatches(filteredText, outputSearchQuery)}
+              </div>
+            ) : log.aiCommand ? (
+              <div className="space-y-3">
+                <div
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg border"
+                  style={{
+                    backgroundColor: theme.colors.accent + '15',
+                    borderColor: theme.colors.accent + '30'
+                  }}
+                >
+                  <span className="font-mono font-bold text-sm" style={{ color: theme.colors.accent }}>
+                    {log.aiCommand.command}:
+                  </span>
+                  <span className="text-sm" style={{ color: theme.colors.textMain }}>
+                    {log.aiCommand.description}
+                  </span>
+                </div>
+                <div className="whitespace-pre-wrap text-sm" style={{ color: theme.colors.textMain }}>
+                  {highlightMatches(filteredText, outputSearchQuery)}
+                </div>
+              </div>
+            ) : (
+              <div className="whitespace-pre-wrap text-sm" style={{ color: theme.colors.textMain }}>
+                {highlightMatches(filteredText, outputSearchQuery)}
+              </div>
+            )}
+          </>
+        )}
+        {/* Action buttons - bottom right corner */}
+        <div
+          className="absolute bottom-2 right-2 flex items-center gap-1"
+          style={{ transition: 'opacity 0.15s ease-in-out' }}
+        >
+          {/* Speak/Stop Button - only show for non-user messages when TTS is configured */}
+          {audioFeedbackCommand && log.source !== 'user' && (
+            speakingLogId === log.id ? (
+              <button
+                onClick={stopSpeaking}
+                className="p-1.5 rounded opacity-100"
+                style={{ color: theme.colors.error }}
+                title="Stop speaking"
+              >
+                <Square className="w-3.5 h-3.5" fill="currentColor" />
+              </button>
+            ) : (
+              <button
+                onClick={() => speakText?.(log.text, log.id)}
+                className="p-1.5 rounded opacity-0 group-hover:opacity-50 hover:!opacity-100"
+                style={{ color: theme.colors.textDim }}
+                title="Speak text"
+              >
+                <Volume2 className="w-3.5 h-3.5" />
+              </button>
+            )
+          )}
+          {/* Copy to Clipboard Button */}
+          <button
+            onClick={() => copyToClipboard(log.text)}
+            className="p-1.5 rounded opacity-0 group-hover:opacity-50 hover:!opacity-100"
+            style={{ color: theme.colors.textDim }}
+            title="Copy to clipboard"
+          >
+            <Copy className="w-3.5 h-3.5" />
+          </button>
+          {/* Delete button for user messages (both AI and terminal modes) */}
+          {log.source === 'user' && onDeleteLog && (
+            deleteConfirmLogId === log.id ? (
+              <div className="flex items-center gap-1 p-1 rounded border" style={{ backgroundColor: theme.colors.bgSidebar, borderColor: theme.colors.error }}>
+                <span className="text-xs px-1" style={{ color: theme.colors.error }}>Delete?</span>
+                <button
+                  onClick={() => {
+                    const nextIndex = onDeleteLog(log.id);
+                    onSetDeleteConfirmLogId(null);
+                    if (nextIndex !== null && nextIndex >= 0) {
+                      setTimeout(() => {
+                        const container = scrollContainerRef.current;
+                        const items = container?.querySelectorAll('[data-log-index]');
+                        const targetItem = items?.[nextIndex] as HTMLElement;
+                        if (targetItem && container) {
+                          container.scrollTop = targetItem.offsetTop;
+                        }
+                      }, 50);
+                    }
+                  }}
+                  className="px-2 py-0.5 rounded text-xs font-medium hover:opacity-80"
+                  style={{ backgroundColor: theme.colors.error, color: '#fff' }}
+                >
+                  Yes
+                </button>
+                <button
+                  onClick={() => onSetDeleteConfirmLogId(null)}
+                  className="px-2 py-0.5 rounded text-xs hover:opacity-80"
+                  style={{ color: theme.colors.textDim }}
+                >
+                  No
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => onSetDeleteConfirmLogId(log.id)}
+                className="p-1.5 rounded opacity-0 group-hover:opacity-50 hover:!opacity-100 transition-opacity"
+                style={{ color: theme.colors.textDim }}
+                title={isAIMode ? "Delete message and response" : "Delete command and output"}
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            )
+          )}
+          {/* Delivery checkmark for user messages in AI mode - positioned at the end */}
+          {isUserMessage && isAIMode && log.delivered && (
+            <Check
+              className="w-3.5 h-3.5"
+              style={{ color: theme.colors.success, opacity: 0.6 }}
+              title="Message delivered"
+            />
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}, (prevProps, nextProps) => {
+  // Custom comparison - only re-render if these specific props change
+  return (
+    prevProps.log.id === nextProps.log.id &&
+    prevProps.log.text === nextProps.log.text &&
+    prevProps.log.delivered === nextProps.log.delivered &&
+    prevProps.isExpanded === nextProps.isExpanded &&
+    prevProps.localFilterQuery === nextProps.localFilterQuery &&
+    prevProps.filterMode.mode === nextProps.filterMode.mode &&
+    prevProps.filterMode.regex === nextProps.filterMode.regex &&
+    prevProps.activeLocalFilter === nextProps.activeLocalFilter &&
+    prevProps.deleteConfirmLogId === nextProps.deleteConfirmLogId &&
+    prevProps.speakingLogId === nextProps.speakingLogId &&
+    prevProps.outputSearchQuery === nextProps.outputSearchQuery &&
+    prevProps.theme === nextProps.theme &&
+    prevProps.maxOutputLines === nextProps.maxOutputLines
+  );
+});
+
+LogItemComponent.displayName = 'LogItemComponent';
+
+// ============================================================================
+// ElapsedTimeDisplay - Separate component for elapsed time
+// ============================================================================
 
 // Separate component for elapsed time to prevent re-renders of the entire list
 const ElapsedTimeDisplay = memo(({ thinkingStartTime, textColor }: { thinkingStartTime: number; textColor: string }) => {
@@ -117,6 +776,12 @@ export const TerminalOutput = forwardRef<HTMLDivElement, TerminalOutputProps>((p
   // TTS state - track which log is currently speaking and its TTS ID
   const [speakingLogId, setSpeakingLogId] = useState<string | null>(null);
   const [activeTtsId, setActiveTtsId] = useState<number | null>(null);
+
+  // New message indicator state
+  const [isAtBottom, setIsAtBottom] = useState(true);
+  const [hasNewMessages, setHasNewMessages] = useState(false);
+  const [newMessageCount, setNewMessageCount] = useState(0);
+  const lastLogCountRef = useRef(0);
 
   // Copy text to clipboard with notification
   const copyToClipboard = useCallback(async (text: string) => {
@@ -244,119 +909,26 @@ export const TerminalOutput = forwardRef<HTMLDivElement, TerminalOutputProps>((p
     });
   }, []);
 
-  // Helper function to highlight search matches in text
-  const highlightMatches = (text: string, query: string): React.ReactNode => {
-    if (!query) return text;
+  // Callback to update filter mode for a log entry
+  const setFilterModeForLog = useCallback((logId: string, update: (current: { mode: 'include' | 'exclude'; regex: boolean }) => { mode: 'include' | 'exclude'; regex: boolean }) => {
+    setFilterModes(prev => {
+      const newMap = new Map(prev);
+      const current = newMap.get(logId) || { mode: 'include' as const, regex: false };
+      newMap.set(logId, update(current));
+      return newMap;
+    });
+  }, []);
 
-    const parts: React.ReactNode[] = [];
-    let lastIndex = 0;
-    const lowerText = text.toLowerCase();
-    const lowerQuery = query.toLowerCase();
-    let searchIndex = 0;
-
-    while (searchIndex < lowerText.length) {
-      const index = lowerText.indexOf(lowerQuery, searchIndex);
-      if (index === -1) break;
-
-      // Add text before match
-      if (index > lastIndex) {
-        parts.push(text.substring(lastIndex, index));
-      }
-
-      // Add highlighted match
-      parts.push(
-        <span
-          key={`match-${index}`}
-          style={{
-            backgroundColor: theme.colors.warning,
-            color: theme.mode === 'light' ? '#fff' : '#000',
-            padding: '1px 2px',
-            borderRadius: '2px'
-          }}
-        >
-          {text.substring(index, index + query.length)}
-        </span>
-      );
-
-      lastIndex = index + query.length;
-      searchIndex = lastIndex;
-    }
-
-    // Add remaining text
-    if (lastIndex < text.length) {
-      parts.push(text.substring(lastIndex));
-    }
-
-    return parts.length > 0 ? parts : text;
-  };
-
-  // Helper function to add search highlighting markers to text (before ANSI conversion)
-  // Uses special markers that survive ANSI-to-HTML conversion
-  const addHighlightMarkers = (text: string, query: string): string => {
-    if (!query) return text;
-
-    let result = '';
-    let lastIndex = 0;
-    const lowerText = text.toLowerCase();
-    const lowerQuery = query.toLowerCase();
-    let searchIndex = 0;
-
-    while (searchIndex < lowerText.length) {
-      const index = lowerText.indexOf(lowerQuery, searchIndex);
-      if (index === -1) break;
-
-      // Add text before match
-      result += text.substring(lastIndex, index);
-
-      // Add marked match with special tags
-      result += `<mark style="background-color: ${theme.colors.warning}; color: ${theme.mode === 'light' ? '#fff' : '#000'}; padding: 1px 2px; border-radius: 2px;">`;
-      result += text.substring(index, index + query.length);
-      result += '</mark>';
-
-      lastIndex = index + query.length;
-      searchIndex = lastIndex;
-    }
-
-    // Add remaining text
-    result += text.substring(lastIndex);
-
-    return result;
-  };
-
-  // Helper function to filter text by lines containing the query (local filter)
-  const filterTextByLines = (text: string, query: string, mode: 'include' | 'exclude', useRegex: boolean): string => {
-    if (!query) return text;
-
-    const lines = text.split('\n');
-
-    try {
-      if (useRegex) {
-        // Use regex matching
-        const regex = new RegExp(query, 'i');
-        const filteredLines = lines.filter(line => {
-          const matches = regex.test(line);
-          return mode === 'include' ? matches : !matches;
-        });
-        return filteredLines.join('\n');
-      } else {
-        // Use plain text matching
-        const lowerQuery = query.toLowerCase();
-        const filteredLines = lines.filter(line => {
-          const matches = line.toLowerCase().includes(lowerQuery);
-          return mode === 'include' ? matches : !matches;
-        });
-        return filteredLines.join('\n');
-      }
-    } catch (error) {
-      // If regex is invalid, fall back to plain text matching
-      const lowerQuery = query.toLowerCase();
-      const filteredLines = lines.filter(line => {
-        const matches = line.toLowerCase().includes(lowerQuery);
-        return mode === 'include' ? matches : !matches;
-      });
-      return filteredLines.join('\n');
-    }
-  };
+  // Callback to clear local filter for a log entry
+  const clearLocalFilter = useCallback((logId: string) => {
+    setActiveLocalFilter(null);
+    setLocalFilterQuery(logId, '');
+    setFilterModes(prev => {
+      const newMap = new Map(prev);
+      newMap.delete(logId);
+      return newMap;
+    });
+  }, [setLocalFilterQuery]);
 
   // Auto-focus on search input when opened
   useEffect(() => {
@@ -385,51 +957,6 @@ export const TerminalOutput = forwardRef<HTMLDivElement, TerminalOutputProps>((p
       }
     });
   }, [theme]);
-
-  // Process carriage returns to simulate terminal line overwrites
-  // When \r appears (not followed by \n), it means "return to start of line"
-  // and subsequent text overwrites from the beginning
-  const processCarriageReturns = (text: string): string => {
-    // Split by newlines first, then process each line for carriage returns
-    const lines = text.split('\n');
-    const processedLines = lines.map(line => {
-      // If line contains \r (but not \r\n which was already converted to \n),
-      // split by \r and take the last non-empty segment (the final overwrite)
-      if (line.includes('\r')) {
-        const segments = line.split('\r');
-        // Find the last non-empty segment (the final state of the line)
-        for (let i = segments.length - 1; i >= 0; i--) {
-          if (segments[i].trim()) {
-            return segments[i];
-          }
-        }
-        // If all segments are empty, return empty string
-        return '';
-      }
-      return line;
-    });
-    return processedLines.join('\n');
-  };
-
-  // Filter out bash prompt lines and apply processing
-  const processLogText = (text: string, isTerminal: boolean): string => {
-    // Always process carriage returns (for AI status lines like "Claude is thinking...")
-    let processed = processCarriageReturns(text);
-
-    if (!isTerminal) return processed;
-
-    // Remove bash prompt lines (e.g., "bash-3.2$", "zsh%", "$", "#")
-    const lines = processed.split('\n');
-    const filteredLines = lines.filter(line => {
-      const trimmed = line.trim();
-      // Skip empty lines and common prompt patterns
-      if (!trimmed) return false;
-      if (/^(bash-\d+\.\d+\$|zsh[%#]|\$|#)\s*$/.test(trimmed)) return false;
-      return true;
-    });
-
-    return filteredLines.join('\n');
-  };
 
   const activeLogs: LogEntry[] = session.inputMode === 'ai' ? session.aiLogs : session.shellLogs;
 
@@ -482,476 +1009,56 @@ export const TerminalOutput = forwardRef<HTMLDivElement, TerminalOutputProps>((p
     );
   }, [collapsedLogs, outputSearchQuery]);
 
-  // Render a single log item - used by Virtuoso
-  const LogItem = useCallback(({ index, log }: { index: number; log: LogEntry }) => {
-    const isTerminal = session.inputMode === 'terminal';
+  // Handle scroll to detect if user is at bottom
+  const handleScroll = useCallback(() => {
+    if (!scrollContainerRef.current) return;
+    const { scrollTop, scrollHeight, clientHeight } = scrollContainerRef.current;
+    // Consider "at bottom" if within 50px of the bottom
+    const atBottom = scrollHeight - scrollTop - clientHeight < 50;
+    setIsAtBottom(atBottom);
+    // Clear new message indicator when user scrolls to bottom
+    if (atBottom) {
+      setHasNewMessages(false);
+      setNewMessageCount(0);
+    }
+  }, []);
 
-    // Find the most recent user command before this log entry (for echo stripping)
-    let lastUserCommand: string | undefined;
-    if (isTerminal && log.source !== 'user') {
-      for (let i = index - 1; i >= 0; i--) {
-        if (filteredLogs[i].source === 'user') {
-          lastUserCommand = filteredLogs[i].text;
-          break;
-        }
+  // Detect new messages when user is not at bottom
+  useEffect(() => {
+    const currentCount = filteredLogs.length;
+    if (currentCount > lastLogCountRef.current && !isAtBottom) {
+      const newCount = currentCount - lastLogCountRef.current;
+      setHasNewMessages(true);
+      setNewMessageCount(prev => prev + newCount);
+    }
+    lastLogCountRef.current = currentCount;
+  }, [filteredLogs.length, isAtBottom]);
+
+  // Scroll to bottom function
+  const scrollToBottom = useCallback(() => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTo({
+        top: scrollContainerRef.current.scrollHeight,
+        behavior: 'smooth'
+      });
+      setHasNewMessages(false);
+      setNewMessageCount(0);
+    }
+  }, []);
+
+  // Helper to find last user command for echo stripping in terminal mode
+  const getLastUserCommand = useCallback((index: number): string | undefined => {
+    for (let i = index - 1; i >= 0; i--) {
+      if (filteredLogs[i]?.source === 'user') {
+        return filteredLogs[i].text;
       }
     }
+    return undefined;
+  }, [filteredLogs]);
 
-    // Strip command echo from terminal output
-    let textToProcess = log.text;
-    if (isTerminal && log.source !== 'user' && lastUserCommand) {
-      // Remove command echo from beginning of output
-      if (textToProcess.startsWith(lastUserCommand)) {
-        textToProcess = textToProcess.slice(lastUserCommand.length);
-        // Remove newline after command
-        if (textToProcess.startsWith('\r\n')) {
-          textToProcess = textToProcess.slice(2);
-        } else if (textToProcess.startsWith('\n') || textToProcess.startsWith('\r')) {
-          textToProcess = textToProcess.slice(1);
-        }
-      }
-    }
-
-    const processedText = processLogText(textToProcess, isTerminal && log.source !== 'user');
-
-    // Skip rendering stderr entries that have no actual content
-    if (log.source === 'stderr' && !processedText.trim()) {
-      return null;
-    }
-
-    // Separate stdout and stderr for terminal output
-    const separated = log.source === 'stderr'
-      ? { stdout: '', stderr: processedText }
-      : { stdout: processedText, stderr: '' };
-
-    // Apply local filter if active for this log entry (use refs for stable callback)
-    const localFilterQuery = localFiltersRef.current.get(log.id) || '';
-    const filterMode = filterModesRef.current.get(log.id) || { mode: 'include', regex: false };
-    const filteredStdout = localFilterQuery && log.source !== 'user'
-      ? filterTextByLines(separated.stdout, localFilterQuery, filterMode.mode, filterMode.regex)
-      : separated.stdout;
-    const filteredStderr = localFilterQuery && log.source !== 'user'
-      ? filterTextByLines(separated.stderr, localFilterQuery, filterMode.mode, filterMode.regex)
-      : separated.stderr;
-
-    // Check if filter returned no results
-    const hasNoMatches = localFilterQuery && !filteredStdout.trim() && !filteredStderr.trim() && log.source !== 'user';
-
-    // Apply search highlighting before ANSI conversion for terminal output
-    const stdoutWithHighlights = isTerminal && log.source !== 'user' && outputSearchQuery
-      ? addHighlightMarkers(filteredStdout, outputSearchQuery)
-      : filteredStdout;
-
-    // Convert ANSI codes to HTML for terminal output and sanitize
-    const stdoutHtmlContent = isTerminal && log.source !== 'user'
-      ? DOMPurify.sanitize(ansiConverter.toHtml(stdoutWithHighlights))
-      : filteredStdout;
-
-    const htmlContent = stdoutHtmlContent;
-    const filteredText = filteredStdout;
-
-    // Count lines in the filtered text
-    const lineCount = filteredText.split('\n').length;
-    const shouldCollapse = lineCount > maxOutputLines && maxOutputLines !== Infinity;
-    const isExpanded = expandedLogsRef.current.has(log.id);
-
-    // Truncate text if collapsed
-    const displayText = shouldCollapse && !isExpanded
-      ? filteredText.split('\n').slice(0, maxOutputLines).join('\n')
-      : filteredText;
-
-    // Apply highlighting to truncated text as well
-    const displayTextWithHighlights = shouldCollapse && !isExpanded && isTerminal && log.source !== 'user' && outputSearchQuery
-      ? addHighlightMarkers(displayText, outputSearchQuery)
-      : displayText;
-
-    const displayHtmlContent = shouldCollapse && !isExpanded && isTerminal && log.source !== 'user'
-      ? DOMPurify.sanitize(ansiConverter.toHtml(displayTextWithHighlights))
-      : htmlContent;
-
-    // In AI mode, user messages go right with timestamp on the right
-    // In terminal mode, user commands still have the $ prefix style
-    const isAIMode = session.inputMode === 'ai';
-    const isUserMessage = log.source === 'user';
-
-    return (
-      <div className={`flex gap-4 group ${isUserMessage ? 'flex-row-reverse' : ''} px-6 py-2`} data-log-index={index}>
-        <div className={`w-12 shrink-0 text-[10px] pt-2 ${isUserMessage ? 'text-right' : 'text-left'}`}
-             style={{ fontFamily, color: theme.colors.textDim, opacity: 0.6 }}>
-          {new Date(log.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
-        </div>
-        <div className={`flex-1 p-4 rounded-xl border ${isUserMessage ? 'rounded-tr-none' : 'rounded-tl-none'} relative`}
-             style={{
-               backgroundColor: isUserMessage
-                 ? isAIMode
-                   ? `color-mix(in srgb, ${theme.colors.accent} 20%, ${theme.colors.bgSidebar})`
-                   : `color-mix(in srgb, ${theme.colors.accent} 15%, ${theme.colors.bgActivity})`
-                 : log.source === 'stderr'
-                   ? `color-mix(in srgb, ${theme.colors.error} 8%, ${theme.colors.bgActivity})`
-                   : isAIMode ? theme.colors.bgActivity : 'transparent',
-               borderColor: isUserMessage && isAIMode
-                 ? theme.colors.accent + '40'
-                 : log.source === 'stderr' ? theme.colors.error : theme.colors.border
-             }}>
-          {/* Local filter icon for system output only */}
-          {log.source !== 'user' && isTerminal && (
-            <div className="absolute top-2 right-2 flex items-center gap-2">
-              {activeLocalFilterRef.current === log.id || localFilterQuery ? (
-                <div className="flex items-center gap-2 p-2 rounded border" style={{ backgroundColor: theme.colors.bgSidebar, borderColor: theme.colors.border }}>
-                  <button
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => {
-                      setFilterModes(prev => {
-                        const newMap = new Map(prev);
-                        const current = newMap.get(log.id) || { mode: 'include', regex: false };
-                        newMap.set(log.id, { ...current, mode: current.mode === 'include' ? 'exclude' : 'include' });
-                        return newMap;
-                      });
-                    }}
-                    className="p-1 rounded hover:opacity-70 transition-opacity"
-                    style={{ color: filterMode.mode === 'include' ? theme.colors.success : theme.colors.error }}
-                    title={filterMode.mode === 'include' ? 'Include matching lines' : 'Exclude matching lines'}
-                  >
-                    {filterMode.mode === 'include' ? <PlusCircle className="w-3.5 h-3.5" /> : <MinusCircle className="w-3.5 h-3.5" />}
-                  </button>
-                  <button
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => {
-                      setFilterModes(prev => {
-                        const newMap = new Map(prev);
-                        const current = newMap.get(log.id) || { mode: 'include', regex: false };
-                        newMap.set(log.id, { ...current, regex: !current.regex });
-                        return newMap;
-                      });
-                    }}
-                    className="px-2 py-1 rounded hover:opacity-70 transition-opacity text-xs font-bold"
-                    style={{ fontFamily, color: filterMode.regex ? theme.colors.accent : theme.colors.textDim }}
-                    title={filterMode.regex ? 'Using regex' : 'Using plain text'}
-                  >
-                    {filterMode.regex ? '.*' : 'Aa'}
-                  </button>
-                  <input
-                    type="text"
-                    value={localFilterQuery}
-                    onChange={(e) => setLocalFilterQuery(log.id, e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Escape') {
-                        e.stopPropagation();
-                        setActiveLocalFilter(null);
-                        setLocalFilterQuery(log.id, '');
-                        setFilterModes(prev => {
-                          const newMap = new Map(prev);
-                          newMap.delete(log.id);
-                          return newMap;
-                        });
-                      }
-                    }}
-                    onBlur={() => {
-                      if (!localFilterQuery) {
-                        setActiveLocalFilter(null);
-                      }
-                    }}
-                    placeholder={
-                      filterMode.mode === 'include'
-                        ? (filterMode.regex ? "Include by RegEx" : "Include by keyword")
-                        : (filterMode.regex ? "Exclude by RegEx" : "Exclude by keyword")
-                    }
-                    className="w-40 px-2 py-1 text-xs rounded border bg-transparent outline-none"
-                    style={{
-                      borderColor: theme.colors.accent,
-                      color: theme.colors.textMain,
-                      backgroundColor: theme.colors.bgMain
-                    }}
-                    autoFocus={activeLocalFilterRef.current === log.id}
-                  />
-                  <button
-                    onClick={() => {
-                      setActiveLocalFilter(null);
-                      setLocalFilterQuery(log.id, '');
-                      setFilterModes(prev => {
-                        const newMap = new Map(prev);
-                        newMap.delete(log.id);
-                        return newMap;
-                      });
-                    }}
-                    className="p-1 rounded hover:opacity-70 transition-opacity"
-                    style={{ color: theme.colors.textDim }}
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                </div>
-              ) : (
-                <button
-                  onClick={() => toggleLocalFilter(log.id)}
-                  className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-opacity-10 transition-opacity"
-                  style={{
-                    color: localFilterQuery ? theme.colors.accent : theme.colors.textDim,
-                    backgroundColor: localFilterQuery ? theme.colors.bgActivity : 'transparent'
-                  }}
-                  title="Filter this output"
-                >
-                  <Filter className="w-3 h-3" />
-                </button>
-              )}
-            </div>
-          )}
-          {log.images && log.images.length > 0 && (
-            <div className="flex gap-2 mb-2 overflow-x-auto scrollbar-thin" style={{ overscrollBehavior: 'contain' }}>
-              {log.images.map((img, imgIdx) => (
-                <img key={imgIdx} src={img} className="h-20 rounded border cursor-zoom-in" onClick={() => setLightboxImage(img, log.images)} />
-              ))}
-            </div>
-          )}
-          {log.source === 'stderr' && (
-            <div className="mb-2">
-              <span
-                className="px-2 py-1 rounded text-xs font-bold uppercase tracking-wide"
-                style={{
-                  backgroundColor: theme.colors.error,
-                  color: '#fff'
-                }}
-              >
-                STDERR
-              </span>
-            </div>
-          )}
-          {hasNoMatches ? (
-            <div className="flex items-center justify-center py-8 text-sm" style={{ color: theme.colors.textDim }}>
-              <span>No matches found for filter</span>
-            </div>
-          ) : shouldCollapse && !isExpanded ? (
-            <div>
-              <div
-                className={`${isTerminal && log.source !== 'user' ? 'whitespace-pre-wrap text-sm overflow-x-auto' : 'whitespace-pre-wrap text-sm'}`}
-                style={{
-                  maxHeight: `${maxOutputLines * 1.5}em`,
-                  overflow: 'hidden',
-                  color: theme.colors.textMain,
-                  fontFamily
-                }}
-              >
-                {isTerminal && log.source !== 'user' ? (
-                  <div dangerouslySetInnerHTML={{ __html: displayHtmlContent }} />
-                ) : (
-                  displayText
-                )}
-              </div>
-              <button
-                onClick={() => toggleExpanded(log.id)}
-                className="flex items-center gap-2 mt-2 text-xs px-3 py-1.5 rounded border hover:opacity-70 transition-opacity"
-                style={{
-                  borderColor: theme.colors.border,
-                  backgroundColor: theme.colors.bgActivity,
-                  color: theme.colors.accent
-                }}
-              >
-                <ChevronDown className="w-3 h-3" />
-                Show all {lineCount} lines
-              </button>
-            </div>
-          ) : shouldCollapse && isExpanded ? (
-            <div>
-              <div
-                className={`${isTerminal && log.source !== 'user' ? 'whitespace-pre-wrap text-sm overflow-x-auto scrollbar-thin' : 'whitespace-pre-wrap text-sm'}`}
-                style={{
-                  maxHeight: '600px',
-                  overflow: 'auto',
-                  overscrollBehavior: 'contain',
-                  color: theme.colors.textMain,
-                  fontFamily
-                }}
-              >
-                {isTerminal && log.source !== 'user' ? (
-                  <div dangerouslySetInnerHTML={{ __html: displayHtmlContent }} />
-                ) : log.source === 'user' && isTerminal ? (
-                  <div style={{ fontFamily }}>
-                    <span style={{ color: theme.colors.accent }}>$ </span>
-                    {highlightMatches(filteredText, outputSearchQuery)}
-                  </div>
-                ) : log.aiCommand ? (
-                  // AI Command with header and full interpolated prompt
-                  <div className="space-y-3">
-                    {/* Command header */}
-                    <div
-                      className="flex items-center gap-2 px-3 py-2 rounded-lg border"
-                      style={{
-                        backgroundColor: theme.colors.accent + '15',
-                        borderColor: theme.colors.accent + '30'
-                      }}
-                    >
-                      <span className="font-mono font-bold text-sm" style={{ color: theme.colors.accent }}>
-                        {log.aiCommand.command}:
-                      </span>
-                      <span className="text-sm" style={{ color: theme.colors.textMain }}>
-                        {log.aiCommand.description}
-                      </span>
-                    </div>
-                    {/* Full interpolated prompt */}
-                    <div>{highlightMatches(filteredText, outputSearchQuery)}</div>
-                  </div>
-                ) : (
-                  <div>{highlightMatches(filteredText, outputSearchQuery)}</div>
-                )}
-              </div>
-              <button
-                onClick={() => toggleExpanded(log.id)}
-                className="flex items-center gap-2 mt-2 text-xs px-3 py-1.5 rounded border hover:opacity-70 transition-opacity"
-                style={{
-                  borderColor: theme.colors.border,
-                  backgroundColor: theme.colors.bgActivity,
-                  color: theme.colors.accent
-                }}
-              >
-                <ChevronUp className="w-3 h-3" />
-                Show less
-              </button>
-            </div>
-          ) : (
-            <>
-              {isTerminal && log.source !== 'user' ? (
-                <div
-                  className="whitespace-pre-wrap text-sm overflow-x-auto scrollbar-thin"
-                  style={{ color: theme.colors.textMain, fontFamily, overscrollBehavior: 'contain' }}
-                  // Content is sanitized with DOMPurify before being set
-                  dangerouslySetInnerHTML={{ __html: displayHtmlContent }}
-                />
-              ) : log.source === 'user' && isTerminal ? (
-                <div className="whitespace-pre-wrap text-sm" style={{ color: theme.colors.textMain, fontFamily }}>
-                  <span style={{ color: theme.colors.accent }}>$ </span>
-                  {highlightMatches(filteredText, outputSearchQuery)}
-                </div>
-              ) : log.aiCommand ? (
-                // AI Command with header and full interpolated prompt
-                <div className="space-y-3">
-                  {/* Command header */}
-                  <div
-                    className="flex items-center gap-2 px-3 py-2 rounded-lg border"
-                    style={{
-                      backgroundColor: theme.colors.accent + '15',
-                      borderColor: theme.colors.accent + '30'
-                    }}
-                  >
-                    <span className="font-mono font-bold text-sm" style={{ color: theme.colors.accent }}>
-                      {log.aiCommand.command}:
-                    </span>
-                    <span className="text-sm" style={{ color: theme.colors.textMain }}>
-                      {log.aiCommand.description}
-                    </span>
-                  </div>
-                  {/* Full interpolated prompt */}
-                  <div className="whitespace-pre-wrap text-sm" style={{ color: theme.colors.textMain }}>
-                    {highlightMatches(filteredText, outputSearchQuery)}
-                  </div>
-                </div>
-              ) : (
-                <div className="whitespace-pre-wrap text-sm" style={{ color: theme.colors.textMain }}>
-                  {highlightMatches(filteredText, outputSearchQuery)}
-                </div>
-              )}
-            </>
-          )}
-          {/* Action buttons - bottom right corner */}
-          <div
-            className="absolute bottom-2 right-2 flex items-center gap-1"
-            style={{ transition: 'opacity 0.15s ease-in-out' }}
-          >
-            {/* Speak/Stop Button - only show for non-user messages when TTS is configured */}
-            {audioFeedbackCommand && log.source !== 'user' && (
-              speakingLogId === log.id ? (
-                <button
-                  onClick={stopSpeaking}
-                  className="p-1.5 rounded opacity-100"
-                  style={{ color: theme.colors.error }}
-                  title="Stop speaking"
-                >
-                  <Square className="w-3.5 h-3.5" fill="currentColor" />
-                </button>
-              ) : (
-                <button
-                  onClick={() => speakText(log.text, log.id)}
-                  className="p-1.5 rounded opacity-0 group-hover:opacity-50 hover:!opacity-100"
-                  style={{ color: theme.colors.textDim }}
-                  title="Speak text"
-                >
-                  <Volume2 className="w-3.5 h-3.5" />
-                </button>
-              )
-            )}
-            {/* Copy to Clipboard Button */}
-            <button
-              onClick={() => copyToClipboard(log.text)}
-              className="p-1.5 rounded opacity-0 group-hover:opacity-50 hover:!opacity-100"
-              style={{ color: theme.colors.textDim }}
-              title="Copy to clipboard"
-            >
-              <Copy className="w-3.5 h-3.5" />
-            </button>
-            {/* Delete button for user messages (both AI and terminal modes) */}
-            {log.source === 'user' && onDeleteLog && (
-              deleteConfirmLogIdRef.current === log.id ? (
-                <div className="flex items-center gap-1 p-1 rounded border" style={{ backgroundColor: theme.colors.bgSidebar, borderColor: theme.colors.error }}>
-                  <span className="text-xs px-1" style={{ color: theme.colors.error }}>Delete?</span>
-                  <button
-                    onClick={() => {
-                      const nextIndex = onDeleteLog(log.id);
-                      setDeleteConfirmLogId(null);
-                      setDeleteConfirmTrigger(t => t + 1);
-                      // Scroll to the next user command after deletion
-                      if (nextIndex !== null && nextIndex >= 0) {
-                        setTimeout(() => {
-                          const container = scrollContainerRef.current;
-                          const items = container?.querySelectorAll('[data-log-index]');
-                          const targetItem = items?.[nextIndex] as HTMLElement;
-                          if (targetItem && container) {
-                            container.scrollTop = targetItem.offsetTop;
-                          }
-                        }, 50);
-                      }
-                    }}
-                    className="px-2 py-0.5 rounded text-xs font-medium hover:opacity-80"
-                    style={{ backgroundColor: theme.colors.error, color: '#fff' }}
-                  >
-                    Yes
-                  </button>
-                  <button
-                    onClick={() => { setDeleteConfirmLogId(null); setDeleteConfirmTrigger(t => t + 1); }}
-                    className="px-2 py-0.5 rounded text-xs hover:opacity-80"
-                    style={{ color: theme.colors.textDim }}
-                  >
-                    No
-                  </button>
-                </div>
-              ) : (
-                <button
-                  onClick={() => { setDeleteConfirmLogId(log.id); setDeleteConfirmTrigger(t => t + 1); }}
-                  className="p-1.5 rounded opacity-0 group-hover:opacity-50 hover:!opacity-100 transition-opacity"
-                  style={{ color: theme.colors.textDim }}
-                  title={isAIMode ? "Delete message and response" : "Delete command and output"}
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-              )
-            )}
-            {/* Delivery checkmark for user messages in AI mode - positioned at the end */}
-            {isUserMessage && isAIMode && log.delivered && (
-              <Check
-                className="w-3.5 h-3.5"
-                style={{ color: theme.colors.success, opacity: 0.6 }}
-                title="Message delivered"
-              />
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  // Note: We use refs (expandedLogsRef, localFiltersRef, filterModesRef, deleteConfirmLogIdRef, activeLocalFilterRef)
-  // instead of state values in the dependency array to prevent unnecessary re-renders when these change.
-  // The refs are updated synchronously before render, so LogItem always has access to current values.
-  // We use trigger counters (expandedTrigger, filterTrigger, deleteConfirmTrigger) to force re-renders when needed.
-  }, [session.inputMode, filteredLogs, theme, fontFamily, outputSearchQuery, maxOutputLines, onDeleteLog, ansiConverter,
-      toggleExpanded, toggleLocalFilter, setLocalFilterQuery, setLightboxImage, highlightMatches,
-      addHighlightMarkers, filterTextByLines, processLogText, copyToClipboard, speakText, audioFeedbackCommand,
-      expandedTrigger, filterTrigger, deleteConfirmTrigger]);
+  // Computed values for rendering
+  const isTerminal = session.inputMode === 'terminal';
+  const isAIMode = session.inputMode === 'ai';
 
   return (
     <div
@@ -1037,17 +1144,46 @@ export const TerminalOutput = forwardRef<HTMLDivElement, TerminalOutputProps>((p
       <div
         ref={scrollContainerRef}
         className="flex-1 overflow-y-auto scrollbar-thin"
+        onScroll={handleScroll}
       >
         {/* Log entries */}
         {filteredLogs.map((log, index) => (
-          <LogItem key={log.id} index={index} log={log} />
+          <LogItemComponent
+            key={log.id}
+            log={log}
+            index={index}
+            isTerminal={isTerminal}
+            isAIMode={isAIMode}
+            theme={theme}
+            fontFamily={fontFamily}
+            maxOutputLines={maxOutputLines}
+            outputSearchQuery={outputSearchQuery}
+            lastUserCommand={isTerminal && log.source !== 'user' ? getLastUserCommand(index) : undefined}
+            isExpanded={expandedLogs.has(log.id)}
+            onToggleExpanded={toggleExpanded}
+            localFilterQuery={localFilters.get(log.id) || ''}
+            filterMode={filterModes.get(log.id) || { mode: 'include', regex: false }}
+            activeLocalFilter={activeLocalFilter}
+            onToggleLocalFilter={toggleLocalFilter}
+            onSetLocalFilterQuery={setLocalFilterQuery}
+            onSetFilterMode={setFilterModeForLog}
+            onClearLocalFilter={clearLocalFilter}
+            deleteConfirmLogId={deleteConfirmLogId}
+            onDeleteLog={onDeleteLog}
+            onSetDeleteConfirmLogId={setDeleteConfirmLogId}
+            scrollContainerRef={scrollContainerRef}
+            setLightboxImage={setLightboxImage}
+            copyToClipboard={copyToClipboard}
+            speakText={speakText}
+            stopSpeaking={stopSpeaking}
+            speakingLogId={speakingLogId}
+            audioFeedbackCommand={audioFeedbackCommand}
+            ansiConverter={ansiConverter}
+          />
         ))}
 
-        {/* Busy indicator - only show when busy source matches current input mode */}
-        {session.state === 'busy' && (
-          (session.inputMode === 'ai' && session.busySource === 'ai') ||
-          (session.inputMode === 'terminal' && session.busySource === 'terminal')
-        ) && (
+        {/* Terminal busy indicator - only show for terminal commands (AI thinking moved to ThinkingStatusPill) */}
+        {session.state === 'busy' && session.inputMode === 'terminal' && session.busySource === 'terminal' && (
           <div
             className="flex flex-col items-center justify-center gap-2 py-6 mx-6 my-4 rounded-xl border"
             style={{
@@ -1061,7 +1197,7 @@ export const TerminalOutput = forwardRef<HTMLDivElement, TerminalOutputProps>((p
                 style={{ backgroundColor: theme.colors.warning }}
               />
               <span className="text-sm" style={{ color: theme.colors.textMain }}>
-                {session.statusMessage || (session.busySource === 'terminal' ? 'Executing command...' : 'Claude is thinking...')}
+                {session.statusMessage || 'Executing command...'}
               </span>
               {session.thinkingStartTime && (
                 <ElapsedTimeDisplay
@@ -1070,13 +1206,6 @@ export const TerminalOutput = forwardRef<HTMLDivElement, TerminalOutputProps>((p
                 />
               )}
             </div>
-            {session.inputMode === 'ai' && session.usageStats && (
-              <div className="flex items-center gap-4 mt-1 text-xs" style={{ color: theme.colors.textDim }}>
-                <span>In: {session.usageStats.inputTokens.toLocaleString()}</span>
-                <span>Out: {session.usageStats.outputTokens.toLocaleString()}</span>
-                <span>Total: {(session.usageStats.inputTokens + session.usageStats.outputTokens).toLocaleString()}</span>
-              </div>
-            )}
           </div>
         )}
 
@@ -1223,6 +1352,27 @@ export const TerminalOutput = forwardRef<HTMLDivElement, TerminalOutputProps>((p
             </div>
           </div>
         </div>
+      )}
+
+      {/* New Message Indicator - floating arrow button */}
+      {hasNewMessages && !isAtBottom && (
+        <button
+          onClick={scrollToBottom}
+          className="absolute bottom-4 right-6 flex items-center gap-2 px-3 py-2 rounded-full shadow-lg transition-all hover:scale-105 z-20"
+          style={{
+            backgroundColor: theme.colors.accent,
+            color: theme.colors.accentForeground,
+            animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite'
+          }}
+          title="Scroll to new messages"
+        >
+          <ArrowDown className="w-4 h-4" />
+          {newMessageCount > 0 && (
+            <span className="text-xs font-bold">
+              {newMessageCount > 99 ? '99+' : newMessageCount}
+            </span>
+          )}
+        </button>
       )}
 
       {/* Copied to Clipboard Notification */}
