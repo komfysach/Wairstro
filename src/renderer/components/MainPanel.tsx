@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { Wand2, ExternalLink, Columns, Copy, Loader2, Clock, GitBranch, ArrowUp, ArrowDown, FileEdit, List } from 'lucide-react';
+import { Wand2, ExternalLink, Columns, Copy, Loader2, GitBranch, ArrowUp, ArrowDown, FileEdit, List } from 'lucide-react';
 import { LogViewer } from './LogViewer';
 import { TerminalOutput } from './TerminalOutput';
 import { InputArea } from './InputArea';
@@ -9,7 +9,6 @@ import { GitStatusWidget } from './GitStatusWidget';
 import { AgentSessionsBrowser } from './AgentSessionsBrowser';
 import { TabBar } from './TabBar';
 import { gitService } from '../services/git';
-import { formatActiveTime } from '../utils/theme';
 import { getActiveTab, getBusyTabs } from '../utils/tabHelpers';
 import type { Session, Theme, Shortcut, FocusArea, BatchRunState } from '../types';
 
@@ -162,10 +161,10 @@ export function MainPanel(props: MainPanelProps) {
 
   // Get the active tab for header display
   // The header should show the active tab's data (UUID, name, cost, context), not session-level data
-  const activeTab = useMemo(() => {
-    if (!activeSession?.aiTabs) return null;
-    return getActiveTab(activeSession);
-  }, [activeSession?.aiTabs, activeSession?.activeTabId]);
+  // Directly find the active tab without memoization to ensure it updates on every render
+  const activeTab = activeSession?.aiTabs?.find(tab => tab.id === activeSession.activeTabId)
+    ?? activeSession?.aiTabs?.[0]
+    ?? null;
 
   // Compute context usage percentage from active tab's usage stats
   const activeTabContextUsage = useMemo(() => {
@@ -195,7 +194,6 @@ export function MainPanel(props: MainPanelProps) {
   }, []);
 
   // Responsive breakpoints for hiding widgets
-  const showTimeWidget = panelWidth > 600;
   const showCostWidget = panelWidth > 500;
 
   // Git info state
@@ -491,20 +489,6 @@ export function MainPanel(props: MainPanelProps) {
                 onViewDiff={handleViewGitDiff}
               />
 
-              {/* Session UUID Pill - click to copy full UUID */}
-              {activeSession.inputMode === 'ai' && activeTab?.claudeSessionId && (
-                <button
-                  className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border transition-colors hover:opacity-80"
-                  style={{ backgroundColor: theme.colors.accent + '20', color: theme.colors.accent, borderColor: theme.colors.accent + '30' }}
-                  title={`Click to copy: ${activeTab.claudeSessionId}`}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    copyToClipboard(activeTab.claudeSessionId!, 'Session ID Copied to Clipboard');
-                  }}
-                >
-                  {activeTab.claudeSessionId.split('-')[0].toUpperCase()}
-                </button>
-              )}
             </div>
 
             {/* Center: AUTO Mode Indicator */}
@@ -542,26 +526,31 @@ export function MainPanel(props: MainPanelProps) {
             )}
 
             <div className="flex items-center gap-3">
-              {/* Time Tracker - styled as pill (hidden when panel is narrow) */}
-              {showTimeWidget && activeSession.activeTimeMs > 0 && (
-                <span
-                  className="flex items-center gap-1 text-xs font-mono font-bold px-2 py-0.5 rounded-full border"
-                  style={{ borderColor: theme.colors.accent + '30', color: theme.colors.accent, backgroundColor: theme.colors.accent + '10' }}
-                  title={`Active time in this session: ${formatActiveTime(activeSession.activeTimeMs)}`}
+              {/* Session UUID Pill - click to copy full UUID, left-most of session stats */}
+              {activeSession.inputMode === 'ai' && activeTab?.claudeSessionId && (
+                <button
+                  className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border transition-colors hover:opacity-80"
+                  style={{ backgroundColor: theme.colors.accent + '20', color: theme.colors.accent, borderColor: theme.colors.accent + '30' }}
+                  title={`Click to copy: ${activeTab.claudeSessionId}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    copyToClipboard(activeTab.claudeSessionId!, 'Session ID Copied to Clipboard');
+                  }}
                 >
-                  <Clock className="w-3 h-3" />
-                  {formatActiveTime(activeSession.activeTimeMs)}
-                </span>
+                  {activeTab.claudeSessionId.split('-')[0].toUpperCase()}
+                </button>
               )}
+
 
               {/* Cost Tracker - styled as pill (hidden when panel is narrow) - shows active tab's cost */}
-              {showCostWidget && activeSession.inputMode === 'ai' && activeTab?.usageStats && activeTab.usageStats.totalCostUsd > 0 && (
+              {showCostWidget && activeSession.inputMode === 'ai' && activeTab?.claudeSessionId && (
                 <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-full border border-green-500/30 text-green-500 bg-green-500/10">
-                  ${activeTab.usageStats.totalCostUsd.toFixed(2)}
+                  ${(activeTab?.usageStats?.totalCostUsd ?? 0).toFixed(2)}
                 </span>
               )}
 
-              {/* Context Window Widget with Tooltip */}
+              {/* Context Window Widget with Tooltip - only show for tabs with Claude session */}
+              {activeSession.inputMode === 'ai' && activeTab?.claudeSessionId && (
               <div
                 className="flex flex-col items-end mr-2 relative cursor-pointer"
                 onMouseEnter={() => {
@@ -591,7 +580,7 @@ export function MainPanel(props: MainPanelProps) {
                 </div>
 
                 {/* Context Window Tooltip */}
-                {contextTooltipOpen && activeSession.inputMode === 'ai' && activeTab?.usageStats && (
+                {contextTooltipOpen && activeSession.inputMode === 'ai' && (
                   <>
                     {/* Invisible bridge to prevent hover gap */}
                     <div
@@ -630,25 +619,25 @@ export function MainPanel(props: MainPanelProps) {
                         <div className="flex justify-between items-center">
                           <span className="text-xs" style={{ color: theme.colors.textDim }}>Input Tokens</span>
                           <span className="text-xs font-mono" style={{ color: theme.colors.textMain }}>
-                            {activeTab.usageStats.inputTokens.toLocaleString()}
+                            {(activeTab?.usageStats?.inputTokens ?? 0).toLocaleString()}
                           </span>
                         </div>
                         <div className="flex justify-between items-center">
                           <span className="text-xs" style={{ color: theme.colors.textDim }}>Output Tokens</span>
                           <span className="text-xs font-mono" style={{ color: theme.colors.textMain }}>
-                            {activeTab.usageStats.outputTokens.toLocaleString()}
+                            {(activeTab?.usageStats?.outputTokens ?? 0).toLocaleString()}
                           </span>
                         </div>
                         <div className="flex justify-between items-center">
                           <span className="text-xs" style={{ color: theme.colors.textDim }}>Cache Read</span>
                           <span className="text-xs font-mono" style={{ color: theme.colors.textMain }}>
-                            {activeTab.usageStats.cacheReadInputTokens.toLocaleString()}
+                            {(activeTab?.usageStats?.cacheReadInputTokens ?? 0).toLocaleString()}
                           </span>
                         </div>
                         <div className="flex justify-between items-center">
                           <span className="text-xs" style={{ color: theme.colors.textDim }}>Cache Write</span>
                           <span className="text-xs font-mono" style={{ color: theme.colors.textMain }}>
-                            {activeTab.usageStats.cacheCreationInputTokens.toLocaleString()}
+                            {(activeTab?.usageStats?.cacheCreationInputTokens ?? 0).toLocaleString()}
                           </span>
                         </div>
 
@@ -657,15 +646,15 @@ export function MainPanel(props: MainPanelProps) {
                             <span className="text-xs font-bold" style={{ color: theme.colors.textDim }}>Context Tokens</span>
                             <span className="text-xs font-mono font-bold" style={{ color: theme.colors.accent }}>
                               {(
-                                activeTab.usageStats.inputTokens +
-                                activeTab.usageStats.outputTokens
+                                (activeTab?.usageStats?.inputTokens ?? 0) +
+                                (activeTab?.usageStats?.outputTokens ?? 0)
                               ).toLocaleString()}
                             </span>
                           </div>
                           <div className="flex justify-between items-center mt-1">
                             <span className="text-xs font-bold" style={{ color: theme.colors.textDim }}>Context Size</span>
                             <span className="text-xs font-mono font-bold" style={{ color: theme.colors.textMain }}>
-                              {activeTab.usageStats.contextWindow.toLocaleString()}
+                              {(activeTab?.usageStats?.contextWindow ?? 200000).toLocaleString()}
                             </span>
                           </div>
                           <div className="flex justify-between items-center mt-1">
@@ -684,6 +673,7 @@ export function MainPanel(props: MainPanelProps) {
                   </>
                 )}
               </div>
+              )}
 
               {/* Agent Sessions Button */}
               <button
