@@ -2725,8 +2725,8 @@ export default function MaestroConsole() {
         logsEndRef.current?.scrollIntoView({ behavior: 'instant' });
       }
 
-      // Tab shortcuts (AI mode only)
-      if (activeSession?.inputMode === 'ai' && activeSession?.aiTabs) {
+      // Tab shortcuts (AI mode only, requires an explicitly selected session)
+      if (activeSessionId && activeSession?.inputMode === 'ai' && activeSession?.aiTabs) {
         if (isTabShortcut(e, 'newTab')) {
           e.preventDefault();
           const result = createTab(activeSession);
@@ -2757,7 +2757,8 @@ export default function MaestroConsole() {
         if (isTabShortcut(e, 'renameTab')) {
           e.preventDefault();
           const activeTab = getActiveTab(activeSession);
-          if (activeTab) {
+          // Only allow rename if tab has an active Claude session
+          if (activeTab?.claudeSessionId) {
             setRenameTabId(activeTab.id);
             setRenameTabInitialName(activeTab.name || '');
             setRenameTabModalOpen(true);
@@ -2852,7 +2853,8 @@ export default function MaestroConsole() {
     if (activeSession && fileTreeContainerRef.current && activeSession.fileExplorerScrollPos !== undefined) {
       fileTreeContainerRef.current.scrollTop = activeSession.fileExplorerScrollPos;
     }
-  }, [activeSessionId, activeSession?.fileExplorerScrollPos]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSessionId]); // Only restore on session switch, not on scroll position changes
 
   // Reset shortcuts search when modal closes
   useEffect(() => {
@@ -5095,7 +5097,8 @@ export default function MaestroConsole() {
           onRenameTab={() => {
             if (activeSession?.inputMode === 'ai' && activeSession.activeTabId) {
               const activeTab = activeSession.aiTabs?.find(t => t.id === activeSession.activeTabId);
-              if (activeTab) {
+              // Only allow rename if tab has an active Claude session
+              if (activeTab?.claudeSessionId) {
                 setRenameTabId(activeTab.id);
                 setRenameTabInitialName(activeTab.name || '');
                 setRenameTabModalOpen(true);

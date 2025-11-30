@@ -696,8 +696,8 @@ export function MainPanel(props: MainPanelProps) {
           </div>
           )}
 
-          {/* Tab Bar - only shown in AI mode when we have tabs */}
-          {activeSession.inputMode === 'ai' && activeSession.aiTabs && activeSession.aiTabs.length > 0 && onTabSelect && onTabClose && onNewTab && (
+          {/* Tab Bar - only shown in AI mode when we have tabs (hidden during file preview) */}
+          {!previewFile && activeSession.inputMode === 'ai' && activeSession.aiTabs && activeSession.aiTabs.length > 0 && onTabSelect && onTabClose && onNewTab && (
             <TabBar
               tabs={activeSession.aiTabs}
               activeTabId={activeSession.activeTabId}

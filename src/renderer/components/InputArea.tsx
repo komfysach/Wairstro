@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import { Terminal, Cpu, Keyboard, ImageIcon, X, ArrowUp, StopCircle, Eye, History, File, Folder } from 'lucide-react';
 import type { Session, Theme } from '../types';
 import type { TabCompletionSuggestion } from '../hooks/useTabCompletion';
@@ -119,6 +119,19 @@ export function InputArea(props: InputAreaProps) {
     Math.max(0, filteredSlashCommands.length - 1)
   );
 
+  // Refs for slash command items to enable scroll-into-view
+  const slashCommandItemRefs = useRef<(HTMLDivElement | null)[]>([]);
+
+  // Scroll selected slash command into view when index changes
+  useEffect(() => {
+    if (slashCommandOpen && slashCommandItemRefs.current[safeSelectedIndex]) {
+      slashCommandItemRefs.current[safeSelectedIndex]?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest',
+      });
+    }
+  }, [safeSelectedIndex, slashCommandOpen]);
+
   return (
     <div className="relative p-4 border-t" style={{ borderColor: theme.colors.border, backgroundColor: theme.colors.bgSidebar }}>
       {/* ThinkingStatusPill - only show in AI mode */}
@@ -175,6 +188,7 @@ export function InputArea(props: InputAreaProps) {
             {filteredSlashCommands.map((cmd, idx) => (
               <div
                 key={cmd.command}
+                ref={el => slashCommandItemRefs.current[idx] = el}
                 className={`px-4 py-3 cursor-pointer transition-colors ${
                   idx === safeSelectedIndex ? 'font-semibold' : ''
                 }`}
