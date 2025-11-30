@@ -2424,10 +2424,11 @@ export default function MaestroConsole() {
         const isCycleShortcut = (e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === '[' || e.key === ']');
         // Allow sidebar toggle shortcuts (Alt+Cmd+Arrow) even when modals are open
         const isLayoutShortcut = e.altKey && (e.metaKey || e.ctrlKey) && (e.key === 'ArrowLeft' || e.key === 'ArrowRight');
-        // Allow right panel tab shortcuts (Cmd+Shift+F/H/S) even when overlays are open
-        const isRightPanelShortcut = (e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === 'f' || e.key === 'h' || e.key === 's');
+        // Allow right panel tab shortcuts (Cmd+Shift+F/H/S/J) even when overlays are open
+        const keyLower = e.key.toLowerCase();
+        const isRightPanelShortcut = (e.metaKey || e.ctrlKey) && e.shiftKey && (keyLower === 'f' || keyLower === 'h' || keyLower === 's' || keyLower === 'j');
         // Allow system utility shortcuts (Alt+Cmd+L for logs, Alt+Cmd+P for processes) even when modals are open
-        const isSystemUtilShortcut = e.altKey && (e.metaKey || e.ctrlKey) && (e.key === 'l' || e.key === 'p');
+        const isSystemUtilShortcut = e.altKey && (e.metaKey || e.ctrlKey) && (keyLower === 'l' || keyLower === 'p');
 
         if (hasOpenModal()) {
           // TRUE MODAL is open - block most shortcuts from App.tsx
@@ -2716,7 +2717,7 @@ export default function MaestroConsole() {
       else if (isShortcut(e, 'jumpToBottom')) {
         e.preventDefault();
         // Jump to the bottom of the current main panel output (AI logs or terminal output)
-        logsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        logsEndRef.current?.scrollIntoView({ behavior: 'instant' });
       }
 
       // Tab shortcuts (AI mode only)

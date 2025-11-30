@@ -50,10 +50,12 @@ export function ShortcutsHelpModal({ theme, shortcuts, onClose }: ShortcutsHelpM
   // Note: Search input uses autoFocus for immediate focus on mount
 
   const totalShortcuts = Object.values(shortcuts).length;
-  const filteredShortcuts = Object.values(shortcuts).filter(sc =>
-    fuzzyMatch(sc.label, searchQuery) ||
-    fuzzyMatch(sc.keys.join(' '), searchQuery)
-  );
+  const filteredShortcuts = Object.values(shortcuts)
+    .filter(sc =>
+      fuzzyMatch(sc.label, searchQuery) ||
+      fuzzyMatch(sc.keys.join(' '), searchQuery)
+    )
+    .sort((a, b) => a.label.localeCompare(b.label));
   const filteredCount = filteredShortcuts.length;
 
   return (
