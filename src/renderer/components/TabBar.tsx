@@ -547,7 +547,7 @@ export function TabBar({
   return (
     <div
       ref={tabBarRef}
-      className="flex items-end gap-0.5 px-2 pt-2 border-b overflow-x-auto scrollbar-none"
+      className="flex items-end gap-0.5 px-2 pt-2 border-b overflow-x-auto scrollbar-thin"
       style={{
         backgroundColor: theme.colors.bgSidebar,
         borderColor: theme.colors.border
