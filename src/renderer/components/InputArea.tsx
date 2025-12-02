@@ -652,9 +652,9 @@ export const InputArea = React.memo(function InputArea(props: InputAreaProps) {
                     tabSaveToHistory ? '' : 'opacity-40 hover:opacity-70'
                   }`}
                   style={{
-                    backgroundColor: tabSaveToHistory ? `${theme.colors.info}25` : 'transparent',
-                    color: tabSaveToHistory ? theme.colors.info : theme.colors.textDim,
-                    border: tabSaveToHistory ? `1px solid ${theme.colors.info}50` : '1px solid transparent'
+                    backgroundColor: tabSaveToHistory ? `${theme.colors.accent}25` : 'transparent',
+                    color: tabSaveToHistory ? theme.colors.accent : theme.colors.textDim,
+                    border: tabSaveToHistory ? `1px solid ${theme.colors.accent}50` : '1px solid transparent'
                   }}
                   title="Save to History (Cmd+S) - Synopsis added after each completion"
                 >

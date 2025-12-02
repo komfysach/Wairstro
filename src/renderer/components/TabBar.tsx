@@ -570,9 +570,10 @@ export function TabBar({
   const unreadCount = tabs.filter(t => t.hasUnread).length;
 
   // Filter tabs based on unread filter state
-  // When filter is on, show ONLY unread tabs (can be empty)
+  // When filter is on, show unread tabs + the active tab (so user sees what they're viewing)
+  // The active tab disappears from the filtered list when user navigates away from it
   const displayedTabs = showUnreadOnly
-    ? tabs.filter(t => t.hasUnread)
+    ? tabs.filter(t => t.hasUnread || t.id === activeTabId)
     : tabs;
 
   // Check if tabs overflow the container (need sticky + button)

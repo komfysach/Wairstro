@@ -2990,6 +2990,12 @@ export default function MaestroConsole() {
       else if (ctx.isShortcut(e, 'goToFiles')) { e.preventDefault(); ctx.setRightPanelOpen(true); ctx.setActiveRightTab('files'); ctx.setActiveFocus('right'); }
       else if (ctx.isShortcut(e, 'goToHistory')) { e.preventDefault(); ctx.setRightPanelOpen(true); ctx.setActiveRightTab('history'); ctx.setActiveFocus('right'); }
       else if (ctx.isShortcut(e, 'goToScratchpad')) { e.preventDefault(); ctx.setRightPanelOpen(true); ctx.setActiveRightTab('scratchpad'); ctx.setActiveFocus('right'); }
+      else if (ctx.isShortcut(e, 'openImageCarousel')) {
+        e.preventDefault();
+        if (ctx.stagedImages.length > 0) {
+          ctx.handleSetLightboxImage(ctx.stagedImages[0], ctx.stagedImages);
+        }
+      }
       else if (ctx.isShortcut(e, 'focusInput')) {
         e.preventDefault();
         ctx.setActiveFocus('main');
@@ -3613,7 +3619,7 @@ export default function MaestroConsole() {
     setSessions, createTab, closeTab, reopenClosedTab, getActiveTab, setRenameTabId, setRenameTabInitialName,
     setRenameTabModalOpen, navigateToNextTab, navigateToPrevTab, navigateToTabByIndex, navigateToLastTab,
     setFileTreeFilterOpen, isShortcut, isTabShortcut, handleNavBack, handleNavForward, toggleUnreadFilter,
-    setTabSwitcherOpen, showUnreadOnly
+    setTabSwitcherOpen, showUnreadOnly, stagedImages, handleSetLightboxImage
   };
 
   const toggleGroup = (groupId: string) => {
