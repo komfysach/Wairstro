@@ -368,7 +368,12 @@ export function SessionList(props: SessionListProps) {
   const handleTunnelToggle = async () => {
     if (tunnelStatus === 'connected') {
       // Turn off tunnel
-      await window.maestro.tunnel.stop();
+      try {
+        await window.maestro.tunnel.stop();
+      } catch (error) {
+        console.error('[handleTunnelToggle] Failed to stop tunnel:', error);
+        // Continue anyway - we still want to update UI state
+      }
       setTunnelStatus('off');
       setTunnelUrl(null);
       setTunnelError(null);
@@ -378,14 +383,20 @@ export function SessionList(props: SessionListProps) {
       setTunnelStatus('starting');
       setTunnelError(null);
 
-      const result = await window.maestro.tunnel.start();
-      if (result.success && result.url) {
-        setTunnelStatus('connected');
-        setTunnelUrl(result.url);
-        setActiveUrlTab('remote'); // Auto-switch to remote tab
-      } else {
+      try {
+        const result = await window.maestro.tunnel.start();
+        if (result.success && result.url) {
+          setTunnelStatus('connected');
+          setTunnelUrl(result.url);
+          setActiveUrlTab('remote'); // Auto-switch to remote tab
+        } else {
+          setTunnelStatus('error');
+          setTunnelError(result.error || 'Failed to start tunnel');
+        }
+      } catch (error) {
+        console.error('[handleTunnelToggle] Failed to start tunnel:', error);
         setTunnelStatus('error');
-        setTunnelError(result.error || 'Failed to start tunnel');
+        setTunnelError(error instanceof Error ? error.message : 'Failed to start tunnel');
       }
     }
   };

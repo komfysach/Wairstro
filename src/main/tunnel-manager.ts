@@ -19,6 +19,11 @@ class TunnelManager {
   private error: string | null = null;
 
   async start(port: number): Promise<TunnelResult> {
+    // Validate port number
+    if (!Number.isInteger(port) || port < 1 || port > 65535) {
+      return { success: false, error: `Invalid port number: ${port}` };
+    }
+
     // Stop any existing tunnel first
     await this.stop();
 
@@ -30,6 +35,7 @@ class TunnelManager {
       ]);
 
       let resolved = false;
+      let stderrBuffer = '';
 
       // Timeout after 30 seconds
       const timeout = setTimeout(() => {
@@ -42,12 +48,14 @@ class TunnelManager {
       }, 30000);
 
       // Cloudflare outputs the URL to stderr
+      // Accumulate buffer in case URL is split across chunks
       this.process.stderr?.on('data', (data: Buffer) => {
         const output = data.toString();
+        stderrBuffer += output;
         logger.info(`cloudflared output: ${output}`, 'TunnelManager');
 
-        // Look for the trycloudflare.com URL
-        const urlMatch = output.match(/https:\/\/[a-z0-9-]+\.trycloudflare\.com/i);
+        // Look for the trycloudflare.com URL in accumulated buffer
+        const urlMatch = stderrBuffer.match(/https:\/\/[a-z0-9-]+\.trycloudflare\.com/i);
         if (urlMatch && !resolved) {
           this.url = urlMatch[0];
           clearTimeout(timeout);
@@ -75,9 +83,9 @@ class TunnelManager {
           this.error = `cloudflared exited unexpectedly (code ${code})`;
           resolve({ success: false, error: this.error });
         }
-        // Clean up state
+        // Only clear process reference on exit, not URL
+        // URL is cleared explicitly in stop() to preserve it for display
         this.process = null;
-        this.url = null;
       });
     });
   }
@@ -85,7 +93,27 @@ class TunnelManager {
   async stop(): Promise<void> {
     if (this.process) {
       logger.info('Stopping tunnel', 'TunnelManager');
-      this.process.kill('SIGTERM');
+      const proc = this.process;
+      proc.kill('SIGTERM');
+
+      // Wait for process to exit with timeout
+      await new Promise<void>((resolve) => {
+        const timeout = setTimeout(() => {
+          // Force kill if SIGTERM didn't work
+          try {
+            proc.kill('SIGKILL');
+          } catch {
+            // Process may already be dead
+          }
+          resolve();
+        }, 3000);
+
+        proc.once('exit', () => {
+          clearTimeout(timeout);
+          resolve();
+        });
+      });
+
       this.process = null;
     }
     this.url = null;
