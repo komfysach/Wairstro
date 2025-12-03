@@ -1892,9 +1892,13 @@ export default function MaestroConsole() {
 
   // --- BATCH PROCESSOR ---
   // Helper to spawn a Claude agent and wait for completion (for a specific session)
-  const spawnAgentForSession = useCallback(async (sessionId: string, prompt: string): Promise<{ success: boolean; response?: string; claudeSessionId?: string; usageStats?: UsageStats }> => {
+  // cwdOverride allows running in a different directory (e.g., for worktree mode)
+  const spawnAgentForSession = useCallback(async (sessionId: string, prompt: string, cwdOverride?: string): Promise<{ success: boolean; response?: string; claudeSessionId?: string; usageStats?: UsageStats }> => {
     const session = sessions.find(s => s.id === sessionId);
     if (!session) return { success: false };
+
+    // Use override cwd if provided (worktree mode), otherwise use session's cwd
+    const effectiveCwd = cwdOverride || session.cwd;
 
     // This spawns a new Claude session and waits for completion
     try {
@@ -2078,12 +2082,13 @@ export default function MaestroConsole() {
         });
 
         // Spawn the agent with permission-mode plan for batch processing
+        // Use effectiveCwd which may be a worktree path for parallel execution
         const commandToUse = agent.path || agent.command;
         const spawnArgs = [...(agent.args || []), '--permission-mode', 'plan'];
         window.maestro.process.spawn({
           sessionId: targetSessionId,
           toolType: 'claude-code',
-          cwd: session.cwd,
+          cwd: effectiveCwd,
           command: commandToUse,
           args: spawnArgs,
           prompt

@@ -23,6 +23,10 @@ const DEFAULT_BATCH_STATE: BatchRunState = {
   loopIteration: 0,
   // Folder path for file operations
   folderPath: '',
+  // Worktree tracking
+  worktreeActive: false,
+  worktreePath: undefined,
+  worktreeBranch: undefined,
   // Legacy fields (kept for backwards compatibility)
   totalTasks: 0,
   completedTasks: 0,
@@ -43,7 +47,7 @@ interface BatchCompleteInfo {
 interface UseBatchProcessorProps {
   sessions: Session[];
   onUpdateSession: (sessionId: string, updates: Partial<Session>) => void;
-  onSpawnAgent: (sessionId: string, prompt: string) => Promise<{ success: boolean; response?: string; claudeSessionId?: string; usageStats?: UsageStats }>;
+  onSpawnAgent: (sessionId: string, prompt: string, cwdOverride?: string) => Promise<{ success: boolean; response?: string; claudeSessionId?: string; usageStats?: UsageStats }>;
   onSpawnSynopsis: (sessionId: string, cwd: string, claudeSessionId: string, prompt: string) => Promise<{ success: boolean; response?: string }>;
   onAddHistoryEntry: (entry: Omit<HistoryEntry, 'id'>) => void;
   onComplete?: (info: BatchCompleteInfo) => void;
@@ -197,6 +201,22 @@ export function useBatchProcessor({
   };
 
   /**
+   * Generate PR body from completed tasks
+   */
+  const generatePRBody = (documents: BatchDocumentEntry[], totalTasksCompleted: number): string => {
+    const docList = documents.map(d => `- ${d.filename}`).join('\n');
+    return `## Auto Run Summary
+
+**Documents processed:**
+${docList}
+
+**Total tasks completed:** ${totalTasksCompleted}
+
+---
+*This PR was automatically created by Maestro Auto Run.*`;
+  };
+
+  /**
    * Start a batch processing run for a specific session with multi-document support
    */
   const startBatchRun = useCallback(async (sessionId: string, config: BatchRunConfig, folderPath: string) => {
@@ -206,7 +226,7 @@ export function useBatchProcessor({
       return;
     }
 
-    const { documents, prompt, loopEnabled } = config;
+    const { documents, prompt, loopEnabled, worktree } = config;
 
     if (documents.length === 0) {
       console.warn('No documents provided for batch processing:', sessionId);
@@ -218,6 +238,65 @@ export function useBatchProcessor({
 
     // Reset stop flag for this session
     stopRequestedRefs.current[sessionId] = false;
+
+    // Set up worktree if enabled
+    let effectiveCwd = session.cwd; // Default to session's cwd
+    let worktreeActive = false;
+    let worktreePath: string | undefined;
+    let worktreeBranch: string | undefined;
+
+    if (worktree?.enabled && worktree.path && worktree.branchName) {
+      console.log('[BatchProcessor] Setting up worktree at', worktree.path, 'with branch', worktree.branchName);
+
+      try {
+        // Set up or reuse the worktree
+        const setupResult = await window.maestro.git.worktreeSetup(
+          session.cwd,
+          worktree.path,
+          worktree.branchName
+        );
+
+        if (!setupResult.success) {
+          console.error('[BatchProcessor] Failed to set up worktree:', setupResult.error);
+          // Show error to user and abort
+          return;
+        }
+
+        // If worktree exists but on different branch, checkout the requested branch
+        if (setupResult.branchMismatch) {
+          console.log('[BatchProcessor] Worktree exists with different branch, checking out', worktree.branchName);
+
+          const checkoutResult = await window.maestro.git.worktreeCheckout(
+            worktree.path,
+            worktree.branchName,
+            true // createIfMissing
+          );
+
+          if (!checkoutResult.success) {
+            if (checkoutResult.hasUncommittedChanges) {
+              console.error('[BatchProcessor] Cannot checkout: worktree has uncommitted changes');
+              // Abort - user needs to handle uncommitted changes first
+              return;
+            } else {
+              console.error('[BatchProcessor] Failed to checkout branch:', checkoutResult.error);
+              return;
+            }
+          }
+        }
+
+        // Worktree is ready - use it as the working directory
+        effectiveCwd = worktree.path;
+        worktreeActive = true;
+        worktreePath = worktree.path;
+        worktreeBranch = worktree.branchName;
+
+        console.log('[BatchProcessor] Worktree ready at', effectiveCwd);
+
+      } catch (error) {
+        console.error('[BatchProcessor] Error setting up worktree:', error);
+        return;
+      }
+    }
 
     // Calculate initial total tasks across all documents
     let initialTotalTasks = 0;
@@ -249,6 +328,10 @@ export function useBatchProcessor({
         loopIteration: 0,
         // Folder path for file operations
         folderPath,
+        // Worktree tracking
+        worktreeActive,
+        worktreePath,
+        worktreeBranch,
         // Legacy fields (for backwards compatibility)
         totalTasks: initialTotalTasks,
         completedTasks: 0,
@@ -291,7 +374,7 @@ export function useBatchProcessor({
         const docFilePath = `${folderPath}/${docEntry.filename}.md`;
 
         // Read document and count tasks
-        let { content, taskCount: remainingTasks } = await readDocAndCountTasks(folderPath, docEntry.filename);
+        let { taskCount: remainingTasks } = await readDocAndCountTasks(folderPath, docEntry.filename);
 
         // Skip documents with no tasks
         if (remainingTasks === 0) {
@@ -329,8 +412,8 @@ export function useBatchProcessor({
             // Capture start time for elapsed time tracking
             const taskStartTime = Date.now();
 
-            // Spawn agent with the prompt
-            const result = await onSpawnAgent(sessionId, finalPrompt);
+            // Spawn agent with the prompt, using worktree path if active
+            const result = await onSpawnAgent(sessionId, finalPrompt, worktreeActive ? effectiveCwd : undefined);
 
             // Capture elapsed time
             const elapsedTimeMs = Date.now() - taskStartTime;
@@ -345,8 +428,7 @@ export function useBatchProcessor({
             anyTasksProcessedThisIteration = true;
 
             // Re-read document to get updated task count
-            const { content: updatedContent, taskCount: newRemainingTasks } = await readDocAndCountTasks(folderPath, docEntry.filename);
-            content = updatedContent;
+            const { taskCount: newRemainingTasks } = await readDocAndCountTasks(folderPath, docEntry.filename);
             const tasksCompletedThisRun = remainingTasks - newRemainingTasks;
 
             // Update counters
@@ -501,7 +583,41 @@ export function useBatchProcessor({
       }));
     }
 
-    // Reset state for this session
+    // Create PR if worktree was used, PR creation is enabled, and not stopped
+    const wasStopped = stopRequestedRefs.current[sessionId] || false;
+    if (worktreeActive && worktree?.createPROnCompletion && !wasStopped && totalCompletedTasks > 0) {
+      console.log('[BatchProcessor] Creating PR from worktree branch', worktreeBranch);
+
+      try {
+        // Get the default branch to use as the PR base
+        const defaultBranchResult = await window.maestro.git.getDefaultBranch(session.cwd);
+        const baseBranch = defaultBranchResult.success && defaultBranchResult.branch
+          ? defaultBranchResult.branch
+          : 'main';
+
+        // Generate PR title and body
+        const prTitle = `Auto Run: ${documents.length} document(s) processed`;
+        const prBody = generatePRBody(documents, totalCompletedTasks);
+
+        // Create the PR
+        const prResult = await window.maestro.git.createPR(
+          effectiveCwd,
+          baseBranch,
+          prTitle,
+          prBody
+        );
+
+        if (prResult.success) {
+          console.log('[BatchProcessor] PR created successfully:', prResult.prUrl);
+        } else {
+          console.warn('[BatchProcessor] PR creation failed:', prResult.error);
+        }
+      } catch (error) {
+        console.error('[BatchProcessor] Error creating PR:', error);
+      }
+    }
+
+    // Reset state for this session (clear worktree tracking)
     setBatchRunStates(prev => ({
       ...prev,
       [sessionId]: {
@@ -516,6 +632,10 @@ export function useBatchProcessor({
         loopEnabled: false,
         loopIteration: 0,
         folderPath: '',
+        // Clear worktree tracking
+        worktreeActive: false,
+        worktreePath: undefined,
+        worktreeBranch: undefined,
         totalTasks: 0,
         completedTasks: 0,
         currentTaskIndex: 0,
@@ -526,7 +646,6 @@ export function useBatchProcessor({
 
     // Call completion callback if provided
     if (onComplete) {
-      const wasStopped = stopRequestedRefs.current[sessionId] || false;
       onComplete({
         sessionId,
         sessionName: session.name || session.cwd.split('/').pop() || 'Unknown',
