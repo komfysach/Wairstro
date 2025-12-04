@@ -224,7 +224,7 @@ Commands support **template variables** that are automatically substituted at ru
 | Variable | Description |
 |----------|-------------|
 | `{{SESSION_NAME}}` | Current session name |
-| `{{CLAUDE_SESSION_ID}}` | Claude Code session ID (for conversation continuity) |
+| `{{AGENT_SESSION_ID}}` | Agent session ID (for conversation continuity) |
 | `{{PROJECT_NAME}}` | Project folder name |
 | `{{PROJECT_PATH}}` | Full path to project directory |
 | `{{GIT_BRANCH}}` | Current git branch (if in a git repo) |

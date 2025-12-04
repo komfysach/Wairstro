@@ -1415,25 +1415,30 @@ export function BatchRunnerModal(props: BatchRunnerModalProps) {
               {/* Enable Worktree Toggle */}
               <div className="flex items-center gap-3 mb-4">
                 <button
-                  onClick={() => setWorktreeEnabled(!worktreeEnabled)}
+                  onClick={() => ghCliStatus?.installed && setWorktreeEnabled(!worktreeEnabled)}
+                  disabled={!ghCliStatus?.installed}
                   className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-colors ${
-                    worktreeEnabled ? 'border-accent' : 'border-border hover:bg-white/5'
+                    !ghCliStatus?.installed
+                      ? 'opacity-50 cursor-not-allowed'
+                      : worktreeEnabled
+                        ? 'border-accent'
+                        : 'border-border hover:bg-white/5'
                   }`}
                   style={{
-                    borderColor: worktreeEnabled ? theme.colors.accent : theme.colors.border,
-                    backgroundColor: worktreeEnabled ? theme.colors.accent + '15' : 'transparent'
+                    borderColor: worktreeEnabled && ghCliStatus?.installed ? theme.colors.accent : theme.colors.border,
+                    backgroundColor: worktreeEnabled && ghCliStatus?.installed ? theme.colors.accent + '15' : 'transparent'
                   }}
                 >
                   <div
                     className={`w-4 h-4 rounded border flex items-center justify-center ${
-                      worktreeEnabled ? 'bg-accent border-accent' : ''
+                      worktreeEnabled && ghCliStatus?.installed ? 'bg-accent border-accent' : ''
                     }`}
                     style={{
-                      borderColor: worktreeEnabled ? theme.colors.accent : theme.colors.border,
-                      backgroundColor: worktreeEnabled ? theme.colors.accent : 'transparent'
+                      borderColor: worktreeEnabled && ghCliStatus?.installed ? theme.colors.accent : theme.colors.border,
+                      backgroundColor: worktreeEnabled && ghCliStatus?.installed ? theme.colors.accent : 'transparent'
                     }}
                   >
-                    {worktreeEnabled && (
+                    {worktreeEnabled && ghCliStatus?.installed && (
                       <svg className="w-3 h-3 text-white" viewBox="0 0 12 12" fill="none">
                         <path d="M2 6L5 9L10 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                       </svg>
@@ -1441,11 +1446,40 @@ export function BatchRunnerModal(props: BatchRunnerModalProps) {
                   </div>
                   <span
                     className="text-sm font-medium"
-                    style={{ color: worktreeEnabled ? theme.colors.accent : theme.colors.textMain }}
+                    style={{ color: worktreeEnabled && ghCliStatus?.installed ? theme.colors.accent : theme.colors.textMain }}
                   >
                     Enable Worktree
                   </span>
                 </button>
+
+                {/* GitHub CLI not installed warning - shown inline with disabled toggle */}
+                {ghCliStatus !== null && !ghCliStatus.installed && (
+                  <div className="flex items-center gap-2 text-xs" style={{ color: theme.colors.textDim }}>
+                    <AlertTriangle className="w-4 h-4 shrink-0" style={{ color: theme.colors.warning }} />
+                    <span>
+                      Install{' '}
+                      <a
+                        href="https://cli.github.com"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="underline hover:opacity-80"
+                        style={{ color: theme.colors.accent }}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        GitHub CLI
+                      </a>
+                      {' '}to enable worktree features
+                    </span>
+                  </div>
+                )}
+
+                {/* Still checking gh CLI status */}
+                {ghCliStatus === null && (
+                  <div className="flex items-center gap-2 text-xs" style={{ color: theme.colors.textDim }}>
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                    Checking GitHub CLI...
+                  </div>
+                )}
               </div>
 
               {/* Worktree Configuration (only shown when enabled) */}
@@ -1590,32 +1624,7 @@ export function BatchRunnerModal(props: BatchRunnerModalProps) {
 
                   {/* Create PR on Completion */}
                   <div className="pt-2 border-t" style={{ borderColor: theme.colors.border }}>
-                    {ghCliStatus === null ? (
-                      // Still checking gh CLI status
-                      <div className="flex items-center gap-2 text-xs" style={{ color: theme.colors.textDim }}>
-                        <Loader2 className="w-3 h-3 animate-spin" />
-                        Checking GitHub CLI...
-                      </div>
-                    ) : !ghCliStatus.installed ? (
-                      // gh CLI not installed
-                      <div className="flex items-center gap-2 text-xs" style={{ color: theme.colors.textDim }}>
-                        <AlertTriangle className="w-4 h-4 shrink-0" style={{ color: theme.colors.warning }} />
-                        <span>
-                          Install{' '}
-                          <a
-                            href="https://cli.github.com"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="underline hover:opacity-80"
-                            style={{ color: theme.colors.accent }}
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            GitHub CLI
-                          </a>
-                          {' '}to enable automatic PR creation
-                        </span>
-                      </div>
-                    ) : !ghCliStatus.authenticated ? (
+                    {!ghCliStatus?.authenticated ? (
                       // gh CLI installed but not authenticated
                       <div className="flex items-center gap-2 text-xs" style={{ color: theme.colors.textDim }}>
                         <AlertTriangle className="w-4 h-4 shrink-0" style={{ color: theme.colors.warning }} />
