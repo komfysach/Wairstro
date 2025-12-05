@@ -8,6 +8,8 @@ import type { BatchRunState, SessionState, Theme } from '../types';
 import { AutoRunnerHelpModal } from './AutoRunnerHelpModal';
 import { MermaidRenderer } from './MermaidRenderer';
 import { AutoRunDocumentSelector } from './AutoRunDocumentSelector';
+import { useTemplateAutocomplete } from '../hooks/useTemplateAutocomplete';
+import { TemplateAutocompleteDropdown } from './TemplateAutocompleteDropdown';
 
 // Memoize remarkPlugins array - it never changes
 const REMARK_PLUGINS = [remarkGfm];
@@ -631,6 +633,20 @@ function AutoRunInner({
   const previewScrollPosRef = useRef(initialPreviewScrollPos);
   const editScrollPosRef = useRef(initialEditScrollPos);
 
+  // Template variable autocomplete hook
+  const {
+    autocompleteState,
+    handleKeyDown: handleAutocompleteKeyDown,
+    handleChange: handleAutocompleteChange,
+    selectVariable,
+    closeAutocomplete,
+    autocompleteRef,
+  } = useTemplateAutocomplete({
+    textareaRef,
+    value: localContent,
+    onChange: setLocalContent,
+  });
+
   // Load existing images for the current document from the Auto Run folder
   useEffect(() => {
     if (folderPath && selectedFile) {
@@ -1191,6 +1207,11 @@ function AutoRunInner({
   }, [lightboxFilename, lightboxCurrentIndex, attachmentsList, folderPath, localContent, handleContentChange, closeLightbox, pushUndoState]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // Let template autocomplete handle keys first
+    if (handleAutocompleteKeyDown(e)) {
+      return;
+    }
+
     // Cmd+Z to undo, Cmd+Shift+Z to redo
     if ((e.metaKey || e.ctrlKey) && e.key === 'z') {
       e.preventDefault();
@@ -1748,32 +1769,42 @@ function AutoRunInner({
             </div>
           </div>
         ) : mode === 'edit' ? (
-          <textarea
-            ref={textareaRef}
-            value={localContent}
-            onChange={(e) => {
-              if (!isLocked) {
-                isEditingRef.current = true;
-                // Schedule undo snapshot with current content before the change
-                const previousContent = localContent;
-                const previousCursor = textareaRef.current?.selectionStart || 0;
-                setLocalContent(e.target.value);
-                scheduleUndoSnapshot(previousContent, previousCursor);
-              }
-            }}
-            onFocus={() => { isEditingRef.current = true; }}
-            onBlur={syncContentToParent}
-            onKeyDown={!isLocked ? handleKeyDown : undefined}
-            onPaste={handlePaste}
-            placeholder="Capture notes, images, and tasks in Markdown."
-            readOnly={isLocked}
-            className={`w-full h-full border rounded p-4 bg-transparent outline-none resize-none font-mono text-sm ${isLocked ? 'cursor-not-allowed opacity-70' : ''}`}
-            style={{
-              borderColor: isLocked ? theme.colors.warning : theme.colors.border,
-              color: theme.colors.textMain,
-              backgroundColor: isLocked ? theme.colors.bgActivity + '30' : 'transparent'
-            }}
-          />
+          <div className="relative w-full h-full">
+            <textarea
+              ref={textareaRef}
+              value={localContent}
+              onChange={(e) => {
+                if (!isLocked) {
+                  isEditingRef.current = true;
+                  // Schedule undo snapshot with current content before the change
+                  const previousContent = localContent;
+                  const previousCursor = textareaRef.current?.selectionStart || 0;
+                  // Use autocomplete handler to detect "{{" triggers
+                  handleAutocompleteChange(e);
+                  scheduleUndoSnapshot(previousContent, previousCursor);
+                }
+              }}
+              onFocus={() => { isEditingRef.current = true; }}
+              onBlur={syncContentToParent}
+              onKeyDown={!isLocked ? handleKeyDown : undefined}
+              onPaste={handlePaste}
+              placeholder="Capture notes, images, and tasks in Markdown. (type {{ for variables)"
+              readOnly={isLocked}
+              className={`w-full h-full border rounded p-4 bg-transparent outline-none resize-none font-mono text-sm ${isLocked ? 'cursor-not-allowed opacity-70' : ''}`}
+              style={{
+                borderColor: isLocked ? theme.colors.warning : theme.colors.border,
+                color: theme.colors.textMain,
+                backgroundColor: isLocked ? theme.colors.bgActivity + '30' : 'transparent'
+              }}
+            />
+            {/* Template Variable Autocomplete Dropdown */}
+            <TemplateAutocompleteDropdown
+              ref={autocompleteRef}
+              theme={theme}
+              state={autocompleteState}
+              onSelect={selectVariable}
+            />
+          </div>
         ) : (
           <div
             ref={previewRef}

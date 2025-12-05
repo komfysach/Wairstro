@@ -2386,6 +2386,7 @@ export default function MaestroConsole() {
     stopBatchRun,
   } = useBatchProcessor({
     sessions,
+    groups,
     onUpdateSession: (sessionId, updates) => {
       setSessions(prev => prev.map(s =>
         s.id === sessionId ? { ...s, ...updates } : s

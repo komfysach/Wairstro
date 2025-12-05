@@ -401,6 +401,21 @@ ${docList}
       }
     }
 
+    // Get git branch for template variable substitution
+    let gitBranch: string | undefined;
+    if (session.isGitRepo) {
+      try {
+        const status = await window.maestro.git.getStatus(effectiveCwd);
+        gitBranch = status.branch;
+      } catch {
+        // Ignore git errors - branch will be empty string
+      }
+    }
+
+    // Find group name for this session
+    const sessionGroup = groups.find(g => g.sessionIds.includes(sessionId));
+    const groupName = sessionGroup?.name;
+
     // Calculate initial total tasks across all documents
     let initialTotalTasks = 0;
     for (const doc of documents) {
@@ -560,8 +575,30 @@ ${docList}
             break;
           }
 
-          // Replace $$SCRATCHPAD$$ placeholder with actual document path
-          const finalPrompt = prompt.replace(/\$\$SCRATCHPAD\$\$/g, docFilePath);
+          // Build template context for this task
+          const templateContext: TemplateContext = {
+            session,
+            gitBranch,
+            groupName,
+            autoRunFolder: folderPath,
+            loopNumber: loopIteration + 1, // 1-indexed
+            documentName: docEntry.filename,
+            documentPath: docFilePath,
+          };
+
+          // Substitute template variables in the prompt
+          const finalPrompt = substituteTemplateVariables(prompt, templateContext);
+
+          // Read document content and expand template variables in it
+          const docReadResult = await window.maestro.autorun.readDoc(folderPath, docEntry.filename + '.md');
+          if (docReadResult.success && docReadResult.content) {
+            const expandedDocContent = substituteTemplateVariables(docReadResult.content, templateContext);
+            // Write the expanded content back to the document temporarily
+            // (Claude will read this file, so it needs the expanded variables)
+            if (expandedDocContent !== docReadResult.content) {
+              await window.maestro.autorun.writeDoc(folderPath, docEntry.filename + '.md', expandedDocContent);
+            }
+          }
 
           try {
             // Capture start time for elapsed time tracking

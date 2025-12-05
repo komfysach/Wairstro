@@ -1,6 +1,7 @@
 // Batch processor service for CLI
 // Executes playbooks and yields JSONL events
 
+import { execFileSync } from 'child_process';
 import type { Playbook, SessionInfo, UsageStats, HistoryEntry } from '../../shared/types';
 import type { JsonlEvent } from '../output/jsonl';
 import {
@@ -10,7 +11,8 @@ import {
   uncheckAllTasks,
   writeDoc,
 } from './agent-spawner';
-import { addHistoryEntry } from './storage';
+import { addHistoryEntry, readGroups } from './storage';
+import { substituteTemplateVariables, TemplateContext } from '../../shared/templateVariables';
 
 // Synopsis prompt for batch tasks
 const BATCH_SYNOPSIS_PROMPT = `Provide a brief synopsis of what you just accomplished in this task using this exact format:
@@ -57,6 +59,38 @@ function generateUUID(): string {
 }
 
 /**
+ * Get the current git branch for a directory
+ */
+function getGitBranch(cwd: string): string | undefined {
+  try {
+    const branch = execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], {
+      cwd,
+      encoding: 'utf-8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+    }).trim();
+    return branch || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Check if a directory is a git repository
+ */
+function isGitRepo(cwd: string): boolean {
+  try {
+    execFileSync('git', ['rev-parse', '--is-inside-work-tree'], {
+      cwd,
+      encoding: 'utf-8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Process a playbook and yield JSONL events
  */
 export async function* runPlaybook(
@@ -71,6 +105,13 @@ export async function* runPlaybook(
 ): AsyncGenerator<JsonlEvent> {
   const { dryRun = false, writeHistory = true, debug = false } = options;
   const batchStartTime = Date.now();
+
+  // Get git branch and group name for template variable substitution
+  const gitBranch = getGitBranch(session.cwd);
+  const isGit = isGitRepo(session.cwd);
+  const groups = readGroups();
+  const sessionGroup = groups.find(g => g.id === session.groupId);
+  const groupName = sessionGroup?.name;
 
   // Emit start event
   yield {
@@ -240,9 +281,35 @@ export async function* runPlaybook(
 
         const taskStartTime = Date.now();
 
-        // Replace $$SCRATCHPAD$$ placeholder with actual document path
         const docFilePath = `${folderPath}/${docEntry.filename}.md`;
-        const finalPrompt = playbook.prompt.replace(/\$\$SCRATCHPAD\$\$/g, docFilePath);
+
+        // Build template context for this task
+        const templateContext: TemplateContext = {
+          session: {
+            ...session,
+            isGitRepo: isGit,
+          },
+          gitBranch,
+          groupName,
+          autoRunFolder: folderPath,
+          loopNumber: loopIteration + 1, // 1-indexed
+          documentName: docEntry.filename,
+          documentPath: docFilePath,
+        };
+
+        // Substitute template variables in the prompt
+        const finalPrompt = substituteTemplateVariables(playbook.prompt, templateContext);
+
+        // Read document content and expand template variables in it
+        const { content: docContent } = readDocAndCountTasks(folderPath, docEntry.filename);
+        if (docContent) {
+          const expandedDocContent = substituteTemplateVariables(docContent, templateContext);
+          // Write the expanded content back to the document temporarily
+          // (Claude will read this file, so it needs the expanded variables)
+          if (expandedDocContent !== docContent) {
+            writeDoc(folderPath, `${docEntry.filename}.md`, expandedDocContent);
+          }
+        }
 
         // Spawn agent
         const result = await spawnAgent(session.cwd, finalPrompt);
