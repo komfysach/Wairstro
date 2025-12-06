@@ -334,7 +334,6 @@ export class ProcessManager extends EventEmitter {
                 // Extract slash commands from init message
                 // Claude Code emits available slash commands (built-in + user-defined) in the init message
                 if (msg.type === 'system' && msg.subtype === 'init' && msg.slash_commands) {
-                  console.log(`[ProcessManager] Received ${msg.slash_commands.length} slash commands from Claude Code init:`, msg.slash_commands.slice(0, 5), '...');
                   this.emit('slash-commands', sessionId, msg.slash_commands);
                 }
                 // Extract usage statistics from stream-json messages (typically in 'result' type)

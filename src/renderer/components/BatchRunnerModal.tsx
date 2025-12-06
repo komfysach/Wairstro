@@ -57,7 +57,17 @@ You are **{{AGENT_NAME}}**, a Maestro-managed AI agent working on the **{{PROJEC
 
 NOTE: If you see a clear issue tag like a little moniker or some short form in front of the task, then your synopsis message should start with that exact token because we're clearly using it as a unique identifier.
 
-If there are no remaining open tasks, exit immediately and state that there is nothing left to do.`;
+If there are no remaining open tasks, exit immediately and state that there is nothing left to do.
+
+---
+
+## Tasks
+
+Process tasks from this document:
+
+{{DOCUMENT_PATH}}
+
+Save changes directly in that file.`;
 
 interface BatchRunnerModalProps {
   theme: Theme;

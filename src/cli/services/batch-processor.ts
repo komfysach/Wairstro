@@ -403,6 +403,14 @@ export async function* runPlaybook(
             elapsedTimeMs: elapsedMs,
           };
           addHistoryEntry(historyEntry);
+          if (debug) {
+            yield {
+              type: 'debug',
+              timestamp: Date.now(),
+              category: 'history',
+              message: `Wrote history entry: ${historyEntry.id.slice(0, 8)}`,
+            };
+          }
         }
 
         remainingTasks = newRemainingTasks;

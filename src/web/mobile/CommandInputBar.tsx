@@ -900,6 +900,159 @@ export function CommandInputBar({
         onSelectedIndexChange={setSelectedSlashCommandIndex}
       />
 
+      {/* EXPANDED MOBILE AI MODE - Full width textarea with send button below */}
+      {mobileExpandedHeight ? (
+        <form
+          onSubmit={handleMobileSubmit}
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px',
+            paddingLeft: '16px',
+            paddingRight: '16px',
+            flex: 1,
+            maxWidth: '100%',
+            overflow: 'hidden',
+          }}
+        >
+          {/* Full-width textarea */}
+          <textarea
+            ref={textareaRef}
+            value={value}
+            onChange={handleChange}
+            onKeyDown={handleKeyDown}
+            placeholder={getPlaceholder()}
+            disabled={isDisabled}
+            autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="off"
+            spellCheck={false}
+            enterKeyHint="enter"
+            rows={1}
+            style={{
+              flex: 1,
+              width: '100%',
+              padding: '14px 18px',
+              borderRadius: '12px',
+              backgroundColor: colors.bgMain,
+              border: `2px solid ${colors.accent}`,
+              boxShadow: `0 0 0 3px ${colors.accent}33`,
+              color: colors.textMain,
+              fontSize: '17px',
+              fontFamily: 'inherit',
+              lineHeight: `${LINE_HEIGHT}px`,
+              outline: 'none',
+              minHeight: '150px',
+              WebkitAppearance: 'none',
+              appearance: 'none',
+              resize: 'none',
+              WebkitFontSmoothing: 'antialiased',
+              MozOsxFontSmoothing: 'grayscale',
+              overflowY: 'auto',
+              overflowX: 'hidden',
+              wordWrap: 'break-word',
+            }}
+            onBlur={(e) => {
+              // Delay collapse to allow click on send button
+              setTimeout(() => {
+                if (!containerRef.current?.contains(document.activeElement)) {
+                  setIsExpanded(false);
+                }
+              }, 150);
+              onInputBlur?.();
+            }}
+            aria-label="AI message input. Press the send button to submit."
+            aria-multiline="true"
+          />
+
+          {/* Full-width send button below textarea */}
+          {inputMode === 'ai' && isSessionBusy ? (
+            <button
+              type="button"
+              onClick={handleInterrupt}
+              style={{
+                width: '100%',
+                padding: '12px',
+                borderRadius: '12px',
+                backgroundColor: '#ef4444',
+                color: '#ffffff',
+                fontSize: '15px',
+                fontWeight: 600,
+                border: 'none',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                transition: 'opacity 150ms ease, background-color 150ms ease',
+                WebkitTapHighlightColor: 'transparent',
+              }}
+              onTouchStart={(e) => {
+                e.currentTarget.style.backgroundColor = '#dc2626';
+              }}
+              onTouchEnd={(e) => {
+                e.currentTarget.style.backgroundColor = '#ef4444';
+              }}
+              aria-label="Cancel running AI query"
+            >
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+              <span>Stop</span>
+            </button>
+          ) : (
+            <button
+              type="submit"
+              disabled={isDisabled || !value.trim()}
+              style={{
+                width: '100%',
+                padding: '12px',
+                borderRadius: '12px',
+                backgroundColor: colors.accent,
+                color: '#ffffff',
+                fontSize: '15px',
+                fontWeight: 600,
+                border: 'none',
+                cursor: isDisabled || !value.trim() ? 'default' : 'pointer',
+                opacity: isDisabled || !value.trim() ? 0.5 : 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                transition: 'opacity 150ms ease, background-color 150ms ease',
+                WebkitTapHighlightColor: 'transparent',
+              }}
+              aria-label="Send message"
+            >
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <line x1="12" y1="19" x2="12" y2="5" />
+                <polyline points="5 12 12 5 19 12" />
+              </svg>
+              <span>Send</span>
+            </button>
+          )}
+        </form>
+      ) : (
+      /* NORMAL MODE - Original layout with side buttons */
       <form
         onSubmit={handleMobileSubmit}
         style={{
@@ -911,8 +1064,6 @@ export function CommandInputBar({
           // Ensure form doesn't overflow screen width
           maxWidth: '100%',
           overflow: 'hidden',
-          // Expand container on mobile when input is focused
-          ...(mobileExpandedHeight && { flex: 1 }),
         }}
       >
         {/* Mode toggle button - AI / Terminal */}
@@ -1190,7 +1341,7 @@ export function CommandInputBar({
             />
           </div>
         ) : (
-          /* AI mode: regular textarea - expands on mobile when focused */
+          /* AI mode: regular textarea - on mobile phone, focus triggers expanded mode */
           <textarea
             ref={textareaRef}
             value={value}
@@ -1201,61 +1352,57 @@ export function CommandInputBar({
             autoComplete="off"
             autoCorrect="off"
             autoCapitalize="off"
-          spellCheck={false}
-          enterKeyHint="enter"
-          rows={1}
-          style={{
-            flex: 1,
-            // minWidth: 0 is critical for flex items to shrink below content size
-            minWidth: 0,
-            // Large touch-friendly padding (minimum 12px, but larger for comfort)
-            padding: '14px 18px',
-            borderRadius: '12px',
-            backgroundColor: colors.bgMain,
-            border: `2px solid ${colors.border}`,
-            // Never ghost out the input - user can always type
-            color: colors.textMain,
-            // 16px minimum prevents iOS zoom on focus, 17px for better readability
-            fontSize: '17px',
-            fontFamily: 'inherit',
-            lineHeight: `${LINE_HEIGHT}px`,
-            outline: 'none',
-            // On mobile when expanded, use 50vh height; otherwise use dynamic height
-            height: mobileExpandedHeight || `${textareaHeight}px`,
-            // Large minimum height for easy touch targeting
-            minHeight: `${MIN_INPUT_HEIGHT}px`,
-            // Maximum height based on mobile expansion or MAX_LINES
-            maxHeight: mobileExpandedHeight || `${MAX_TEXTAREA_HEIGHT}px`,
-            // Reset appearance for consistent styling
-            WebkitAppearance: 'none',
-            appearance: 'none',
-            // Remove default textarea resize handle
-            resize: 'none',
-            // Smooth height transitions for auto-expansion
-            transition: mobileExpandedHeight
-              ? 'height 200ms ease-out, border-color 150ms ease, box-shadow 150ms ease'
-              : 'height 100ms ease-out, border-color 150ms ease, box-shadow 150ms ease',
-            // Better text rendering on mobile
-            WebkitFontSmoothing: 'antialiased',
-            MozOsxFontSmoothing: 'grayscale',
-            // Enable scrolling when expanded or when content exceeds max height
-            overflowY: mobileExpandedHeight || textareaHeight >= MAX_TEXTAREA_HEIGHT ? 'auto' : 'hidden',
-            overflowX: 'hidden',
-            wordWrap: 'break-word',
-          }}
-          onFocus={(e) => {
-            // Add focus ring for accessibility
-            e.currentTarget.style.borderColor = colors.accent;
-            e.currentTarget.style.boxShadow = `0 0 0 3px ${colors.accent}33`;
-            handleMobileAIFocus();
-          }}
-          onBlur={(e) => {
-            // Remove focus ring
-            e.currentTarget.style.borderColor = colors.border;
-            e.currentTarget.style.boxShadow = 'none';
-            onInputBlur?.();
-          }}
-          aria-label="AI message input. Press the send button to submit."
+            spellCheck={false}
+            enterKeyHint="enter"
+            rows={1}
+            style={{
+              flex: 1,
+              // minWidth: 0 is critical for flex items to shrink below content size
+              minWidth: 0,
+              // Large touch-friendly padding (minimum 12px, but larger for comfort)
+              padding: '14px 18px',
+              borderRadius: '12px',
+              backgroundColor: colors.bgMain,
+              border: `2px solid ${colors.border}`,
+              // Never ghost out the input - user can always type
+              color: colors.textMain,
+              // 16px minimum prevents iOS zoom on focus, 17px for better readability
+              fontSize: '17px',
+              fontFamily: 'inherit',
+              lineHeight: `${LINE_HEIGHT}px`,
+              outline: 'none',
+              height: `${textareaHeight}px`,
+              // Large minimum height for easy touch targeting
+              minHeight: `${MIN_INPUT_HEIGHT}px`,
+              maxHeight: `${MAX_TEXTAREA_HEIGHT}px`,
+              // Reset appearance for consistent styling
+              WebkitAppearance: 'none',
+              appearance: 'none',
+              // Remove default textarea resize handle
+              resize: 'none',
+              // Smooth height transitions for auto-expansion
+              transition: 'height 100ms ease-out, border-color 150ms ease, box-shadow 150ms ease',
+              // Better text rendering on mobile
+              WebkitFontSmoothing: 'antialiased',
+              MozOsxFontSmoothing: 'grayscale',
+              // Enable scrolling when content exceeds max height
+              overflowY: textareaHeight >= MAX_TEXTAREA_HEIGHT ? 'auto' : 'hidden',
+              overflowX: 'hidden',
+              wordWrap: 'break-word',
+            }}
+            onFocus={(e) => {
+              // Add focus ring for accessibility
+              e.currentTarget.style.borderColor = colors.accent;
+              e.currentTarget.style.boxShadow = `0 0 0 3px ${colors.accent}33`;
+              handleMobileAIFocus();
+            }}
+            onBlur={(e) => {
+              // Remove focus ring
+              e.currentTarget.style.borderColor = colors.border;
+              e.currentTarget.style.boxShadow = 'none';
+              onInputBlur?.();
+            }}
+            aria-label="AI message input. Press the send button to submit."
           aria-multiline="true"
         />
         )}
@@ -1366,6 +1513,7 @@ export function CommandInputBar({
           </button>
         )}
       </form>
+      )}
 
       {/* Inline CSS for animations */}
       <style>

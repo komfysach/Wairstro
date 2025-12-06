@@ -3,6 +3,7 @@ import path from 'path';
 import os from 'os';
 import crypto from 'crypto';
 import fs from 'fs/promises';
+import fsSync from 'fs';
 import { createWriteStream } from 'fs';
 import archiver from 'archiver';
 import AdmZip from 'adm-zip';
@@ -213,6 +214,9 @@ let mainWindow: BrowserWindow | null = null;
 let processManager: ProcessManager | null = null;
 let webServer: WebServer | null = null;
 let agentDetector: AgentDetector | null = null;
+let historyFileWatcherInterval: NodeJS.Timeout | null = null;
+let lastHistoryFileMtime: number = 0;
+let historyNeedsReload: boolean = false;
 
 /**
  * Create and configure the web server with all necessary callbacks.
@@ -647,6 +651,9 @@ app.whenReady().then(() => {
   logger.info('Creating main window', 'Startup');
   createWindow();
 
+  // Start history file watcher (polls every 60 seconds for external changes)
+  startHistoryFileWatcher();
+
   // Note: Web server is not auto-started - it starts when user enables web interface
   // via live:startServer IPC call from the renderer
 
@@ -665,6 +672,11 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', async () => {
   logger.info('Application shutting down', 'Shutdown');
+  // Stop history file watcher
+  if (historyFileWatcherInterval) {
+    clearInterval(historyFileWatcherInterval);
+    historyFileWatcherInterval = null;
+  }
   // Clean up all running processes
   logger.info('Killing all running processes', 'Shutdown');
   processManager?.killAll();
@@ -674,6 +686,43 @@ app.on('before-quit', async () => {
   await webServer?.stop();
   logger.info('Shutdown complete', 'Shutdown');
 });
+
+/**
+ * Start watching the history file for external changes (e.g., from CLI).
+ * Polls every 60 seconds and notifies renderer if file was modified.
+ */
+function startHistoryFileWatcher() {
+  const historyFilePath = historyStore.path;
+
+  // Get initial mtime
+  try {
+    const stats = fsSync.statSync(historyFilePath);
+    lastHistoryFileMtime = stats.mtimeMs;
+  } catch {
+    // File doesn't exist yet, that's fine
+    lastHistoryFileMtime = 0;
+  }
+
+  // Poll every 60 seconds
+  historyFileWatcherInterval = setInterval(() => {
+    try {
+      const stats = fsSync.statSync(historyFilePath);
+      if (stats.mtimeMs > lastHistoryFileMtime) {
+        lastHistoryFileMtime = stats.mtimeMs;
+        // File was modified externally - mark for reload on next getAll
+        historyNeedsReload = true;
+        logger.debug('History file changed externally, notifying renderer', 'HistoryWatcher');
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('history:externalChange');
+        }
+      }
+    } catch {
+      // File might not exist, ignore
+    }
+  }, 60000); // 60 seconds
+
+  logger.info('History file watcher started', 'Startup');
+}
 
 function setupIpcHandlers() {
   // Settings management
@@ -3157,7 +3206,25 @@ function setupIpcHandlers() {
 
   // History persistence (per-project and optionally per-session)
   ipcMain.handle('history:getAll', async (_event, projectPath?: string, sessionId?: string) => {
-    const allEntries = historyStore.get('entries', []);
+    // If external changes were detected, reload from disk
+    let allEntries: HistoryEntry[];
+    if (historyNeedsReload) {
+      try {
+        const historyFilePath = historyStore.path;
+        const fileContent = fsSync.readFileSync(historyFilePath, 'utf-8');
+        const data = JSON.parse(fileContent);
+        allEntries = data.entries || [];
+        // Update the in-memory store with fresh data
+        historyStore.set('entries', allEntries);
+        historyNeedsReload = false;
+        logger.debug('Reloaded history from disk after external change', 'History');
+      } catch (error) {
+        logger.warn(`Failed to reload history from disk: ${error}`, 'History');
+        allEntries = historyStore.get('entries', []);
+      }
+    } else {
+      allEntries = historyStore.get('entries', []);
+    }
     let filteredEntries = allEntries;
 
     if (projectPath) {
@@ -3171,6 +3238,23 @@ function setupIpcHandlers() {
     }
 
     return filteredEntries;
+  });
+
+  // Force reload history from disk (for manual refresh)
+  ipcMain.handle('history:reload', async () => {
+    try {
+      const historyFilePath = historyStore.path;
+      const fileContent = fsSync.readFileSync(historyFilePath, 'utf-8');
+      const data = JSON.parse(fileContent);
+      const entries = data.entries || [];
+      historyStore.set('entries', entries);
+      historyNeedsReload = false;
+      logger.debug('Force reloaded history from disk', 'History');
+      return true;
+    } catch (error) {
+      logger.warn(`Failed to force reload history from disk: ${error}`, 'History');
+      return false;
+    }
   });
 
   ipcMain.handle('history:add', async (_event, entry: HistoryEntry) => {

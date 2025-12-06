@@ -1224,8 +1224,6 @@ export default function MaestroConsole() {
         description: getSlashCommandDescription(cmd),
       }));
 
-      console.log(`[App] Received ${commands.length} slash commands for session ${actualSessionId}:`, commands.slice(0, 5));
-
       setSessions(prev => prev.map(s => {
         if (s.id !== actualSessionId) return s;
         return { ...s, claudeCommands: commands };
@@ -1337,32 +1335,36 @@ export default function MaestroConsole() {
         // Token counts need to be accumulated across exchanges for accurate context window tracking
         // Claude Code CLI reports per-exchange tokens, not cumulative session tokens
         let updatedAiTabs = s.aiTabs;
-        let accumulatedTabStats: typeof usageStats | null = null;
         if (tabId && s.aiTabs) {
           updatedAiTabs = s.aiTabs.map(tab => {
             if (tab.id !== tabId) return tab;
-            // Accumulate all stats for this specific tab
+            // Accumulate cost/output tokens for total tracking, but keep current context tokens
+            // This allows proper context display after /compact while still tracking total usage
             const existing = tab.usageStats;
-            accumulatedTabStats = {
-              inputTokens: (existing?.inputTokens || 0) + usageStats.inputTokens,
-              outputTokens: (existing?.outputTokens || 0) + usageStats.outputTokens,
-              cacheReadInputTokens: (existing?.cacheReadInputTokens || 0) + usageStats.cacheReadInputTokens,
-              cacheCreationInputTokens: (existing?.cacheCreationInputTokens || 0) + usageStats.cacheCreationInputTokens,
-              totalCostUsd: (existing?.totalCostUsd || 0) + usageStats.totalCostUsd,
-              contextWindow: usageStats.contextWindow // Use latest context window size
-            };
             return {
               ...tab,
-              usageStats: accumulatedTabStats
+              usageStats: {
+                // Current context tokens (not accumulated - reflects actual state after compaction)
+                inputTokens: usageStats.inputTokens,
+                cacheReadInputTokens: usageStats.cacheReadInputTokens,
+                cacheCreationInputTokens: usageStats.cacheCreationInputTokens,
+                contextWindow: usageStats.contextWindow,
+                // Accumulated values for total tracking
+                outputTokens: (existing?.outputTokens || 0) + usageStats.outputTokens,
+                totalCostUsd: (existing?.totalCostUsd || 0) + usageStats.totalCostUsd,
+              }
             };
           });
         }
 
-        // Calculate context window usage percentage from accumulated tab stats
-        // For a conversation, context contains all inputs and outputs accumulated over the session
-        const effectiveStats = accumulatedTabStats || usageStats;
-        const contextTokens = effectiveStats.inputTokens + effectiveStats.outputTokens;
-        const contextPercentage = Math.min(Math.round((contextTokens / effectiveStats.contextWindow) * 100), 100);
+        // Calculate context window usage percentage from CURRENT reported tokens
+        // Claude Code reports the actual context size in each response (inputTokens + cache tokens)
+        // This naturally reflects compaction - after /compact, the reported context is smaller
+        // We use the raw usageStats (not accumulated) because it represents current context state
+        const currentContextTokens = usageStats.inputTokens + usageStats.cacheReadInputTokens + usageStats.cacheCreationInputTokens;
+        const contextPercentage = usageStats.contextWindow > 0
+          ? Math.min(Math.round((currentContextTokens / usageStats.contextWindow) * 100), 100)
+          : 0;
 
         // Accumulate session-level stats for backwards compatibility
         const existingSessionStats = s.usageStats;
@@ -1755,6 +1757,17 @@ export default function MaestroConsole() {
       }
     });
   }, [sessions]);
+
+  // Listen for external history changes (e.g., from CLI) and refresh history panel
+  useEffect(() => {
+    const unsubscribe = window.maestro.history.onExternalChange(async () => {
+      console.log('[History] External change detected, reloading from disk and refreshing history panel');
+      // Reload from disk before refreshing (to bypass electron-store cache)
+      await window.maestro.history.reload();
+      rightPanelRef.current?.refreshHistoryPanel();
+    });
+    return unsubscribe;
+  }, []);
 
   // Combine built-in slash commands with custom AI commands for autocomplete
   // Filter out isSystemCommand entries since those are already in slashCommands with execute functions
@@ -2554,7 +2567,12 @@ export default function MaestroConsole() {
 
   // Handler to start batch run from modal with multi-document support
   const handleStartBatchRun = useCallback((config: BatchRunConfig) => {
-    if (!activeSession || !activeSession.autoRunFolderPath) return;
+    console.log('[App] handleStartBatchRun called with config:', config);
+    if (!activeSession || !activeSession.autoRunFolderPath) {
+      console.log('[App] handleStartBatchRun early return - no active session or autoRunFolderPath');
+      return;
+    }
+    console.log('[App] Starting batch run for session:', activeSession.id, 'folder:', activeSession.autoRunFolderPath);
     setBatchRunnerModalOpen(false);
     startBatchRun(activeSession.id, config, activeSession.autoRunFolderPath);
   }, [activeSession, startBatchRun]);
@@ -5544,6 +5562,10 @@ export default function MaestroConsole() {
           gitRefsCacheTime
         } : s
       ));
+
+      // Also refresh history panel (reload from disk first to bypass electron-store cache)
+      await window.maestro.history.reload();
+      rightPanelRef.current?.refreshHistoryPanel();
     } catch (error) {
       console.error('Git/file state refresh error:', error);
       const errorMsg = (error as Error)?.message || 'Unknown error';
@@ -5889,7 +5911,7 @@ export default function MaestroConsole() {
           onRefreshGitFileState={async () => {
             if (activeSessionId) {
               await refreshGitFileState(activeSessionId);
-              setSuccessFlashNotification('File/Git State Refreshed');
+              setSuccessFlashNotification('Files, Git, History Refreshed');
               setTimeout(() => setSuccessFlashNotification(null), 2000);
             }
           }}

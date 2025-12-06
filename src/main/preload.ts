@@ -484,6 +484,12 @@ contextBridge.exposeInMainWorld('maestro', {
       ipcRenderer.invoke('history:delete', entryId),
     update: (entryId: string, updates: { validated?: boolean }) =>
       ipcRenderer.invoke('history:update', entryId, updates),
+    onExternalChange: (handler: () => void) => {
+      const wrappedHandler = () => handler();
+      ipcRenderer.on('history:externalChange', wrappedHandler);
+      return () => ipcRenderer.removeListener('history:externalChange', wrappedHandler);
+    },
+    reload: () => ipcRenderer.invoke('history:reload'),
   },
 
   // Notification API
@@ -928,6 +934,8 @@ export interface MaestroAPI {
     clear: (projectPath?: string) => Promise<boolean>;
     delete: (entryId: string) => Promise<boolean>;
     update: (entryId: string, updates: { validated?: boolean }) => Promise<boolean>;
+    onExternalChange: (handler: () => void) => () => void;
+    reload: () => Promise<boolean>;
   };
   notification: {
     show: (title: string, body: string) => Promise<{ success: boolean; error?: string }>;

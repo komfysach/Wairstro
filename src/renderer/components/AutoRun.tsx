@@ -1498,28 +1498,29 @@ function AutoRunInner({
           onClick={() => !isLocked && setMode('edit')}
           disabled={isLocked}
           className={`flex items-center gap-2 px-3 py-1.5 rounded text-xs transition-colors ${
-            mode === 'edit' ? 'font-semibold' : ''
+            mode === 'edit' && !isLocked ? 'font-semibold' : ''
           } ${isLocked ? 'opacity-50 cursor-not-allowed' : ''}`}
           style={{
-            backgroundColor: mode === 'edit' ? theme.colors.bgActivity : 'transparent',
-            color: mode === 'edit' ? theme.colors.textMain : theme.colors.textDim,
-            border: `1px solid ${mode === 'edit' ? theme.colors.accent : theme.colors.border}`
+            backgroundColor: mode === 'edit' && !isLocked ? theme.colors.bgActivity : 'transparent',
+            color: isLocked ? theme.colors.textDim : (mode === 'edit' ? theme.colors.textMain : theme.colors.textDim),
+            border: `1px solid ${mode === 'edit' && !isLocked ? theme.colors.accent : theme.colors.border}`
           }}
+          title={isLocked ? 'Editing disabled while Auto Run active' : 'Edit document'}
         >
           <Edit className="w-3.5 h-3.5" />
           Edit
         </button>
         <button
-          onClick={() => !isLocked && setMode('preview')}
-          disabled={isLocked}
+          onClick={() => setMode('preview')}
           className={`flex items-center gap-2 px-3 py-1.5 rounded text-xs transition-colors ${
-            mode === 'preview' ? 'font-semibold' : ''
-          } ${isLocked ? 'opacity-50 cursor-not-allowed' : ''}`}
+            mode === 'preview' || isLocked ? 'font-semibold' : ''
+          }`}
           style={{
-            backgroundColor: mode === 'preview' ? theme.colors.bgActivity : 'transparent',
-            color: mode === 'preview' ? theme.colors.textMain : theme.colors.textDim,
-            border: `1px solid ${mode === 'preview' ? theme.colors.accent : theme.colors.border}`
+            backgroundColor: mode === 'preview' || isLocked ? theme.colors.bgActivity : 'transparent',
+            color: mode === 'preview' || isLocked ? theme.colors.textMain : theme.colors.textDim,
+            border: `1px solid ${mode === 'preview' || isLocked ? theme.colors.accent : theme.colors.border}`
           }}
+          title="Preview document"
         >
           <Eye className="w-3.5 h-3.5" />
           Preview

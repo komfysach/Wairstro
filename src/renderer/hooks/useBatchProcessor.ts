@@ -317,16 +317,19 @@ ${docList}
    * Start a batch processing run for a specific session with multi-document support
    */
   const startBatchRun = useCallback(async (sessionId: string, config: BatchRunConfig, folderPath: string) => {
+    console.log('[BatchProcessor] startBatchRun called:', { sessionId, folderPath, config });
+
     const session = sessions.find(s => s.id === sessionId);
     if (!session) {
-      console.error('Session not found for batch processing:', sessionId);
+      console.error('[BatchProcessor] Session not found for batch processing:', sessionId);
       return;
     }
 
     const { documents, prompt, loopEnabled, maxLoops, worktree } = config;
+    console.log('[BatchProcessor] Config parsed - documents:', documents.length, 'loopEnabled:', loopEnabled, 'maxLoops:', maxLoops);
 
     if (documents.length === 0) {
-      console.warn('No documents provided for batch processing:', sessionId);
+      console.warn('[BatchProcessor] No documents provided for batch processing:', sessionId);
       return;
     }
 
@@ -412,8 +415,8 @@ ${docList}
       }
     }
 
-    // Find group name for this session
-    const sessionGroup = groups.find(g => g.sessionIds.includes(sessionId));
+    // Find group name for this session (sessions have groupId, groups have id)
+    const sessionGroup = session.groupId ? groups.find(g => g.id === session.groupId) : null;
     const groupName = sessionGroup?.name;
 
     // Calculate initial total tasks across all documents

@@ -260,10 +260,15 @@ export function getConfigDirectory(): string {
  * Add a history entry
  */
 export function addHistoryEntry(entry: HistoryEntry): void {
-  const filePath = path.join(getConfigDir(), 'maestro-history.json');
-  const data = readStoreFile<HistoryStore>('maestro-history.json') || { entries: [] };
+  try {
+    const filePath = path.join(getConfigDir(), 'maestro-history.json');
+    const data = readStoreFile<HistoryStore>('maestro-history.json') || { entries: [] };
 
-  data.entries.push(entry);
+    data.entries.unshift(entry); // Add to beginning (most recent first)
 
-  fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
+    fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
+  } catch (error) {
+    // Log error but don't throw - history writing shouldn't break playbook execution
+    console.error(`[WARNING] Failed to write history entry: ${error instanceof Error ? error.message : String(error)}`);
+  }
 }
