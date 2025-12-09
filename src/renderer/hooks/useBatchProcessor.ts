@@ -468,17 +468,22 @@ ${docList}
     }));
 
     // AUTORUN LOG: Start
-    console.log('[AUTORUN] Logging start event');
-    window.maestro.logger.autorun(
-      `Auto Run started`,
-      session.name,
-      {
-        documents: documents.map(d => d.filename),
-        totalTasks: initialTotalTasks,
-        loopEnabled,
-        maxLoops: maxLoops ?? 'unlimited'
-      }
-    );
+    try {
+      console.log('[AUTORUN] Logging start event - calling window.maestro.logger.autorun');
+      window.maestro.logger.autorun(
+        `Auto Run started`,
+        session.name,
+        {
+          documents: documents.map(d => d.filename),
+          totalTasks: initialTotalTasks,
+          loopEnabled,
+          maxLoops: maxLoops ?? 'unlimited'
+        }
+      );
+      console.log('[AUTORUN] Start event logged successfully');
+    } catch (err) {
+      console.error('[AUTORUN] Error logging start event:', err);
+    }
 
     // Store custom prompt for persistence
     setCustomPrompts(prev => ({ ...prev, [sessionId]: prompt }));

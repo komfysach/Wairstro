@@ -619,6 +619,33 @@ describe('AgentPromptComposerModal', () => {
   });
 
   describe('textarea interaction', () => {
+    it('inserts tab character on Tab key', async () => {
+      // Use "HelloWorld" without space so tab insertion is clearer
+      renderWithLayerStack(
+        <AgentPromptComposerModal
+          isOpen={true}
+          onClose={vi.fn()}
+          theme={theme}
+          initialValue="HelloWorld"
+          onSubmit={vi.fn()}
+        />
+      );
+
+      const textarea = screen.getByPlaceholderText(
+        'Enter your agent prompt... (type {{ for variables)'
+      ) as HTMLTextAreaElement;
+
+      // Set cursor position after "Hello"
+      textarea.selectionStart = 5;
+      textarea.selectionEnd = 5;
+
+      await act(async () => {
+        fireEvent.keyDown(textarea, { key: 'Tab' });
+      });
+
+      expect(textarea.value).toBe('Hello\tWorld');
+    });
+
     it('updates value when typing', async () => {
       renderWithLayerStack(
         <AgentPromptComposerModal

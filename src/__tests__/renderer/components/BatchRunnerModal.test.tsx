@@ -495,6 +495,25 @@ describe('BatchRunnerModal', () => {
   });
 
   describe('Agent Prompt', () => {
+    it('inserts tab character on Tab key', async () => {
+      render(<BatchRunnerModal {...createDefaultProps()} />);
+
+      const textarea = screen.getByPlaceholderText('Enter the prompt for the batch agent...') as HTMLTextAreaElement;
+
+      // Clear and set a simple value (no space - "HelloWorld")
+      fireEvent.change(textarea, { target: { value: 'HelloWorld' } });
+
+      // Set cursor position after "Hello"
+      textarea.selectionStart = 5;
+      textarea.selectionEnd = 5;
+
+      fireEvent.keyDown(textarea, { key: 'Tab' });
+
+      await waitFor(() => {
+        expect(textarea.value).toBe('Hello\tWorld');
+      });
+    });
+
     it('displays default prompt in textarea', async () => {
       render(<BatchRunnerModal {...createDefaultProps()} />);
 

@@ -104,6 +104,21 @@ export function AgentPromptComposerModal({
     if (handleAutocompleteKeyDown(e)) {
       return;
     }
+
+    // Insert actual tab character instead of moving focus
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      const textarea = e.currentTarget;
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      const newValue = value.substring(0, start) + '\t' + value.substring(end);
+      setValue(newValue);
+      // Restore cursor position after the tab
+      requestAnimationFrame(() => {
+        textarea.selectionStart = start + 1;
+        textarea.selectionEnd = start + 1;
+      });
+    }
   };
 
   const tokenCount = estimateTokenCount(value);

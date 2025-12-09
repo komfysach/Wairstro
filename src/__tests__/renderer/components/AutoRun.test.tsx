@@ -354,6 +354,25 @@ describe('AutoRun', () => {
   });
 
   describe('Keyboard Shortcuts', () => {
+    it('inserts tab character on Tab key', async () => {
+      // Use "HelloWorld" without space so tab insertion is clearer
+      const props = createDefaultProps({ content: 'HelloWorld' });
+      render(<AutoRun {...props} />);
+
+      const textarea = screen.getByRole('textbox') as HTMLTextAreaElement;
+      fireEvent.focus(textarea);
+
+      // Set cursor position after "Hello"
+      textarea.selectionStart = 5;
+      textarea.selectionEnd = 5;
+
+      fireEvent.keyDown(textarea, { key: 'Tab' });
+
+      await waitFor(() => {
+        expect(textarea.value).toBe('Hello\tWorld');
+      });
+    });
+
     it('toggles mode on Cmd+E', async () => {
       const props = createDefaultProps({ mode: 'edit' });
       render(<AutoRun {...props} />);

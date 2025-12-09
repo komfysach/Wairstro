@@ -1248,6 +1248,28 @@ const AutoRunInner = forwardRef<AutoRunHandle, AutoRunProps>(function AutoRunInn
       return;
     }
 
+    // Insert actual tab character instead of moving focus
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      const textarea = e.currentTarget;
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+
+      // Push undo state before modifying content
+      pushUndoState();
+
+      const newContent = localContent.substring(0, start) + '\t' + localContent.substring(end);
+      setLocalContent(newContent);
+      lastUndoSnapshotRef.current = newContent;
+
+      // Restore cursor position after the tab
+      requestAnimationFrame(() => {
+        textarea.selectionStart = start + 1;
+        textarea.selectionEnd = start + 1;
+      });
+      return;
+    }
+
     // Cmd+Z to undo, Cmd+Shift+Z to redo
     if ((e.metaKey || e.ctrlKey) && e.key === 'z') {
       e.preventDefault();
