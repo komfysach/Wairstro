@@ -10,13 +10,13 @@ Maestro ships with a variety of themes that fall under three categories: Dark, L
 <img width="3592" height="2302" alt="image" src="https://github.com/user-attachments/assets/09db8891-4303-419a-b4ab-be729cf65e04" />
 
 ### Nord
-<img width="3592" height="2302" alt="image" src="https://github.com/user-attachments/assets/4183458e-99ec-4479-a525-c3031d29ac20" />
+<img width="3592" height="2302" alt="image" src="https://github.com/user-attachments/assets/1c413246-5342-47d7-a012-4d50f7dd49ea" />
 
 ### Tokyo Night
-<img width="3592" height="2302" alt="image" src="https://github.com/user-attachments/assets/36d95f8d-a3ca-4f71-8e07-587be4b41e8e" />
+<img width="3592" height="2302" alt="image" src="https://github.com/user-attachments/assets/9ede9789-bf71-4c1c-beec-b242cdb89a22" />
 
 ### Catppuccin Mocha
-<img width="3592" height="2302" alt="image" src="https://github.com/user-attachments/assets/22b8742a-80e9-423f-9ace-2f24eb1adce0" />
+<img width="3592" height="2302" alt="image" src="https://github.com/user-attachments/assets/64c6a699-cb64-4d5a-a245-69ab29cb59e3" />
 
 ### Gruvbox Dark
 <img width="3592" height="2302" alt="image" src="https://github.com/user-attachments/assets/523ce4b2-fc9f-4dab-a047-8eeb09cd10ae" />
@@ -59,4 +59,5 @@ It's a vibe.
 ### InQuest
 An homage to InQuest.net, acquired by OPSWAT in 2024.
 <img width="3592" height="2302" alt="image" src="https://github.com/user-attachments/assets/706961b2-037a-4228-9b69-0958847f2bcc" />
+
 
