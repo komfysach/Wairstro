@@ -482,8 +482,9 @@ describe('HistoryDetailModal', () => {
         />
       );
 
-      // Context = 5000 + 2000 + 3000 = 10000 / 100000 = 10%
-      expect(screen.getByText('10%')).toBeInTheDocument();
+      // Context = (inputTokens + outputTokens) / contextWindow
+      // (5000 + 1000) / 100000 = 6%
+      expect(screen.getByText('6%')).toBeInTheDocument();
     });
 
     it('should display token counts', () => {
@@ -639,7 +640,7 @@ describe('HistoryDetailModal', () => {
           theme={mockTheme}
           entry={createMockEntry({
             usageStats: {
-              inputTokens: 75000,
+              inputTokens: 74000,
               outputTokens: 1000,
               cacheReadInputTokens: 0,
               cacheCreationInputTokens: 0,
@@ -651,7 +652,7 @@ describe('HistoryDetailModal', () => {
         />
       );
 
-      // 75% usage should show warning color
+      // (74000 + 1000) / 100000 = 75%
       expect(screen.getByText('75%')).toBeInTheDocument();
     });
 
@@ -661,7 +662,7 @@ describe('HistoryDetailModal', () => {
           theme={mockTheme}
           entry={createMockEntry({
             usageStats: {
-              inputTokens: 95000,
+              inputTokens: 94000,
               outputTokens: 1000,
               cacheReadInputTokens: 0,
               cacheCreationInputTokens: 0,
@@ -673,7 +674,7 @@ describe('HistoryDetailModal', () => {
         />
       );
 
-      // 95% usage should show error color
+      // (94000 + 1000) / 100000 = 95%
       expect(screen.getByText('95%')).toBeInTheDocument();
     });
 

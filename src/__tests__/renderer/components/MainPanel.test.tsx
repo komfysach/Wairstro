@@ -657,8 +657,8 @@ describe('MainPanel', () => {
   });
 
   describe('Auto mode indicator', () => {
-    it('should display Auto mode button when batch run is active', () => {
-      const batchRunState: BatchRunState = {
+    it('should display Auto mode button when batch run is active for current session', () => {
+      const currentSessionBatchState: BatchRunState = {
         isRunning: true,
         isStopping: false,
         documents: ['doc1.md'],
@@ -678,14 +678,14 @@ describe('MainPanel', () => {
         sessionIds: [],
       };
 
-      render(<MainPanel {...defaultProps} batchRunState={batchRunState} />);
+      render(<MainPanel {...defaultProps} currentSessionBatchState={currentSessionBatchState} />);
 
       expect(screen.getByText('Auto')).toBeInTheDocument();
       expect(screen.getByText('2/5')).toBeInTheDocument();
     });
 
     it('should display Stopping state when isStopping is true', () => {
-      const batchRunState: BatchRunState = {
+      const currentSessionBatchState: BatchRunState = {
         isRunning: true,
         isStopping: true,
         documents: ['doc1.md'],
@@ -705,14 +705,14 @@ describe('MainPanel', () => {
         sessionIds: [],
       };
 
-      render(<MainPanel {...defaultProps} batchRunState={batchRunState} />);
+      render(<MainPanel {...defaultProps} currentSessionBatchState={currentSessionBatchState} />);
 
       expect(screen.getByText('Stopping...')).toBeInTheDocument();
     });
 
-    it('should call showConfirmation when Auto button is clicked', () => {
-      const showConfirmation = vi.fn();
-      const batchRunState: BatchRunState = {
+    it('should call onStopBatchRun directly when Auto button is clicked', () => {
+      const onStopBatchRun = vi.fn();
+      const currentSessionBatchState: BatchRunState = {
         isRunning: true,
         isStopping: false,
         documents: ['doc1.md'],
@@ -732,19 +732,17 @@ describe('MainPanel', () => {
         sessionIds: [],
       };
 
-      render(<MainPanel {...defaultProps} batchRunState={batchRunState} showConfirmation={showConfirmation} />);
+      render(<MainPanel {...defaultProps} currentSessionBatchState={currentSessionBatchState} onStopBatchRun={onStopBatchRun} />);
 
       fireEvent.click(screen.getByText('Auto'));
 
-      expect(showConfirmation).toHaveBeenCalledWith(
-        'Stop the batch run? The current task will complete before stopping.',
-        expect.any(Function)
-      );
+      // onStopBatchRun handles its own confirmation modal, so it should be called directly
+      expect(onStopBatchRun).toHaveBeenCalled();
     });
 
-    it('should not call showConfirmation when Auto button is clicked while stopping', () => {
-      const showConfirmation = vi.fn();
-      const batchRunState: BatchRunState = {
+    it('should not call onStopBatchRun when Auto button is clicked while stopping', () => {
+      const onStopBatchRun = vi.fn();
+      const currentSessionBatchState: BatchRunState = {
         isRunning: true,
         isStopping: true,
         documents: ['doc1.md'],
@@ -764,11 +762,11 @@ describe('MainPanel', () => {
         sessionIds: [],
       };
 
-      render(<MainPanel {...defaultProps} batchRunState={batchRunState} showConfirmation={showConfirmation} />);
+      render(<MainPanel {...defaultProps} currentSessionBatchState={currentSessionBatchState} onStopBatchRun={onStopBatchRun} />);
 
       fireEvent.click(screen.getByText('Stopping...'));
 
-      expect(showConfirmation).not.toHaveBeenCalled();
+      expect(onStopBatchRun).not.toHaveBeenCalled();
     });
   });
 

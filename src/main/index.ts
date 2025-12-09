@@ -4115,6 +4115,91 @@ function setupIpcHandlers() {
     }
   );
 
+  // File watcher for Auto Run folder - detects external changes
+  const autoRunWatchers = new Map<string, fsSync.FSWatcher>();
+  let autoRunWatchDebounceTimer: NodeJS.Timeout | null = null;
+
+  // Start watching an Auto Run folder for changes
+  ipcMain.handle('autorun:watchFolder', async (_event, folderPath: string) => {
+    try {
+      // Stop any existing watcher for this folder
+      if (autoRunWatchers.has(folderPath)) {
+        autoRunWatchers.get(folderPath)?.close();
+        autoRunWatchers.delete(folderPath);
+      }
+
+      // Validate folder exists
+      const folderStat = await fs.stat(folderPath);
+      if (!folderStat.isDirectory()) {
+        return { success: false, error: 'Path is not a directory' };
+      }
+
+      // Start watching the folder recursively
+      const watcher = fsSync.watch(folderPath, { recursive: true }, (eventType, filename) => {
+        // Only care about .md files
+        if (!filename || !filename.toLowerCase().endsWith('.md')) {
+          return;
+        }
+
+        // Debounce to avoid flooding with events during rapid saves
+        if (autoRunWatchDebounceTimer) {
+          clearTimeout(autoRunWatchDebounceTimer);
+        }
+
+        autoRunWatchDebounceTimer = setTimeout(() => {
+          autoRunWatchDebounceTimer = null;
+          // Send event to renderer
+          if (mainWindow && !mainWindow.isDestroyed()) {
+            // Remove .md extension from filename to match autorun conventions
+            const filenameWithoutExt = filename.replace(/\.md$/i, '');
+            mainWindow.webContents.send('autorun:fileChanged', {
+              folderPath,
+              filename: filenameWithoutExt,
+              eventType, // 'rename' or 'change'
+            });
+            logger.info(`Auto Run file changed: ${filename} (${eventType})`, 'AutoRun');
+          }
+        }, 300); // 300ms debounce
+      });
+
+      autoRunWatchers.set(folderPath, watcher);
+
+      watcher.on('error', (error) => {
+        logger.error(`Auto Run watcher error for ${folderPath}`, 'AutoRun', error);
+      });
+
+      logger.info(`Started watching Auto Run folder: ${folderPath}`, 'AutoRun');
+      return { success: true };
+    } catch (error) {
+      logger.error('Error starting Auto Run folder watcher', 'AutoRun', error);
+      return { success: false, error: String(error) };
+    }
+  });
+
+  // Stop watching an Auto Run folder
+  ipcMain.handle('autorun:unwatchFolder', async (_event, folderPath: string) => {
+    try {
+      if (autoRunWatchers.has(folderPath)) {
+        autoRunWatchers.get(folderPath)?.close();
+        autoRunWatchers.delete(folderPath);
+        logger.info(`Stopped watching Auto Run folder: ${folderPath}`, 'AutoRun');
+      }
+      return { success: true };
+    } catch (error) {
+      logger.error('Error stopping Auto Run folder watcher', 'AutoRun', error);
+      return { success: false, error: String(error) };
+    }
+  });
+
+  // Clean up all watchers on app quit
+  app.on('before-quit', () => {
+    for (const [folderPath, watcher] of autoRunWatchers) {
+      watcher.close();
+      logger.info(`Cleaned up Auto Run watcher for: ${folderPath}`, 'AutoRun');
+    }
+    autoRunWatchers.clear();
+  });
+
   // ============================================
   // Playbook IPC Handlers
   // ============================================

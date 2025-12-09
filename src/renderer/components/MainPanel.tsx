@@ -119,7 +119,8 @@ interface MainPanelProps {
   onOpenQueueBrowser?: () => void;
 
   // Auto mode props
-  batchRunState?: BatchRunState;
+  batchRunState?: BatchRunState;  // For display (may be from any session with active batch)
+  currentSessionBatchState?: BatchRunState | null;  // For current session only (input highlighting)
   onStopBatchRun?: () => void;
   showConfirmation?: (message: string, onConfirm: () => void) => void;
 
@@ -167,12 +168,13 @@ export function MainPanel(props: MainPanelProps) {
     setAboutModalOpen, setRightPanelOpen, setGitLogOpen, inputRef, logsEndRef, terminalOutputRef,
     fileTreeContainerRef, fileTreeFilterInputRef, toggleInputMode, processInput, handleInterrupt,
     handleInputKeyDown, handlePaste, handleDrop, getContextColor, setActiveSessionId,
-    batchRunState, onStopBatchRun, showConfirmation, onRemoveQueuedItem, onOpenQueueBrowser,
+    batchRunState, currentSessionBatchState, onStopBatchRun, showConfirmation, onRemoveQueuedItem, onOpenQueueBrowser,
     isMobileLandscape = false
   } = props;
 
-  const isAutoModeActive = batchRunState?.isRunning || false;
-  const isStopping = batchRunState?.isStopping || false;
+  // isCurrentSessionAutoMode: THIS session has active batch run (for all UI indicators)
+  const isCurrentSessionAutoMode = currentSessionBatchState?.isRunning || false;
+  const isCurrentSessionStopping = currentSessionBatchState?.isStopping || false;
 
   // Context window tooltip hover state
   const [contextTooltipOpen, setContextTooltipOpen] = useState(false);
@@ -551,35 +553,33 @@ export function MainPanel(props: MainPanelProps) {
 
             </div>
 
-            {/* Center: AUTO Mode Indicator */}
-            {isAutoModeActive && (
+            {/* Center: AUTO Mode Indicator - only show for current session */}
+            {isCurrentSessionAutoMode && (
               <button
                 onClick={() => {
-                  if (isStopping) return;
-                  showConfirmation?.(
-                    'Stop the batch run? The current task will complete before stopping.',
-                    () => onStopBatchRun?.()
-                  );
+                  if (isCurrentSessionStopping) return;
+                  // Call onStopBatchRun directly - it handles its own confirmation modal
+                  onStopBatchRun?.();
                 }}
-                disabled={isStopping}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-sm transition-all ${isStopping ? 'cursor-not-allowed' : 'hover:opacity-90 cursor-pointer'}`}
+                disabled={isCurrentSessionStopping}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-sm transition-all ${isCurrentSessionStopping ? 'cursor-not-allowed' : 'hover:opacity-90 cursor-pointer'}`}
                 style={{
                   backgroundColor: theme.colors.error,
                   color: 'white'
                 }}
-                title={isStopping ? 'Stopping after current task...' : 'Click to stop batch run'}
+                title={isCurrentSessionStopping ? 'Stopping after current task...' : 'Click to stop batch run'}
               >
-                {isStopping ? (
+                {isCurrentSessionStopping ? (
                   <Loader2 className="w-5 h-5 animate-spin" />
                 ) : (
                   <Wand2 className="w-5 h-5" />
                 )}
                 <span className="uppercase tracking-wider">
-                  {isStopping ? 'Stopping...' : 'Auto'}
+                  {isCurrentSessionStopping ? 'Stopping...' : 'Auto'}
                 </span>
-                {batchRunState && (
+                {currentSessionBatchState && (
                   <span className="text-xs opacity-80">
-                    {batchRunState.completedTasks}/{batchRunState.totalTasks}
+                    {currentSessionBatchState.completedTasks}/{currentSessionBatchState.totalTasks}
                   </span>
                 )}
               </button>
@@ -880,10 +880,10 @@ export function MainPanel(props: MainPanelProps) {
                 handleInterrupt={handleInterrupt}
                 onInputFocus={handleInputFocus}
                 onInputBlur={props.onInputBlur}
-                isAutoModeActive={isAutoModeActive}
+                isAutoModeActive={isCurrentSessionAutoMode}
                 sessions={sessions}
                 onSessionClick={handleSessionClick}
-                autoRunState={batchRunState}
+                autoRunState={currentSessionBatchState || undefined}
                 onStopAutoRun={onStopBatchRun}
                 onOpenQueueBrowser={onOpenQueueBrowser}
                 tabReadOnlyMode={activeTab?.readOnlyMode ?? false}

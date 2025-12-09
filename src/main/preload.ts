@@ -575,6 +575,16 @@ contextBridge.exposeInMainWorld('maestro', {
       ipcRenderer.invoke('autorun:deleteImage', folderPath, relativePath),
     listImages: (folderPath: string, docName: string) =>
       ipcRenderer.invoke('autorun:listImages', folderPath, docName),
+    // File watching for live updates
+    watchFolder: (folderPath: string) =>
+      ipcRenderer.invoke('autorun:watchFolder', folderPath),
+    unwatchFolder: (folderPath: string) =>
+      ipcRenderer.invoke('autorun:unwatchFolder', folderPath),
+    onFileChanged: (handler: (data: { folderPath: string; filename: string; eventType: string }) => void) => {
+      const wrappedHandler = (_event: Electron.IpcRendererEvent, data: { folderPath: string; filename: string; eventType: string }) => handler(data);
+      ipcRenderer.on('autorun:fileChanged', wrappedHandler);
+      return () => ipcRenderer.removeListener('autorun:fileChanged', wrappedHandler);
+    },
   },
 
   // Playbooks API (saved batch run configurations)
@@ -1039,6 +1049,9 @@ export interface MaestroAPI {
       images?: { filename: string; relativePath: string }[];
       error?: string;
     }>;
+    watchFolder: (folderPath: string) => Promise<{ success: boolean; error?: string }>;
+    unwatchFolder: (folderPath: string) => Promise<{ success: boolean; error?: string }>;
+    onFileChanged: (handler: (data: { folderPath: string; filename: string; eventType: string }) => void) => () => void;
   };
   playbooks: {
     list: (sessionId: string) => Promise<{

@@ -133,6 +133,7 @@ describe('RightPanel', () => {
     onAutoRunRefresh: vi.fn(),
     onAutoRunOpenSetup: vi.fn(),
     batchRunState: undefined,
+    currentSessionBatchState: undefined,  // For session-specific progress display
     onOpenBatchRunner: vi.fn(),
     onStopBatchRun: vi.fn(),
     onJumpToClaudeSession: vi.fn(),
@@ -435,15 +436,15 @@ describe('RightPanel', () => {
   });
 
   describe('Batch run progress', () => {
-    it('should not show progress when batchRunState is undefined', () => {
-      const props = createDefaultProps({ batchRunState: undefined });
+    it('should not show progress when currentSessionBatchState is undefined', () => {
+      const props = createDefaultProps({ currentSessionBatchState: undefined });
       render(<RightPanel {...props} />);
 
       expect(screen.queryByText('Auto Run Active')).not.toBeInTheDocument();
     });
 
     it('should not show progress when batch run is not running', () => {
-      const batchRunState: BatchRunState = {
+      const currentSessionBatchState: BatchRunState = {
         isRunning: false,
         isStopping: false,
         documents: ['doc1'],
@@ -457,14 +458,14 @@ describe('RightPanel', () => {
         loopEnabled: false,
         loopIteration: 0,
       };
-      const props = createDefaultProps({ batchRunState });
+      const props = createDefaultProps({ currentSessionBatchState });
       render(<RightPanel {...props} />);
 
       expect(screen.queryByText('Auto Run Active')).not.toBeInTheDocument();
     });
 
     it('should show progress when batch run is running', () => {
-      const batchRunState: BatchRunState = {
+      const currentSessionBatchState: BatchRunState = {
         isRunning: true,
         isStopping: false,
         documents: ['doc1'],
@@ -478,14 +479,14 @@ describe('RightPanel', () => {
         loopEnabled: false,
         loopIteration: 0,
       };
-      const props = createDefaultProps({ batchRunState });
+      const props = createDefaultProps({ currentSessionBatchState });
       render(<RightPanel {...props} />);
 
       expect(screen.getByText('Auto Run Active')).toBeInTheDocument();
     });
 
     it('should show "Stopping..." when isStopping is true', () => {
-      const batchRunState: BatchRunState = {
+      const currentSessionBatchState: BatchRunState = {
         isRunning: true,
         isStopping: true,
         documents: ['doc1'],
@@ -499,7 +500,7 @@ describe('RightPanel', () => {
         loopEnabled: false,
         loopIteration: 0,
       };
-      const props = createDefaultProps({ batchRunState });
+      const props = createDefaultProps({ currentSessionBatchState });
       render(<RightPanel {...props} />);
 
       expect(screen.getByText('Stopping...')).toBeInTheDocument();
@@ -507,7 +508,7 @@ describe('RightPanel', () => {
     });
 
     it('should show loop iteration indicator when loopEnabled', () => {
-      const batchRunState: BatchRunState = {
+      const currentSessionBatchState: BatchRunState = {
         isRunning: true,
         isStopping: false,
         documents: ['doc1'],
@@ -522,7 +523,7 @@ describe('RightPanel', () => {
         loopIteration: 2,
         maxLoops: 5,
       };
-      const props = createDefaultProps({ batchRunState });
+      const props = createDefaultProps({ currentSessionBatchState });
       render(<RightPanel {...props} />);
 
       // There are two indicators with the same text - one in the header and one at the bottom
@@ -533,7 +534,7 @@ describe('RightPanel', () => {
     });
 
     it('should show infinity symbol when maxLoops is undefined', () => {
-      const batchRunState: BatchRunState = {
+      const currentSessionBatchState: BatchRunState = {
         isRunning: true,
         isStopping: false,
         documents: ['doc1'],
@@ -548,14 +549,14 @@ describe('RightPanel', () => {
         loopIteration: 2,
         maxLoops: undefined,
       };
-      const props = createDefaultProps({ batchRunState });
+      const props = createDefaultProps({ currentSessionBatchState });
       render(<RightPanel {...props} />);
 
       expect(screen.getByText('Loop 3 of ∞')).toBeInTheDocument();
     });
 
     it('should show document progress for multi-document runs', () => {
-      const batchRunState: BatchRunState = {
+      const currentSessionBatchState: BatchRunState = {
         isRunning: true,
         isStopping: false,
         documents: ['doc1', 'doc2', 'doc3'],
@@ -569,14 +570,14 @@ describe('RightPanel', () => {
         loopEnabled: false,
         loopIteration: 0,
       };
-      const props = createDefaultProps({ batchRunState });
+      const props = createDefaultProps({ currentSessionBatchState });
       render(<RightPanel {...props} />);
 
       expect(screen.getByText(/Document 2\/3: doc2.md/)).toBeInTheDocument();
     });
 
     it('should not show document progress for single-document runs', () => {
-      const batchRunState: BatchRunState = {
+      const currentSessionBatchState: BatchRunState = {
         isRunning: true,
         isStopping: false,
         documents: ['doc1'],
@@ -590,14 +591,14 @@ describe('RightPanel', () => {
         loopEnabled: false,
         loopIteration: 0,
       };
-      const props = createDefaultProps({ batchRunState });
+      const props = createDefaultProps({ currentSessionBatchState });
       render(<RightPanel {...props} />);
 
       expect(screen.queryByText(/Document 1\/1/)).not.toBeInTheDocument();
     });
 
     it('should show total tasks completed', () => {
-      const batchRunState: BatchRunState = {
+      const currentSessionBatchState: BatchRunState = {
         isRunning: true,
         isStopping: false,
         documents: ['doc1', 'doc2'],
@@ -611,14 +612,14 @@ describe('RightPanel', () => {
         loopEnabled: false,
         loopIteration: 0,
       };
-      const props = createDefaultProps({ batchRunState });
+      const props = createDefaultProps({ currentSessionBatchState });
       render(<RightPanel {...props} />);
 
       expect(screen.getByText('7 / 20 total tasks completed')).toBeInTheDocument();
     });
 
     it('should show single document task count when totalTasksAcrossAllDocs is 0', () => {
-      const batchRunState: BatchRunState = {
+      const currentSessionBatchState: BatchRunState = {
         isRunning: true,
         isStopping: false,
         documents: ['doc1'],
@@ -632,14 +633,14 @@ describe('RightPanel', () => {
         loopEnabled: false,
         loopIteration: 0,
       };
-      const props = createDefaultProps({ batchRunState });
+      const props = createDefaultProps({ currentSessionBatchState });
       render(<RightPanel {...props} />);
 
       expect(screen.getByText('5 / 10 tasks completed')).toBeInTheDocument();
     });
 
     it('should show loading spinner during batch run', () => {
-      const batchRunState: BatchRunState = {
+      const currentSessionBatchState: BatchRunState = {
         isRunning: true,
         isStopping: false,
         documents: ['doc1'],
@@ -653,7 +654,7 @@ describe('RightPanel', () => {
         loopEnabled: false,
         loopIteration: 0,
       };
-      const props = createDefaultProps({ batchRunState });
+      const props = createDefaultProps({ currentSessionBatchState });
       render(<RightPanel {...props} />);
 
       expect(screen.getByTestId('loader')).toBeInTheDocument();
@@ -824,8 +825,8 @@ describe('RightPanel', () => {
       expect(() => render(<RightPanel {...props} />)).not.toThrow();
     });
 
-    it('should handle batchRunState with zero tasks', () => {
-      const batchRunState: BatchRunState = {
+    it('should handle currentSessionBatchState with zero tasks', () => {
+      const currentSessionBatchState: BatchRunState = {
         isRunning: true,
         isStopping: false,
         documents: ['doc1'],
@@ -839,13 +840,13 @@ describe('RightPanel', () => {
         loopEnabled: false,
         loopIteration: 0,
       };
-      const props = createDefaultProps({ batchRunState });
+      const props = createDefaultProps({ currentSessionBatchState });
 
       expect(() => render(<RightPanel {...props} />)).not.toThrow();
     });
 
     it('should handle special characters in document names', () => {
-      const batchRunState: BatchRunState = {
+      const currentSessionBatchState: BatchRunState = {
         isRunning: true,
         isStopping: false,
         documents: ['doc<script>', 'doc&name', 'doc"quote'],
@@ -859,7 +860,7 @@ describe('RightPanel', () => {
         loopEnabled: false,
         loopIteration: 0,
       };
-      const props = createDefaultProps({ batchRunState });
+      const props = createDefaultProps({ currentSessionBatchState });
 
       expect(() => render(<RightPanel {...props} />)).not.toThrow();
     });
@@ -886,7 +887,7 @@ describe('RightPanel', () => {
 
   describe('Progress bar calculations', () => {
     it('should calculate correct progress percentage', () => {
-      const batchRunState: BatchRunState = {
+      const currentSessionBatchState: BatchRunState = {
         isRunning: true,
         isStopping: false,
         documents: ['doc1'],
@@ -900,7 +901,7 @@ describe('RightPanel', () => {
         loopEnabled: false,
         loopIteration: 0,
       };
-      const props = createDefaultProps({ batchRunState });
+      const props = createDefaultProps({ currentSessionBatchState });
       const { container } = render(<RightPanel {...props} />);
 
       // Find the progress bar
@@ -909,7 +910,7 @@ describe('RightPanel', () => {
     });
 
     it('should use error color when stopping', () => {
-      const batchRunState: BatchRunState = {
+      const currentSessionBatchState: BatchRunState = {
         isRunning: true,
         isStopping: true,
         documents: ['doc1'],
@@ -923,7 +924,7 @@ describe('RightPanel', () => {
         loopEnabled: false,
         loopIteration: 0,
       };
-      const props = createDefaultProps({ batchRunState });
+      const props = createDefaultProps({ currentSessionBatchState });
       const { container } = render(<RightPanel {...props} />);
 
       // Find the progress bar inner div with error color (browser normalizes hex to rgb)
@@ -932,7 +933,7 @@ describe('RightPanel', () => {
     });
 
     it('should use warning color when not stopping', () => {
-      const batchRunState: BatchRunState = {
+      const currentSessionBatchState: BatchRunState = {
         isRunning: true,
         isStopping: false,
         documents: ['doc1'],
@@ -946,7 +947,7 @@ describe('RightPanel', () => {
         loopEnabled: false,
         loopIteration: 0,
       };
-      const props = createDefaultProps({ batchRunState });
+      const props = createDefaultProps({ currentSessionBatchState });
       const { container } = render(<RightPanel {...props} />);
 
       // Find the progress bar inner div with warning color (browser normalizes hex to rgb)
@@ -982,7 +983,7 @@ describe('RightPanel', () => {
 
   describe('Elapsed time calculation', () => {
     it('should clear elapsed time when batch run is not running', async () => {
-      const batchRunState: BatchRunState = {
+      const currentSessionBatchState: BatchRunState = {
         isRunning: false,
         isStopping: false,
         documents: ['doc1'],
@@ -997,7 +998,7 @@ describe('RightPanel', () => {
         loopIteration: 0,
         startTime: Date.now(),
       };
-      const props = createDefaultProps({ batchRunState });
+      const props = createDefaultProps({ currentSessionBatchState });
       render(<RightPanel {...props} />);
 
       // Elapsed time should not be displayed when not running
@@ -1006,7 +1007,7 @@ describe('RightPanel', () => {
 
     it('should display elapsed seconds when batch run is running', async () => {
       const startTime = Date.now() - 5000; // Started 5 seconds ago
-      const batchRunState: BatchRunState = {
+      const currentSessionBatchState: BatchRunState = {
         isRunning: true,
         isStopping: false,
         documents: ['doc1'],
@@ -1021,7 +1022,7 @@ describe('RightPanel', () => {
         loopIteration: 0,
         startTime,
       };
-      const props = createDefaultProps({ batchRunState });
+      const props = createDefaultProps({ currentSessionBatchState });
       render(<RightPanel {...props} />);
 
       // Initial render shows elapsed time
@@ -1034,7 +1035,7 @@ describe('RightPanel', () => {
 
     it('should display elapsed minutes and seconds', async () => {
       const startTime = Date.now() - 125000; // Started 2 minutes 5 seconds ago
-      const batchRunState: BatchRunState = {
+      const currentSessionBatchState: BatchRunState = {
         isRunning: true,
         isStopping: false,
         documents: ['doc1'],
@@ -1049,7 +1050,7 @@ describe('RightPanel', () => {
         loopIteration: 0,
         startTime,
       };
-      const props = createDefaultProps({ batchRunState });
+      const props = createDefaultProps({ currentSessionBatchState });
       render(<RightPanel {...props} />);
 
       await act(async () => {
@@ -1062,7 +1063,7 @@ describe('RightPanel', () => {
 
     it('should display elapsed hours and minutes', async () => {
       const startTime = Date.now() - 3725000; // Started 1 hour, 2 minutes, 5 seconds ago
-      const batchRunState: BatchRunState = {
+      const currentSessionBatchState: BatchRunState = {
         isRunning: true,
         isStopping: false,
         documents: ['doc1'],
@@ -1077,7 +1078,7 @@ describe('RightPanel', () => {
         loopIteration: 0,
         startTime,
       };
-      const props = createDefaultProps({ batchRunState });
+      const props = createDefaultProps({ currentSessionBatchState });
       render(<RightPanel {...props} />);
 
       await act(async () => {
@@ -1090,7 +1091,7 @@ describe('RightPanel', () => {
 
     it('should update elapsed time every second', async () => {
       const startTime = Date.now();
-      const batchRunState: BatchRunState = {
+      const currentSessionBatchState: BatchRunState = {
         isRunning: true,
         isStopping: false,
         documents: ['doc1'],
@@ -1105,7 +1106,7 @@ describe('RightPanel', () => {
         loopIteration: 0,
         startTime,
       };
-      const props = createDefaultProps({ batchRunState });
+      const props = createDefaultProps({ currentSessionBatchState });
       render(<RightPanel {...props} />);
 
       // Initial render
@@ -1130,7 +1131,7 @@ describe('RightPanel', () => {
     it('should clear interval when batch run stops', async () => {
       const clearIntervalSpy = vi.spyOn(window, 'clearInterval');
       const startTime = Date.now();
-      const batchRunState: BatchRunState = {
+      const currentSessionBatchState: BatchRunState = {
         isRunning: true,
         isStopping: false,
         documents: ['doc1'],
@@ -1145,7 +1146,7 @@ describe('RightPanel', () => {
         loopIteration: 0,
         startTime,
       };
-      const props = createDefaultProps({ batchRunState });
+      const props = createDefaultProps({ currentSessionBatchState });
       const { rerender } = render(<RightPanel {...props} />);
 
       await act(async () => {
@@ -1153,8 +1154,8 @@ describe('RightPanel', () => {
       });
 
       // Stop the batch run
-      const stoppedBatchRunState = { ...batchRunState, isRunning: false };
-      rerender(<RightPanel {...createDefaultProps({ batchRunState: stoppedBatchRunState })} />);
+      const stoppedBatchRunState = { ...currentSessionBatchState, isRunning: false };
+      rerender(<RightPanel {...createDefaultProps({ currentSessionBatchState: stoppedBatchRunState })} />);
 
       expect(clearIntervalSpy).toHaveBeenCalled();
     });

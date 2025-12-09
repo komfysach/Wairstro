@@ -1132,7 +1132,8 @@ export default function MaestroConsole() {
             addHistoryEntryRef.current({
               type: 'USER',
               summary: result.response,
-              claudeSessionId: synopsisData!.claudeSessionId
+              claudeSessionId: synopsisData!.claudeSessionId,
+              usageStats: result.usageStats
             });
 
             // Show toast for synopsis completion
@@ -2317,7 +2318,7 @@ export default function MaestroConsole() {
     cwd: string,
     resumeClaudeSessionId: string,
     prompt: string
-  ): Promise<{ success: boolean; response?: string; claudeSessionId?: string }> => {
+  ): Promise<{ success: boolean; response?: string; claudeSessionId?: string; usageStats?: UsageStats }> => {
     try {
       const agent = await window.maestro.agents.get('claude-code');
       if (!agent) return { success: false };
@@ -2328,15 +2329,18 @@ export default function MaestroConsole() {
       return new Promise((resolve) => {
         let claudeSessionId: string | undefined;
         let responseText = '';
+        let synopsisUsageStats: UsageStats | undefined;
 
         let cleanupData: (() => void) | undefined;
         let cleanupSessionId: (() => void) | undefined;
         let cleanupExit: (() => void) | undefined;
+        let cleanupUsage: (() => void) | undefined;
 
         const cleanup = () => {
           cleanupData?.();
           cleanupSessionId?.();
           cleanupExit?.();
+          cleanupUsage?.();
         };
 
         cleanupData = window.maestro.process.onData((sid: string, data: string) => {
@@ -2351,10 +2355,29 @@ export default function MaestroConsole() {
           }
         });
 
+        // Capture usage stats for this synopsis request
+        cleanupUsage = window.maestro.process.onUsage((sid: string, usageStats) => {
+          if (sid === targetSessionId) {
+            // Accumulate usage stats (there may be multiple events)
+            if (!synopsisUsageStats) {
+              synopsisUsageStats = { ...usageStats };
+            } else {
+              synopsisUsageStats = {
+                ...usageStats,
+                inputTokens: synopsisUsageStats.inputTokens + usageStats.inputTokens,
+                outputTokens: synopsisUsageStats.outputTokens + usageStats.outputTokens,
+                cacheReadInputTokens: synopsisUsageStats.cacheReadInputTokens + usageStats.cacheReadInputTokens,
+                cacheCreationInputTokens: synopsisUsageStats.cacheCreationInputTokens + usageStats.cacheCreationInputTokens,
+                totalCostUsd: synopsisUsageStats.totalCostUsd + usageStats.totalCostUsd,
+              };
+            }
+          }
+        });
+
         cleanupExit = window.maestro.process.onExit((sid: string) => {
           if (sid === targetSessionId) {
             cleanup();
-            resolve({ success: true, response: responseText, claudeSessionId });
+            resolve({ success: true, response: responseText, claudeSessionId, usageStats: synopsisUsageStats });
           }
         });
 
@@ -2709,7 +2732,7 @@ export default function MaestroConsole() {
       ? activeBatchSessionIds[0]
       : activeSession?.id;
     if (!sessionId) return;
-    setConfirmModalMessage('Stop the batch run after the current task completes?');
+    setConfirmModalMessage('Stop Auto Run after the current task completes?');
     setConfirmModalOnConfirm(() => () => stopBatchRun(sessionId));
     setConfirmModalOpen(true);
   }, [activeBatchSessionIds, activeSession, stopBatchRun]);
@@ -3721,6 +3744,49 @@ export default function MaestroConsole() {
 
     loadAutoRunData();
   }, [activeSessionId, activeSession?.autoRunFolderPath, activeSession?.autoRunSelectedFile]);
+
+  // File watching for Auto Run - watch whenever a folder is configured
+  // Updates reflect immediately whether from batch runs, terminal commands, or external editors
+  useEffect(() => {
+    const folderPath = activeSession?.autoRunFolderPath;
+    const selectedFile = activeSession?.autoRunSelectedFile;
+
+    // Only watch if folder is set
+    if (!folderPath) return;
+
+    // Start watching the folder
+    window.maestro.autorun.watchFolder(folderPath);
+
+    // Listen for file change events
+    const unsubscribe = window.maestro.autorun.onFileChanged(async (data) => {
+      // Only respond to changes in the current folder
+      if (data.folderPath !== folderPath) return;
+
+      // Reload document list for any change (in case files added/removed)
+      const listResult = await window.maestro.autorun.listDocs(folderPath);
+      if (listResult.success) {
+        setAutoRunDocumentList(listResult.files || []);
+        setAutoRunDocumentTree((listResult.tree as Array<{ name: string; type: 'file' | 'folder'; path: string; children?: unknown[] }>) || []);
+      }
+
+      // If we have a selected document and it matches the changed file, reload its content
+      if (selectedFile && data.filename === selectedFile) {
+        const contentResult = await window.maestro.autorun.readDoc(
+          folderPath,
+          selectedFile + '.md'
+        );
+        if (contentResult.success) {
+          setAutoRunContent(contentResult.content || '');
+        }
+      }
+    });
+
+    // Cleanup: stop watching when folder changes or unmount
+    return () => {
+      window.maestro.autorun.unwatchFolder(folderPath);
+      unsubscribe();
+    };
+  }, [activeSession?.autoRunFolderPath, activeSession?.autoRunSelectedFile]);
 
   // Auto-scroll logs
   const activeTabLogs = activeSession ? getActiveTab(activeSession)?.logs : undefined;
@@ -6454,6 +6520,7 @@ export default function MaestroConsole() {
         getContextColor={getContextColor}
         setActiveSessionId={setActiveSessionId}
         batchRunState={activeBatchRunState}
+        currentSessionBatchState={currentSessionBatchState}
         onStopBatchRun={handleStopBatchRun}
         showConfirmation={showConfirmation}
         onDeleteLog={(logId: string): number | null => {

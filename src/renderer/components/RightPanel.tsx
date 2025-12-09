@@ -101,17 +101,17 @@ export const RightPanel = forwardRef<RightPanelHandle, RightPanelProps>(function
   const historyPanelRef = useRef<HistoryPanelHandle>(null);
   const autoRunRef = useRef<AutoRunHandle>(null);
 
-  // Elapsed time for Auto Run display (updates every second when running)
+  // Elapsed time for Auto Run display (updates every second when current session is running)
   const [elapsedTime, setElapsedTime] = useState<string>('');
 
   useEffect(() => {
-    if (!batchRunState?.isRunning || !batchRunState?.startTime) {
+    if (!currentSessionBatchState?.isRunning || !currentSessionBatchState?.startTime) {
       setElapsedTime('');
       return;
     }
 
     const updateElapsed = () => {
-      const elapsed = Date.now() - batchRunState.startTime!;
+      const elapsed = Date.now() - currentSessionBatchState.startTime!;
       const seconds = Math.floor(elapsed / 1000);
       const minutes = Math.floor(seconds / 60);
       const hours = Math.floor(minutes / 60);
@@ -128,7 +128,7 @@ export const RightPanel = forwardRef<RightPanelHandle, RightPanelProps>(function
     updateElapsed(); // Initial update
     const interval = setInterval(updateElapsed, 1000);
     return () => clearInterval(interval);
-  }, [batchRunState?.isRunning, batchRunState?.startTime]);
+  }, [currentSessionBatchState?.isRunning, currentSessionBatchState?.startTime]);
 
   // Expose methods to parent
   useImperativeHandle(ref, () => ({
@@ -320,8 +320,8 @@ export const RightPanel = forwardRef<RightPanelHandle, RightPanelProps>(function
         )}
       </div>
 
-      {/* Batch Run Progress - shown at bottom of all tabs (shows any active batch run) */}
-      {batchRunState && batchRunState.isRunning && (
+      {/* Batch Run Progress - shown at bottom of all tabs (only for current session) */}
+      {currentSessionBatchState && currentSessionBatchState.isRunning && (
         <div
           className="mx-4 mb-4 px-4 py-3 rounded border flex-shrink-0"
           style={{
@@ -334,11 +334,11 @@ export const RightPanel = forwardRef<RightPanelHandle, RightPanelProps>(function
             <div className="flex items-center gap-2">
               <Loader2 className="w-4 h-4 animate-spin" style={{ color: theme.colors.warning }} />
               <span className="text-xs font-bold uppercase" style={{ color: theme.colors.textMain }}>
-                {batchRunState.isStopping ? 'Stopping...' : 'Auto Run Active'}
+                {currentSessionBatchState.isStopping ? 'Stopping...' : 'Auto Run Active'}
               </span>
             </div>
             {/* Elapsed time */}
-            {elapsedTime && !batchRunState.isStopping && (
+            {elapsedTime && !currentSessionBatchState.isStopping && (
               <span className="text-xs font-mono" style={{ color: theme.colors.textDim }}>
                 {elapsedTime}
               </span>
@@ -346,7 +346,7 @@ export const RightPanel = forwardRef<RightPanelHandle, RightPanelProps>(function
           </div>
 
           {/* Document progress with inline progress bar - only for multi-document runs */}
-          {batchRunState.documents && batchRunState.documents.length > 1 && (
+          {currentSessionBatchState.documents && currentSessionBatchState.documents.length > 1 && (
             <div className="mb-2">
               {/* Document name with progress bar */}
               <div className="flex items-center gap-2">
@@ -354,7 +354,7 @@ export const RightPanel = forwardRef<RightPanelHandle, RightPanelProps>(function
                   className="text-xs font-medium shrink-0"
                   style={{ color: theme.colors.textMain }}
                 >
-                  Document {batchRunState.currentDocumentIndex + 1}/{batchRunState.documents.length}: {batchRunState.documents[batchRunState.currentDocumentIndex]}.md
+                  Document {currentSessionBatchState.currentDocumentIndex + 1}/{currentSessionBatchState.documents.length}: {currentSessionBatchState.documents[currentSessionBatchState.currentDocumentIndex]}.md
                 </span>
                 <div
                   className="flex-1 h-1 rounded-full overflow-hidden"
@@ -364,8 +364,8 @@ export const RightPanel = forwardRef<RightPanelHandle, RightPanelProps>(function
                     className="h-full transition-all duration-300 ease-out"
                     style={{
                       width: `${
-                        batchRunState.currentDocTasksTotal > 0
-                          ? (batchRunState.currentDocTasksCompleted / batchRunState.currentDocTasksTotal) * 100
+                        currentSessionBatchState.currentDocTasksTotal > 0
+                          ? (currentSessionBatchState.currentDocTasksCompleted / currentSessionBatchState.currentDocTasksTotal) * 100
                           : 0
                       }%`,
                       backgroundColor: theme.colors.accent
@@ -385,13 +385,13 @@ export const RightPanel = forwardRef<RightPanelHandle, RightPanelProps>(function
               className="h-full transition-all duration-500 ease-out"
               style={{
                 width: `${
-                  batchRunState.totalTasksAcrossAllDocs > 0
-                    ? (batchRunState.completedTasksAcrossAllDocs / batchRunState.totalTasksAcrossAllDocs) * 100
-                    : batchRunState.totalTasks > 0
-                      ? (batchRunState.completedTasks / batchRunState.totalTasks) * 100
+                  currentSessionBatchState.totalTasksAcrossAllDocs > 0
+                    ? (currentSessionBatchState.completedTasksAcrossAllDocs / currentSessionBatchState.totalTasksAcrossAllDocs) * 100
+                    : currentSessionBatchState.totalTasks > 0
+                      ? (currentSessionBatchState.completedTasks / currentSessionBatchState.totalTasks) * 100
                       : 0
                 }%`,
-                backgroundColor: batchRunState.isStopping ? theme.colors.error : theme.colors.warning
+                backgroundColor: currentSessionBatchState.isStopping ? theme.colors.error : theme.colors.warning
               }}
             />
           </div>
@@ -399,20 +399,20 @@ export const RightPanel = forwardRef<RightPanelHandle, RightPanelProps>(function
           {/* Overall completed count with loop info */}
           <div className="mt-2 flex items-center justify-between">
             <span className="text-[10px]" style={{ color: theme.colors.textDim }}>
-              {batchRunState.isStopping
+              {currentSessionBatchState.isStopping
                 ? 'Waiting for current task to complete before stopping...'
-                : batchRunState.totalTasksAcrossAllDocs > 0
-                  ? `${batchRunState.completedTasksAcrossAllDocs} / ${batchRunState.totalTasksAcrossAllDocs} total tasks completed`
-                  : `${batchRunState.completedTasks} / ${batchRunState.totalTasks} tasks completed`
+                : currentSessionBatchState.totalTasksAcrossAllDocs > 0
+                  ? `${currentSessionBatchState.completedTasksAcrossAllDocs} / ${currentSessionBatchState.totalTasksAcrossAllDocs} total tasks completed`
+                  : `${currentSessionBatchState.completedTasks} / ${currentSessionBatchState.totalTasks} tasks completed`
               }
             </span>
             {/* Loop iteration indicator */}
-            {batchRunState.loopEnabled && (
+            {currentSessionBatchState.loopEnabled && (
               <span
                 className="text-[10px] px-1.5 py-0.5 rounded"
                 style={{ backgroundColor: theme.colors.accent + '20', color: theme.colors.accent }}
               >
-                Loop {batchRunState.loopIteration + 1} of {batchRunState.maxLoops ?? '∞'}
+                Loop {currentSessionBatchState.loopIteration + 1} of {currentSessionBatchState.maxLoops ?? '∞'}
               </span>
             )}
           </div>
