@@ -1050,7 +1050,7 @@ function DocumentReview({
     >
       {/* Header with document info */}
       <div
-        className="px-4 py-3 border-b"
+        className="px-6 py-4 border-b"
         style={{
           borderColor: theme.colors.border,
           backgroundColor: `${theme.colors.success}10`,
@@ -1090,7 +1090,7 @@ function DocumentReview({
       </div>
 
       {/* Document editor */}
-      <div className="flex-1 overflow-hidden p-4">
+      <div className="flex-1 overflow-hidden px-6 py-4">
         <DocumentEditor
           content={localContent}
           onContentChange={handleContentChange}
@@ -1109,7 +1109,7 @@ function DocumentReview({
       {/* Error message */}
       {launchError && (
         <div
-          className="mx-4 mb-2 px-4 py-2 rounded-lg flex items-center gap-2"
+          className="mx-6 mb-2 px-4 py-2 rounded-lg flex items-center gap-2"
           style={{
             backgroundColor: `${theme.colors.error}20`,
             borderColor: theme.colors.error,
@@ -1144,7 +1144,7 @@ function DocumentReview({
 
       {/* Action buttons */}
       <div
-        className="px-4 py-4 border-t"
+        className="px-6 py-4 border-t"
         style={{
           borderColor: theme.colors.border,
           backgroundColor: theme.colors.bgSidebar,
@@ -1197,12 +1197,44 @@ function DocumentReview({
         </div>
 
         {/* Keyboard hints */}
-        <p
-          className="text-xs text-center mt-3"
-          style={{ color: theme.colors.textDim }}
-        >
-          Tab to switch between buttons • Enter to select • Escape to go back
-        </p>
+        <div className="mt-4 flex justify-center gap-6">
+          <span
+            className="text-xs flex items-center gap-1"
+            style={{ color: theme.colors.textDim }}
+          >
+            <kbd
+              className="px-1.5 py-0.5 rounded text-xs"
+              style={{ backgroundColor: theme.colors.border }}
+            >
+              Tab
+            </kbd>
+            Switch buttons
+          </span>
+          <span
+            className="text-xs flex items-center gap-1"
+            style={{ color: theme.colors.textDim }}
+          >
+            <kbd
+              className="px-1.5 py-0.5 rounded text-xs"
+              style={{ backgroundColor: theme.colors.border }}
+            >
+              Enter
+            </kbd>
+            Select
+          </span>
+          <span
+            className="text-xs flex items-center gap-1"
+            style={{ color: theme.colors.textDim }}
+          >
+            <kbd
+              className="px-1.5 py-0.5 rounded text-xs"
+              style={{ backgroundColor: theme.colors.border }}
+            >
+              Esc
+            </kbd>
+            Go back
+          </span>
+        </div>
       </div>
     </div>
   );

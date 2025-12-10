@@ -629,14 +629,14 @@ export function ConversationScreen({ theme }: ConversationScreenProps): JSX.Elem
         </div>
 
         {/* Keyboard hints */}
-        <div className="mt-3 flex justify-center gap-6">
+        <div className="mt-4 flex justify-center gap-6">
           <span
             className="text-xs flex items-center gap-1"
             style={{ color: theme.colors.textDim }}
           >
             <kbd
               className="px-1.5 py-0.5 rounded text-xs"
-              style={{ backgroundColor: theme.colors.bgMain }}
+              style={{ backgroundColor: theme.colors.border }}
             >
               Enter
             </kbd>
@@ -648,7 +648,7 @@ export function ConversationScreen({ theme }: ConversationScreenProps): JSX.Elem
           >
             <kbd
               className="px-1.5 py-0.5 rounded text-xs"
-              style={{ backgroundColor: theme.colors.bgMain }}
+              style={{ backgroundColor: theme.colors.border }}
             >
               Shift+Enter
             </kbd>
@@ -660,7 +660,7 @@ export function ConversationScreen({ theme }: ConversationScreenProps): JSX.Elem
           >
             <kbd
               className="px-1.5 py-0.5 rounded text-xs"
-              style={{ backgroundColor: theme.colors.bgMain }}
+              style={{ backgroundColor: theme.colors.border }}
             >
               Esc
             </kbd>
