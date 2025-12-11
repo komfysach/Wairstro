@@ -27,9 +27,11 @@ import { StandingOvationOverlay } from './components/StandingOvationOverlay';
 import { FirstRunCelebration } from './components/FirstRunCelebration';
 import { PlaygroundPanel } from './components/PlaygroundPanel';
 import { AutoRunSetupModal } from './components/AutoRunSetupModal';
+import { DebugWizardModal } from './components/DebugWizardModal';
 import { MaestroWizard, useWizard, WizardResumeModal, SerializableWizardState, AUTO_RUN_FOLDER_NAME } from './components/Wizard';
 import { TourOverlay } from './components/Wizard/tour';
 import { CONDUCTOR_BADGES } from './constants/conductorBadges';
+import { EmptyStateView } from './components/EmptyStateView';
 
 // Import custom hooks
 import { useBatchProcessor } from './hooks/useBatchProcessor';
@@ -107,6 +109,10 @@ const getSlashCommandDescription = (cmd: string): string => {
   // Generic description for unknown commands
   return 'Claude Code command';
 };
+
+// Default prompt to use when user sends only an image without text
+// This instructs the AI to analyze the image and infer the user's intent from context
+const DEFAULT_IMAGE_ONLY_PROMPT = 'Examine the attached picture and best determine based on available and existing context, what the user wants done next.';
 
 export default function MaestroConsole() {
   // --- LAYER STACK (for blocking shortcuts when modals are open) ---
@@ -268,6 +274,7 @@ export default function MaestroConsole() {
   const [logViewerOpen, setLogViewerOpen] = useState(false);
   const [processMonitorOpen, setProcessMonitorOpen] = useState(false);
   const [playgroundOpen, setPlaygroundOpen] = useState(false);
+  const [debugWizardModalOpen, setDebugWizardModalOpen] = useState(false);
   const [createGroupModalOpen, setCreateGroupModalOpen] = useState(false);
   const [newGroupName, setNewGroupName] = useState('');
   const [newGroupEmoji, setNewGroupEmoji] = useState('📂');
@@ -620,6 +627,15 @@ export default function MaestroConsole() {
       }
     }
   }, [settingsLoaded, sessionsLoaded]);
+
+  // Expose debug helpers to window for console access
+  // No dependency array - always keep functions fresh
+  (window as any).__maestroDebug = {
+    openDebugWizard: () => setDebugWizardModalOpen(true),
+    openCommandK: () => setQuickActionOpen(true),
+    openWizard: () => openWizardModal(),
+    openSettings: () => setSettingsModalOpen(true),
+  };
 
   // Check for unacknowledged badges on startup (show missed standing ovations)
   useEffect(() => {
@@ -3133,6 +3149,13 @@ export default function MaestroConsole() {
     };
     if (shiftNumberMap[key] === mainKey) return true;
 
+    // For Alt+Meta shortcuts on macOS, e.key produces special characters (e.g., Alt+p = π, Alt+l = ¬)
+    // Use e.code to get the physical key pressed instead
+    if (altPressed && e.code) {
+      const codeKey = e.code.replace('Key', '').toLowerCase();
+      return codeKey === mainKey;
+    }
+
     return key === mainKey;
   };
 
@@ -3217,9 +3240,12 @@ export default function MaestroConsole() {
         // Allow jumpToBottom (Cmd+Shift+J) from anywhere - always scroll main panel to bottom
         const isJumpToBottomShortcut = (e.metaKey || e.ctrlKey) && e.shiftKey && keyLower === 'j';
         // Allow system utility shortcuts (Alt+Cmd+L for logs, Alt+Cmd+P for processes) even when modals are open
-        const isSystemUtilShortcut = e.altKey && (e.metaKey || e.ctrlKey) && (keyLower === 'l' || keyLower === 'p');
+        // NOTE: Must use e.code for Alt key combos on macOS because e.key produces special characters (e.g., Alt+P = π)
+        const codeKeyLower = e.code?.replace('Key', '').toLowerCase() || '';
+        const isSystemUtilShortcut = e.altKey && (e.metaKey || e.ctrlKey) && (codeKeyLower === 'l' || codeKeyLower === 'p');
         // Allow session jump shortcuts (Alt+Cmd+NUMBER) even when modals are open
-        const isSessionJumpShortcut = e.altKey && (e.metaKey || e.ctrlKey) && /^[0-9]$/.test(e.key);
+        // NOTE: Must use e.code for Alt key combos on macOS because e.key produces special characters
+        const isSessionJumpShortcut = e.altKey && (e.metaKey || e.ctrlKey) && /^Digit[0-9]$/.test(e.code || '');
 
         if (ctx.hasOpenModal()) {
           // TRUE MODAL is open - block most shortcuts from App.tsx
@@ -3525,8 +3551,11 @@ export default function MaestroConsole() {
       }
       else if (ctx.isShortcut(e, 'toggleMode')) ctx.toggleInputMode();
       else if (ctx.isShortcut(e, 'quickAction')) {
-        ctx.setQuickActionInitialMode('main');
-        ctx.setQuickActionOpen(true);
+        // Only open quick actions if there are agents
+        if (ctx.sessions.length > 0) {
+          ctx.setQuickActionInitialMode('main');
+          ctx.setQuickActionOpen(true);
+        }
       }
       else if (ctx.isShortcut(e, 'help')) ctx.setShortcutsHelpOpen(true);
       else if (ctx.isShortcut(e, 'settings')) { ctx.setSettingsModalOpen(true); ctx.setSettingsTab('general'); }
@@ -5109,14 +5138,20 @@ export default function MaestroConsole() {
           // If images are present, they will be passed via stream-json input format
           // Use agent.path (full path) if available, otherwise fall back to agent.command
           const commandToUse = agent.path || agent.command;
+
+          // If user sends only an image without text, inject the default image-only prompt
+          const hasImages = capturedImages.length > 0;
+          const hasNoText = !capturedInputValue.trim();
+          const effectivePrompt = (hasImages && hasNoText) ? DEFAULT_IMAGE_ONLY_PROMPT : capturedInputValue;
+
           await window.maestro.process.spawn({
             sessionId: targetSessionId,
             toolType: 'claude-code',
             cwd: freshSession.cwd,
             command: commandToUse,
             args: spawnArgs,
-            prompt: capturedInputValue,
-            images: capturedImages.length > 0 ? capturedImages : undefined
+            prompt: effectivePrompt,
+            images: hasImages ? capturedImages : undefined
           });
         } catch (error) {
           console.error('Failed to spawn Claude batch process:', error);
@@ -5554,16 +5589,24 @@ export default function MaestroConsole() {
 
       const commandToUse = agent.path || agent.command;
 
-      if (item.type === 'message' && item.text) {
+      // Check if this is a message with images but no text
+      const hasImages = item.images && item.images.length > 0;
+      const hasText = item.text && item.text.trim();
+      const isImageOnlyMessage = item.type === 'message' && hasImages && !hasText;
+
+      if (item.type === 'message' && (hasText || isImageOnlyMessage)) {
         // Process a message - spawn Claude with the message text
+        // If user sends only an image without text, inject the default image-only prompt
+        const effectivePrompt = isImageOnlyMessage ? DEFAULT_IMAGE_ONLY_PROMPT : item.text!;
+
         await window.maestro.process.spawn({
           sessionId: targetSessionId,
           toolType: 'claude-code',
           cwd: session.cwd,
           command: commandToUse,
           args: spawnArgs,
-          prompt: item.text,
-          images: item.images && item.images.length > 0 ? item.images : undefined
+          prompt: effectivePrompt,
+          images: hasImages ? item.images : undefined
         });
       } else if (item.type === 'command' && item.command) {
         // Process a slash command - find the matching custom AI command
@@ -6668,6 +6711,11 @@ export default function MaestroConsole() {
           setUpdateCheckModalOpen={setUpdateCheckModalOpen}
           openWizard={openWizardModal}
           wizardGoToStep={wizardGoToStep}
+          setDebugWizardModalOpen={setDebugWizardModalOpen}
+          startTour={() => {
+            setTourFromWizard(false);
+            setTourOpen(true);
+          }}
         />
       )}
       {lightboxImage && (
@@ -6709,6 +6757,7 @@ export default function MaestroConsole() {
           theme={theme}
           shortcuts={shortcuts}
           onClose={() => setShortcutsHelpOpen(false)}
+          hasNoAgents={sessions.length === 0}
         />
       )}
 
@@ -6785,6 +6834,13 @@ export default function MaestroConsole() {
           onClose={() => setPlaygroundOpen(false)}
         />
       )}
+
+      {/* --- DEBUG WIZARD MODAL --- */}
+      <DebugWizardModal
+        theme={theme}
+        isOpen={debugWizardModalOpen}
+        onClose={() => setDebugWizardModalOpen(false)}
+      />
 
       {/* --- CREATE GROUP MODAL --- */}
       {createGroupModalOpen && (
@@ -6881,8 +6937,23 @@ export default function MaestroConsole() {
         />
       )}
 
-      {/* --- LEFT SIDEBAR (hidden in mobile landscape) --- */}
-      {!isMobileLandscape && (
+      {/* --- EMPTY STATE VIEW (when no sessions) --- */}
+      {sessions.length === 0 && !isMobileLandscape ? (
+        <EmptyStateView
+          theme={theme}
+          shortcuts={shortcuts}
+          onNewAgent={addNewSession}
+          onOpenWizard={openWizardModal}
+          onOpenSettings={() => { setSettingsModalOpen(true); setSettingsTab('general'); }}
+          onOpenShortcutsHelp={() => setShortcutsHelpOpen(true)}
+          onOpenAbout={() => setAboutModalOpen(true)}
+          onCheckForUpdates={() => setUpdateCheckModalOpen(true)}
+          // Don't show tour option when no agents exist - nothing to tour
+        />
+      ) : null}
+
+      {/* --- LEFT SIDEBAR (hidden in mobile landscape and when no sessions) --- */}
+      {!isMobileLandscape && sessions.length > 0 && (
         <ErrorBoundary>
           <SessionList
             theme={theme}
@@ -6944,7 +7015,8 @@ export default function MaestroConsole() {
         </ErrorBoundary>
       )}
 
-      {/* --- CENTER WORKSPACE --- */}
+      {/* --- CENTER WORKSPACE (hidden when no sessions) --- */}
+      {sessions.length > 0 && (
       <MainPanel
         logViewerOpen={logViewerOpen}
         agentSessionsOpen={agentSessionsOpen}
@@ -7353,9 +7425,10 @@ export default function MaestroConsole() {
         }}
         onOpenPromptComposer={() => setPromptComposerOpen(true)}
       />
+      )}
 
-      {/* --- RIGHT PANEL (hidden in mobile landscape) --- */}
-      {!isMobileLandscape && (
+      {/* --- RIGHT PANEL (hidden in mobile landscape and when no sessions) --- */}
+      {!isMobileLandscape && sessions.length > 0 && (
         <ErrorBoundary>
           <RightPanel
             ref={rightPanelRef}
@@ -7624,6 +7697,7 @@ export default function MaestroConsole() {
         customAICommands={customAICommands}
         setCustomAICommands={setCustomAICommands}
         initialTab={settingsTab}
+        hasNoAgents={sessions.length === 0}
       />
 
       {/* --- WIZARD RESUME MODAL (asks if user wants to resume incomplete wizard) --- */}

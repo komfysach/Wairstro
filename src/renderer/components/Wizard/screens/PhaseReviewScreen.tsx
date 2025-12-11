@@ -29,7 +29,6 @@ import {
   ChevronDown,
   ChevronRight,
   X,
-  FileText,
 } from 'lucide-react';
 import type { Theme } from '../../../types';
 import { useWizard, type GeneratedDocument } from '../WizardContext';
@@ -59,6 +58,7 @@ interface PhaseReviewScreenProps {
 
 /**
  * Document selector dropdown for switching between generated documents
+ * Styled to match the Auto Run panel's document selector
  */
 function DocumentSelector({
   documents,
@@ -73,6 +73,7 @@ function DocumentSelector({
 }): JSX.Element {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -81,82 +82,88 @@ function DocumentSelector({
         setIsOpen(false);
       }
     }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [isOpen]);
+
+  // Close dropdown on Escape - stop propagation to prevent modal from closing
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape' && isOpen) {
+        event.preventDefault();
+        event.stopPropagation();
+        setIsOpen(false);
+        buttonRef.current?.focus();
+      }
+    }
+    if (isOpen) {
+      // Use capture phase to intercept before modal's escape handler
+      document.addEventListener('keydown', handleKeyDown, true);
+      return () => document.removeEventListener('keydown', handleKeyDown, true);
+    }
+  }, [isOpen]);
 
   const selectedDoc = documents[selectedIndex];
 
   return (
-    <div className="relative" ref={dropdownRef}>
+    <div ref={dropdownRef} className="relative flex-1 min-w-0">
       <button
+        ref={buttonRef}
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors hover:opacity-80"
+        className="w-full min-w-0 flex items-center justify-between px-3 py-2 rounded text-sm transition-colors hover:opacity-90"
         style={{
           backgroundColor: theme.colors.bgActivity,
           color: theme.colors.textMain,
           border: `1px solid ${theme.colors.border}`,
         }}
       >
-        <FileText className="w-4 h-4" style={{ color: theme.colors.success }} />
-        <span className="truncate max-w-[200px]">{selectedDoc?.filename || 'Select document'}</span>
+        <span className="truncate min-w-0 flex-1">
+          {selectedDoc?.filename || 'Select document...'}
+        </span>
         <ChevronDown
-          className="w-4 h-4 shrink-0 transition-transform"
-          style={{
-            color: theme.colors.textDim,
-            transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
-          }}
+          className={`w-4 h-4 ml-2 shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+          style={{ color: theme.colors.textDim }}
         />
       </button>
 
-      {isOpen && documents.length > 1 && (
+      {/* Dropdown Menu */}
+      {isOpen && (
         <div
-          className="absolute top-full left-0 mt-1 w-80 max-h-60 overflow-y-auto rounded-lg shadow-lg z-50"
+          className="absolute top-full left-0 right-0 mt-1 rounded shadow-lg overflow-hidden z-50"
           style={{
-            backgroundColor: theme.colors.bgMain,
+            backgroundColor: theme.colors.bgSidebar,
             border: `1px solid ${theme.colors.border}`,
+            maxHeight: '300px',
+            overflowY: 'auto',
           }}
         >
-          {documents.map((doc, index) => (
-            <button
-              key={doc.filename}
-              onClick={() => {
-                onSelect(index);
-                setIsOpen(false);
-              }}
-              className="w-full px-3 py-2.5 text-left text-sm flex items-center gap-2 hover:opacity-80 transition-opacity"
-              style={{
-                backgroundColor: index === selectedIndex ? `${theme.colors.accent}15` : 'transparent',
-                color: theme.colors.textMain,
-                borderBottom: index < documents.length - 1 ? `1px solid ${theme.colors.border}` : undefined,
-              }}
+          {documents.length === 0 ? (
+            <div
+              className="px-3 py-2 text-sm"
+              style={{ color: theme.colors.textDim }}
             >
-              <FileText
-                className="w-4 h-4 shrink-0"
-                style={{ color: index === selectedIndex ? theme.colors.accent : theme.colors.textDim }}
-              />
-              <div className="flex-1 min-w-0">
-                <span className="block truncate font-medium">{doc.filename}</span>
-                <span
-                  className="text-xs"
-                  style={{ color: theme.colors.textDim }}
-                >
-                  {doc.taskCount} tasks
-                </span>
-              </div>
-              {index === selectedIndex && (
-                <span
-                  className="text-xs px-2 py-0.5 rounded"
-                  style={{
-                    backgroundColor: `${theme.colors.accent}20`,
-                    color: theme.colors.accent,
-                  }}
-                >
-                  Current
-                </span>
-              )}
-            </button>
-          ))}
+              No documents generated
+            </div>
+          ) : (
+            documents.map((doc, index) => (
+              <button
+                key={doc.filename}
+                onClick={() => {
+                  onSelect(index);
+                  setIsOpen(false);
+                }}
+                className="w-full text-left px-3 py-2 text-sm transition-colors hover:bg-white/5"
+                style={{
+                  color: index === selectedIndex ? theme.colors.accent : theme.colors.textMain,
+                  backgroundColor: index === selectedIndex ? theme.colors.bgActivity : 'transparent',
+                }}
+              >
+                {doc.filename}
+              </button>
+            ))
+          )}
         </div>
       )}
     </div>
@@ -311,6 +318,12 @@ function DocumentEditor({
   onRemoveAttachment,
   theme,
   isLocked,
+  textareaRef,
+  previewRef,
+  documents,
+  selectedDocIndex,
+  onDocumentSelect,
+  statsText,
 }: {
   content: string;
   onContentChange: (content: string) => void;
@@ -323,9 +336,13 @@ function DocumentEditor({
   onRemoveAttachment: (filename: string) => void;
   theme: Theme;
   isLocked: boolean;
+  textareaRef: React.RefObject<HTMLTextAreaElement>;
+  previewRef: React.RefObject<HTMLDivElement>;
+  documents: GeneratedDocument[];
+  selectedDocIndex: number;
+  onDocumentSelect: (index: number) => void;
+  statsText: string;
 }): JSX.Element {
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const previewRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [attachmentsExpanded, setAttachmentsExpanded] = useState(true);
 
@@ -648,77 +665,96 @@ function DocumentEditor({
     [theme, folderPath]
   );
 
+  // Calculate dropdown width based on longest filename
+  // Approximate: ~8px per character + padding (40px for icon + padding)
+  const longestFilename = useMemo(() => {
+    if (documents.length === 0) return '';
+    return documents.reduce((longest, doc) =>
+      doc.filename.length > longest.length ? doc.filename : longest
+    , '');
+  }, [documents]);
+
+  // Min 280px, max 500px, scale with filename length
+  const dropdownWidth = useMemo(() => {
+    const charWidth = 7.5; // approximate px per character in the font
+    const padding = 60; // padding + chevron icon space
+    const calculatedWidth = longestFilename.length * charWidth + padding;
+    return Math.min(500, Math.max(280, calculatedWidth));
+  }, [longestFilename]);
+
   return (
     <div className="flex flex-col flex-1 min-h-0">
-      {/* Mode toggle and controls */}
-      <div className="flex gap-2 mb-3 justify-center">
-        <button
-          onClick={() => !isLocked && onModeChange('edit')}
-          disabled={isLocked}
-          className={`flex items-center gap-2 px-3 py-1.5 rounded text-xs transition-colors ${
-            mode === 'edit' && !isLocked ? 'font-semibold' : ''
-          } ${isLocked ? 'opacity-50 cursor-not-allowed' : ''}`}
-          style={{
-            backgroundColor:
-              mode === 'edit' && !isLocked
-                ? theme.colors.bgActivity
-                : 'transparent',
-            color: isLocked
-              ? theme.colors.textDim
-              : mode === 'edit'
-              ? theme.colors.textMain
-              : theme.colors.textDim,
-            border: `1px solid ${
-              mode === 'edit' && !isLocked
-                ? theme.colors.accent
-                : theme.colors.border
-            }`,
-          }}
-          title="Edit document (⌘E)"
-        >
-          <Edit className="w-3.5 h-3.5" />
-          Edit
-        </button>
-        <button
-          onClick={() => onModeChange('preview')}
-          className={`flex items-center gap-2 px-3 py-1.5 rounded text-xs transition-colors ${
-            mode === 'preview' ? 'font-semibold' : ''
-          }`}
-          style={{
-            backgroundColor:
-              mode === 'preview' ? theme.colors.bgActivity : 'transparent',
-            color:
-              mode === 'preview' ? theme.colors.textMain : theme.colors.textDim,
-            border: `1px solid ${
-              mode === 'preview' ? theme.colors.accent : theme.colors.border
-            }`,
-          }}
-          title="Preview document (⌘E)"
-        >
-          <Eye className="w-3.5 h-3.5" />
-          Preview
-        </button>
-        {mode === 'edit' && !isLocked && (
+      {/* Toolbar row: Document selector + Edit/Preview buttons - centered */}
+      <div className="flex items-center justify-center gap-3 mb-2">
+        {/* Document selector - width based on longest filename */}
+        <div className="min-w-0" style={{ width: dropdownWidth }}>
+          <DocumentSelector
+            documents={documents}
+            selectedIndex={selectedDocIndex}
+            onSelect={onDocumentSelect}
+            theme={theme}
+          />
+        </div>
+
+        {/* Edit/Preview toggle */}
+        <div className="flex gap-2">
           <button
-            onClick={() => fileInputRef.current?.click()}
-            className="flex items-center gap-2 px-3 py-1.5 rounded text-xs transition-colors hover:opacity-80"
+            onClick={() => !isLocked && onModeChange('edit')}
+            disabled={isLocked}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded text-xs transition-colors ${
+              mode === 'edit' && !isLocked ? 'font-semibold' : ''
+            } ${isLocked ? 'opacity-50 cursor-not-allowed' : ''}`}
             style={{
-              backgroundColor: 'transparent',
-              color: theme.colors.textDim,
-              border: `1px solid ${theme.colors.border}`,
+              backgroundColor:
+                mode === 'edit' && !isLocked
+                  ? theme.colors.bgActivity
+                  : 'transparent',
+              color: isLocked
+                ? theme.colors.textDim
+                : mode === 'edit'
+                ? theme.colors.textMain
+                : theme.colors.textDim,
+              border: `1px solid ${
+                mode === 'edit' && !isLocked
+                  ? theme.colors.accent
+                  : theme.colors.border
+              }`,
             }}
-            title="Add image (or paste from clipboard)"
+            title="Edit document (⌘E)"
           >
-            <Image className="w-3.5 h-3.5" />
+            <Edit className="w-3.5 h-3.5" />
+            Edit
           </button>
-        )}
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          onChange={handleFileSelect}
-          className="hidden"
-        />
+          <button
+            onClick={() => onModeChange('preview')}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded text-xs transition-colors ${
+              mode === 'preview' ? 'font-semibold' : ''
+            }`}
+            style={{
+              backgroundColor:
+                mode === 'preview' ? theme.colors.bgActivity : 'transparent',
+              color:
+                mode === 'preview' ? theme.colors.textMain : theme.colors.textDim,
+              border: `1px solid ${
+                mode === 'preview' ? theme.colors.accent : theme.colors.border
+              }`,
+            }}
+            title="Preview document (⌘E)"
+          >
+            <Eye className="w-3.5 h-3.5" />
+            Preview
+          </button>
+        </div>
+      </div>
+
+      {/* Stats text centered below toolbar */}
+      <div className="text-center mb-3">
+        <span
+          className="text-xs"
+          style={{ color: theme.colors.textDim }}
+        >
+          {statsText}
+        </span>
       </div>
 
       {/* Attached Images Preview (edit mode) */}
@@ -841,7 +877,7 @@ function DocumentReview({
     setCurrentDocumentIndex,
   } = useWizard();
 
-  const { generatedDocuments, directoryPath, agentName, currentDocumentIndex } = state;
+  const { generatedDocuments, directoryPath, currentDocumentIndex } = state;
   const currentDoc = generatedDocuments[currentDocumentIndex] || generatedDocuments[0];
   const folderPath = `${directoryPath}/${AUTO_RUN_FOLDER_NAME}`;
 
@@ -857,10 +893,12 @@ function DocumentReview({
   const [launchingButton, setLaunchingButton] = useState<'ready' | 'tour' | null>(null);
   const [launchError, setLaunchError] = useState<string | null>(null);
 
-  // Refs for button focus
+  // Refs for button focus and editor content
   const readyButtonRef = useRef<HTMLButtonElement>(null);
   const tourButtonRef = useRef<HTMLButtonElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const previewRef = useRef<HTMLDivElement>(null);
 
   // Auto-save timer ref
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -962,6 +1000,19 @@ function DocumentReview({
   // Handle content change
   const handleContentChange = useCallback((newContent: string) => {
     setLocalContent(newContent);
+  }, []);
+
+  // Handle mode change with focus management
+  const handleModeChange = useCallback((newMode: 'edit' | 'preview') => {
+    setMode(newMode);
+    // Focus the appropriate element after mode change
+    setTimeout(() => {
+      if (newMode === 'edit') {
+        textareaRef.current?.focus();
+      } else {
+        previewRef.current?.focus();
+      }
+    }, 50);
   }, []);
 
   // Handle adding attachment
@@ -1066,6 +1117,14 @@ function DocumentReview({
   // Handle keyboard navigation
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
+      // Global ⌘E to toggle edit/preview mode
+      if ((e.metaKey || e.ctrlKey) && e.key === 'e') {
+        e.preventDefault();
+        e.stopPropagation();
+        handleModeChange(mode === 'edit' ? 'preview' : 'edit');
+        return;
+      }
+
       // Tab between buttons
       if (e.key === 'Tab') {
         const focusedElement = document.activeElement;
@@ -1087,7 +1146,7 @@ function DocumentReview({
         }
       }
     },
-    [handleLaunch, launchingButton]
+    [handleLaunch, handleModeChange, launchingButton, mode]
   );
 
   // Task count
@@ -1105,6 +1164,11 @@ function DocumentReview({
     );
   }
 
+  // Build stats text
+  const statsText = generatedDocuments.length > 1
+    ? `${totalTasks} total tasks • ${generatedDocuments.length} documents • ${taskCount} tasks in this document`
+    : `${taskCount} tasks ready to run`;
+
   return (
     <div
       ref={containerRef}
@@ -1112,61 +1176,13 @@ function DocumentReview({
       tabIndex={-1}
       onKeyDown={handleKeyDown}
     >
-      {/* Header with document selector */}
-      <div
-        className="px-6 py-3 border-b"
-        style={{
-          borderColor: theme.colors.border,
-          backgroundColor: `${theme.colors.success}10`,
-        }}
-      >
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            {generatedDocuments.length > 1 ? (
-              <DocumentSelector
-                documents={generatedDocuments}
-                selectedIndex={currentDocumentIndex}
-                onSelect={handleDocumentSelect}
-                theme={theme}
-              />
-            ) : (
-              <div className="flex items-center gap-2">
-                <FileText className="w-4 h-4" style={{ color: theme.colors.success }} />
-                <span className="font-medium" style={{ color: theme.colors.textMain }}>
-                  {currentDoc?.filename}
-                </span>
-              </div>
-            )}
-            <span
-              className="text-xs"
-              style={{ color: theme.colors.textDim }}
-            >
-              {taskCount} tasks ready to run
-              {generatedDocuments.length > 1 &&
-                ` • ${generatedDocuments.length} phases total (${totalTasks} tasks)`}
-            </span>
-          </div>
-          {agentName && (
-            <div
-              className="px-3 py-1 rounded-full text-xs font-medium"
-              style={{
-                backgroundColor: theme.colors.bgActivity,
-                color: theme.colors.textDim,
-              }}
-            >
-              {agentName}
-            </div>
-          )}
-        </div>
-      </div>
-
       {/* Document editor - flex to fill available space */}
       <div className="flex-1 min-h-0 flex flex-col px-6 py-4">
         <DocumentEditor
           content={localContent}
           onContentChange={handleContentChange}
           mode={mode}
-          onModeChange={setMode}
+          onModeChange={handleModeChange}
           folderPath={folderPath}
           selectedFile={currentDoc.filename.replace(/\.md$/, '')}
           attachments={attachments}
@@ -1174,6 +1190,12 @@ function DocumentReview({
           onRemoveAttachment={handleRemoveAttachment}
           theme={theme}
           isLocked={launchingButton !== null}
+          textareaRef={textareaRef}
+          previewRef={previewRef}
+          documents={generatedDocuments}
+          selectedDocIndex={currentDocumentIndex}
+          onDocumentSelect={handleDocumentSelect}
+          statsText={statsText}
         />
       </div>
 
@@ -1269,6 +1291,18 @@ function DocumentReview({
 
         {/* Keyboard hints */}
         <div className="mt-4 flex justify-center gap-6">
+          <span
+            className="text-xs flex items-center gap-1"
+            style={{ color: theme.colors.textDim }}
+          >
+            <kbd
+              className="px-1.5 py-0.5 rounded text-xs"
+              style={{ backgroundColor: theme.colors.border }}
+            >
+              ⌘E
+            </kbd>
+            Toggle Edit/Preview
+          </span>
           <span
             className="text-xs flex items-center gap-1"
             style={{ color: theme.colors.textDim }}

@@ -21,6 +21,8 @@ interface TourStepProps {
   spotlight: SpotlightInfo | null;
   /** Callback to advance to next step */
   onNext: () => void;
+  /** Callback to go to a specific step (0-based index) */
+  onGoToStep: (stepIndex: number) => void;
   /** Callback to skip/end the tour */
   onSkip: () => void;
   /** Whether this is the last step */
@@ -206,6 +208,7 @@ export function TourStep({
   totalSteps,
   spotlight,
   onNext,
+  onGoToStep,
   onSkip,
   isLastStep,
   isTransitioning,
@@ -290,23 +293,31 @@ export function TourStep({
 
         {/* Navigation buttons */}
         <div className="flex items-center justify-between">
-          {/* Progress dots */}
+          {/* Progress dots - past steps are clickable */}
           <div className="flex items-center gap-1.5">
-            {Array.from({ length: totalSteps }, (_, i) => (
-              <div
-                key={i}
-                className="w-2 h-2 rounded-full transition-all duration-200"
-                style={{
-                  backgroundColor:
-                    i < stepNumber
-                      ? theme.colors.accent
-                      : i === stepNumber - 1
-                      ? theme.colors.accent
-                      : theme.colors.border,
-                  transform: i === stepNumber - 1 ? 'scale(1.2)' : 'scale(1)',
-                }}
-              />
-            ))}
+            {Array.from({ length: totalSteps }, (_, i) => {
+              const isPast = i < stepNumber - 1;
+              const isCurrent = i === stepNumber - 1;
+              return (
+                <button
+                  key={i}
+                  onClick={() => isPast && onGoToStep(i)}
+                  disabled={!isPast}
+                  className={`w-2 h-2 rounded-full transition-all duration-200 ${
+                    isPast ? 'cursor-pointer hover:scale-150' : ''
+                  }`}
+                  style={{
+                    backgroundColor:
+                      i < stepNumber
+                        ? theme.colors.accent
+                        : theme.colors.border,
+                    transform: isCurrent ? 'scale(1.2)' : 'scale(1)',
+                    opacity: isPast ? 0.7 : 1,
+                  }}
+                  title={isPast ? `Go back to step ${i + 1}` : undefined}
+                />
+              );
+            })}
           </div>
 
           {/* Continue button */}

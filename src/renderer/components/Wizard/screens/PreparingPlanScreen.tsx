@@ -34,6 +34,23 @@ function formatFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+/**
+ * Format elapsed time in human-readable format (e.g., "1h 10m 12s")
+ */
+function formatElapsedTime(ms: number): string {
+  const totalSeconds = Math.floor(ms / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  const parts: string[] = [];
+  if (hours > 0) parts.push(`${hours}h`);
+  if (minutes > 0 || hours > 0) parts.push(`${minutes}m`);
+  parts.push(`${seconds}s`);
+
+  return parts.join(' ');
+}
+
 interface PreparingPlanScreenProps {
   theme: Theme;
 }
@@ -414,7 +431,7 @@ function CreatedFilesList({
           className="text-xs font-medium uppercase tracking-wide"
           style={{ color: theme.colors.success }}
         >
-          Files Created ({files.length})
+          Work Plans Drafted ({files.length})
         </span>
       </div>
       {/* Responsive list - grows to fit content but scrolls if too many */}
@@ -452,13 +469,32 @@ function LoadingIndicator({
   message,
   theme,
   createdFiles = [],
+  startTime,
 }: {
   message: string;
   theme: Theme;
   createdFiles?: CreatedFileInfo[];
+  startTime?: number;
 }): JSX.Element {
   // Calculate total tasks across all files
   const totalTasks = createdFiles.reduce((sum, file) => sum + (file.taskCount || 0), 0);
+
+  // Track elapsed time with a timer that updates every second
+  const [elapsedMs, setElapsedMs] = useState(0);
+
+  useEffect(() => {
+    if (!startTime) return;
+
+    // Update immediately
+    setElapsedMs(Date.now() - startTime);
+
+    // Update every second
+    const interval = setInterval(() => {
+      setElapsedMs(Date.now() - startTime);
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [startTime]);
 
   return (
     <div className="flex-1 flex flex-col p-6 items-center justify-center">
@@ -490,13 +526,21 @@ function LoadingIndicator({
           {message}
         </h3>
 
-        {/* Subtitle */}
+        {/* Subtitle with elapsed time */}
         <p
           className="text-sm text-center max-w-md"
           style={{ color: theme.colors.textDim }}
         >
           This may take a while. We're creating detailed task documents based on your project requirements.
         </p>
+        {startTime && elapsedMs > 0 && (
+          <p
+            className="text-xs mt-1 font-mono"
+            style={{ color: theme.colors.textDim }}
+          >
+            Elapsed: {formatElapsedTime(elapsedMs)}
+          </p>
+        )}
 
         {/* Total task count (replaces bouncing dots when tasks exist) */}
         {totalTasks > 0 ? (
@@ -511,7 +555,7 @@ function LoadingIndicator({
               className="text-lg font-medium"
               style={{ color: theme.colors.textMain }}
             >
-              {totalTasks === 1 ? 'task' : 'tasks'} generated
+              {totalTasks === 1 ? 'Task' : 'Tasks'} Planned
             </span>
           </div>
         ) : (
@@ -660,7 +704,7 @@ export function PreparingPlanScreen({
   } = useWizard();
 
   const [progressMessage, setProgressMessage] = useState(
-    'Generating Auto Run documents...'
+    'Generating Auto Run Documents...'
   );
   const generationStartedRef = useRef(false);
 
@@ -668,6 +712,9 @@ export function PreparingPlanScreen({
   const [createdFiles, setCreatedFiles] = useState<CreatedFileInfo[]>([]);
   // Track filenames we've already seen to avoid duplicates
   const seenFilesRef = useRef<Set<string>>(new Set());
+
+  // Track generation start time for elapsed time display
+  const [generationStartTime, setGenerationStartTime] = useState<number | undefined>(undefined);
 
   // Screen reader announcement state
   const [announcement, setAnnouncement] = useState('');
@@ -684,9 +731,10 @@ export function PreparingPlanScreen({
 
     setGeneratingDocuments(true);
     setGenerationError(null);
-    setProgressMessage('Generating Auto Run documents...');
+    setProgressMessage('Generating Auto Run Documents...');
     setCreatedFiles([]); // Reset files list
     seenFilesRef.current.clear(); // Reset seen files tracking
+    setGenerationStartTime(Date.now()); // Start elapsed time tracking
 
     // Announce generation start
     setAnnouncement('Preparing your action plans. This may take a while.');
@@ -891,7 +939,7 @@ export function PreparingPlanScreen({
   return (
     <>
       {announcementElement}
-      <LoadingIndicator message={progressMessage} theme={theme} createdFiles={createdFiles} />
+      <LoadingIndicator message={progressMessage} theme={theme} createdFiles={createdFiles} startTime={generationStartTime} />
     </>
   );
 }

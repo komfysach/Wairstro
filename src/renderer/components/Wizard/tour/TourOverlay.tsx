@@ -108,6 +108,7 @@ export function TourOverlay({
     isTransitioning,
     nextStep,
     previousStep,
+    goToStep,
     skipTour: internalSkipTour,
     isLastStep,
   } = useTour({
@@ -263,6 +264,7 @@ export function TourOverlay({
         totalSteps={totalSteps}
         spotlight={spotlight}
         onNext={nextStep}
+        onGoToStep={goToStep}
         onSkip={skipTour}
         isLastStep={isLastStep}
         isTransitioning={isTransitioning}

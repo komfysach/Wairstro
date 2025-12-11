@@ -64,6 +64,8 @@ interface QuickActionsModalProps {
   setUpdateCheckModalOpen?: (open: boolean) => void;
   openWizard?: () => void;
   wizardGoToStep?: (step: WizardStep) => void;
+  setDebugWizardModalOpen?: (open: boolean) => void;
+  startTour?: () => void;
 }
 
 export function QuickActionsModal(props: QuickActionsModalProps) {
@@ -78,7 +80,7 @@ export function QuickActionsModal(props: QuickActionsModalProps) {
     setShortcutsHelpOpen, setAboutModalOpen, setLogViewerOpen, setProcessMonitorOpen,
     setAgentSessionsOpen, setActiveClaudeSessionId, setGitDiffPreview, setGitLogOpen,
     onRenameTab, onToggleReadOnlyMode, onOpenTabSwitcher, tabShortcuts, isAiMode, setPlaygroundOpen, onRefreshGitFileState,
-    onDebugReleaseQueuedItem, markdownRawMode, onToggleMarkdownRawMode, setUpdateCheckModalOpen, openWizard, wizardGoToStep
+    onDebugReleaseQueuedItem, markdownRawMode, onToggleMarkdownRawMode, setUpdateCheckModalOpen, openWizard, wizardGoToStep, setDebugWizardModalOpen, startTour
   } = props;
 
   const [search, setSearch] = useState('');
@@ -228,6 +230,7 @@ export function QuickActionsModal(props: QuickActionsModalProps) {
     { id: 'settings', label: 'Settings', shortcut: shortcuts.settings, action: () => { setSettingsModalOpen(true); setQuickActionOpen(false); } },
     { id: 'theme', label: 'Change Theme', action: () => { setSettingsModalOpen(true); setSettingsTab('theme'); setQuickActionOpen(false); } },
     { id: 'shortcuts', label: 'View Shortcuts', shortcut: shortcuts.help, action: () => { setShortcutsHelpOpen(true); setQuickActionOpen(false); } },
+    ...(startTour ? [{ id: 'tour', label: 'Start Introductory Tour', subtext: 'Take a guided tour of the interface', action: () => { startTour(); setQuickActionOpen(false); } }] : []),
     { id: 'logs', label: 'View System Logs', shortcut: shortcuts.systemLogs, action: () => { setLogViewerOpen(true); setQuickActionOpen(false); } },
     { id: 'processes', label: 'View System Processes', shortcut: shortcuts.processMonitor, action: () => { setProcessMonitorOpen(true); setQuickActionOpen(false); } },
     ...(activeSession ? [{ id: 'agentSessions', label: `View Agent Sessions for ${activeSession.name}`, shortcut: shortcuts.agentSessions, action: () => { setActiveClaudeSessionId(null); setAgentSessionsOpen(true); setQuickActionOpen(false); } }] : []),
@@ -321,14 +324,12 @@ export function QuickActionsModal(props: QuickActionsModalProps) {
         setQuickActionOpen(false);
       }
     }] : []),
-    ...(openWizard && wizardGoToStep ? [{
+    ...(setDebugWizardModalOpen ? [{
       id: 'debugWizardPhaseReview',
       label: 'Debug: Wizard → Review Action Plans',
       subtext: 'Jump directly to Phase Review step (requires existing Auto Run docs)',
       action: () => {
-        openWizard();
-        // Small delay to ensure wizard is open before navigating
-        setTimeout(() => wizardGoToStep('phase-review'), 50);
+        setDebugWizardModalOpen(true);
         setQuickActionOpen(false);
       }
     }] : []),

@@ -11,9 +11,10 @@ interface ShortcutsHelpModalProps {
   theme: Theme;
   shortcuts: Record<string, Shortcut>;
   onClose: () => void;
+  hasNoAgents?: boolean;
 }
 
-export function ShortcutsHelpModal({ theme, shortcuts, onClose }: ShortcutsHelpModalProps) {
+export function ShortcutsHelpModal({ theme, shortcuts, onClose, hasNoAgents }: ShortcutsHelpModalProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const { registerLayer, unregisterLayer, updateLayerHandler } = useLayerStack();
   const layerIdRef = useRef<string>();
@@ -89,6 +90,11 @@ export function ShortcutsHelpModal({ theme, shortcuts, onClose }: ShortcutsHelpM
               <X className="w-4 h-4" />
             </button>
           </div>
+          {hasNoAgents && (
+            <p className="text-xs mb-3 px-2 py-1.5 rounded" style={{ backgroundColor: theme.colors.accent + '20', color: theme.colors.accent }}>
+              Note: Most functionality is unavailable until you've created your first agent.
+            </p>
+          )}
           <input
             type="text"
             value={searchQuery}

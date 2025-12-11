@@ -253,6 +253,10 @@ export function useBatchProcessor({
   // Refs for tracking stop requests per session
   const stopRequestedRefs = useRef<Record<string, boolean>>({});
 
+  // Ref to always have access to latest sessions (fixes stale closure in startBatchRun)
+  const sessionsRef = useRef(sessions);
+  sessionsRef.current = sessions;
+
   // Helper to get batch state for a session
   const getBatchState = useCallback((sessionId: string): BatchRunState => {
     return batchRunStates[sessionId] || DEFAULT_BATCH_STATE;
@@ -323,7 +327,8 @@ ${docList}
   const startBatchRun = useCallback(async (sessionId: string, config: BatchRunConfig, folderPath: string) => {
     console.log('[BatchProcessor] startBatchRun called:', { sessionId, folderPath, config });
 
-    const session = sessions.find(s => s.id === sessionId);
+    // Use sessionsRef to get latest sessions (handles case where session was just created)
+    const session = sessionsRef.current.find(s => s.id === sessionId);
     if (!session) {
       console.error('[BatchProcessor] Session not found for batch processing:', sessionId);
       return;
@@ -1128,7 +1133,7 @@ ${docList}
         elapsedTimeMs: Date.now() - batchStartTime
       });
     }
-  }, [sessions, onUpdateSession, onSpawnAgent, onSpawnSynopsis, onAddHistoryEntry, onComplete, onPRResult, audioFeedbackEnabled, audioFeedbackCommand]);
+  }, [onUpdateSession, onSpawnAgent, onSpawnSynopsis, onAddHistoryEntry, onComplete, onPRResult, audioFeedbackEnabled, audioFeedbackCommand]);
 
   /**
    * Request to stop the batch run for a specific session after current task completes

@@ -1065,6 +1065,7 @@ export function SessionList(props: SessionListProps) {
               {menuOpen && (
                 <div
                   className="absolute top-full left-0 mt-2 w-72 rounded-lg shadow-2xl z-50 overflow-hidden"
+                  data-tour="hamburger-menu-contents"
                   style={{
                     backgroundColor: theme.colors.bgSidebar,
                     border: `1px solid ${theme.colors.border}`,

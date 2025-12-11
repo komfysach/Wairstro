@@ -356,19 +356,13 @@ export function MainPanel(props: MainPanelProps) {
   // Show empty state when no active session
   if (!activeSession) {
     return (
-      <>
-        <div
-          className="flex-1 flex flex-col items-center justify-center min-w-0 relative opacity-30"
-          style={{ backgroundColor: theme.colors.bgMain }}
-        >
-          <Wand2 className="w-16 h-16 mb-4" style={{ color: theme.colors.textDim }} />
-          <p className="text-sm" style={{ color: theme.colors.textDim }}>No agents. Create one to get started.</p>
-        </div>
-        <div
-          className="w-96 opacity-30"
-          style={{ backgroundColor: theme.colors.bgSidebar }}
-        />
-      </>
+      <div
+        className="flex-1 flex flex-col items-center justify-center min-w-0 relative opacity-30"
+        style={{ backgroundColor: theme.colors.bgMain }}
+      >
+        <Wand2 className="w-16 h-16 mb-4" style={{ color: theme.colors.textDim }} />
+        <p className="text-sm" style={{ color: theme.colors.textDim }}>No agents. Create one to get started.</p>
+      </div>
     );
   }
 

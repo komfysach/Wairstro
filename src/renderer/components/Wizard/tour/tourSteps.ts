@@ -22,10 +22,10 @@ import type { TourStepConfig, TourUIAction } from './useTour';
  * 4) History tab - explain auto vs manual entries
  * 5) Left panel hamburger menu - show menu options
  * 6) Left panel session list - explain sessions and groups
- * 7) Main terminal area - explain AI Terminal vs Command Terminal
- * 8) Input area - explain read-only during Auto Run
- * 9) Header area - explain status indicators and controls
- * 10) Keyboard shortcuts hint - mention Cmd+Shift+? for all shortcuts
+ * 7) Main terminal area - explain AI Terminal
+ * 8) Input area - explain messaging the AI
+ * 9) Terminal mode - teach Cmd+J shortcut
+ * 10) Keyboard shortcuts - mention Cmd+/ for all shortcuts, end tour
  */
 export const tourSteps: TourStepConfig[] = [
   {
@@ -118,7 +118,7 @@ export const tourSteps: TourStepConfig[] = [
     descriptionGeneric:
       'This is the AI Terminal where you communicate with your AI assistant. In "AI" mode, messages go to the AI. Switch to "Terminal" mode for direct shell commands.',
     selector: '[data-tour="main-terminal"]',
-    position: 'top',
+    position: 'center',
     uiActions: [],
   },
   {
@@ -133,23 +133,23 @@ export const tourSteps: TourStepConfig[] = [
     uiActions: [],
   },
   {
-    id: 'header-controls',
-    title: 'Status & Controls',
+    id: 'terminal-mode',
+    title: 'Terminal Mode',
     description:
-      'The header shows session status, context usage, and quick controls. The colored indicator shows if the AI is ready (green), thinking (yellow), or disconnected (red). A pulsing green dot appears next to sessions with unread messages. Click the stop button to interrupt long operations.',
+      'Press Cmd+J (or Ctrl+J on Windows/Linux) to switch between AI mode and Terminal mode. Terminal mode gives you a direct shell for running commands yourself.',
     descriptionGeneric:
-      'The header shows session status, context usage, and quick controls. The colored indicator shows if the AI is ready (green), thinking (yellow), or disconnected (red). A pulsing green dot appears next to sessions with unread messages.',
-    selector: '[data-tour="header-controls"]',
-    position: 'bottom',
+      'Press Cmd+J (or Ctrl+J on Windows/Linux) to switch between AI mode and Terminal mode. Terminal mode gives you a direct shell for running commands yourself.',
+    selector: '[data-tour="input-area"]',
+    position: 'top',
     uiActions: [],
   },
   {
     id: 'keyboard-shortcuts',
     title: 'Keyboard Shortcuts',
     description:
-      'Maestro is designed for keyboard-first navigation. Press Cmd+Shift+? (or Ctrl+Shift+? on Windows/Linux) anytime to see all available shortcuts. You\'re now ready to build amazing things!',
+      'Maestro is keyboard-first. Press Cmd+/ (or Ctrl+/ on Windows/Linux) anytime to see all available shortcuts. You\'re now ready to build amazing things!',
     descriptionGeneric:
-      'Maestro is designed for keyboard-first navigation. Press Cmd+Shift+? (or Ctrl+Shift+? on Windows/Linux) anytime to see all available shortcuts. You\'re ready to go!',
+      'Maestro is keyboard-first. Press Cmd+/ (or Ctrl+/ on Windows/Linux) anytime to see all available shortcuts. You\'re ready to go!',
     selector: null, // Center screen, no specific element
     position: 'center',
     uiActions: [],

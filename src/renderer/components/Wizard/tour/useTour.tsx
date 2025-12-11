@@ -94,6 +94,8 @@ interface UseTourReturn {
   nextStep: () => void;
   /** Go back to previous step */
   previousStep: () => void;
+  /** Go to a specific step by index */
+  goToStep: (stepIndex: number) => void;
   /** Skip/end the tour */
   skipTour: () => void;
   /** Whether on the last step */
@@ -310,6 +312,7 @@ export function useTour({
     isTransitioning,
     nextStep,
     previousStep,
+    goToStep,
     skipTour,
     isLastStep,
   };

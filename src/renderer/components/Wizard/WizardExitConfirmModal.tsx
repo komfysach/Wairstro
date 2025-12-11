@@ -141,7 +141,7 @@ export function WizardExitConfirmModal({
             className="text-sm mt-3 leading-relaxed"
             style={{ color: theme.colors.textDim }}
           >
-            Your progress will be saved, and you can resume where you left off the next time you open Maestro.
+            Your progress can be saved, and you can resume where you left off the next time you open Maestro.
           </p>
 
           {/* Progress indicator */}
@@ -181,7 +181,7 @@ export function WizardExitConfirmModal({
           </div>
 
           {/* Actions */}
-          <div className="mt-6 flex justify-end gap-3">
+          <div className="mt-6 flex justify-center gap-3">
             <button
               onClick={onConfirmExit}
               className="px-4 py-2 rounded-lg border text-sm font-medium hover:bg-white/5 transition-colors"

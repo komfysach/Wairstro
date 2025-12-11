@@ -491,7 +491,7 @@ class PhaseGenerator {
       // Generate the prompt
       const prompt = generateDocumentGenerationPrompt(config);
 
-      callbacks?.onProgress?.('Generating Auto Run documents...');
+      callbacks?.onProgress?.('Generating Auto Run Documents...');
 
       // Spawn the agent and wait for completion
       const result = await this.runAgent(agent, config, prompt, callbacks);
