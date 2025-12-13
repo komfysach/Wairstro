@@ -16,10 +16,15 @@ import { registerHistoryHandlers, HistoryHandlerDependencies } from './history';
 import { registerAgentsHandlers, AgentsHandlerDependencies } from './agents';
 import { registerProcessHandlers, ProcessHandlerDependencies } from './process';
 import { registerPersistenceHandlers, PersistenceHandlerDependencies, MaestroSettings, SessionsData, GroupsData } from './persistence';
+import { registerSystemHandlers, setupLoggerEventForwarding, SystemHandlerDependencies } from './system';
 import { HistoryEntry } from '../../../shared/types';
 import { AgentDetector } from '../../agent-detector';
 import { ProcessManager } from '../../process-manager';
 import { WebServer } from '../../web-server';
+import { tunnelManager as tunnelManagerInstance } from '../../tunnel-manager';
+
+// Type for tunnel manager instance
+type TunnelManagerType = typeof tunnelManagerInstance;
 
 // Re-export individual handlers for selective registration
 export { registerGitHandlers };
@@ -29,10 +34,12 @@ export { registerHistoryHandlers };
 export { registerAgentsHandlers };
 export { registerProcessHandlers };
 export { registerPersistenceHandlers };
+export { registerSystemHandlers, setupLoggerEventForwarding };
 export type { HistoryHandlerDependencies };
 export type { AgentsHandlerDependencies };
 export type { ProcessHandlerDependencies };
 export type { PersistenceHandlerDependencies };
+export type { SystemHandlerDependencies };
 export type { MaestroSettings, SessionsData, GroupsData };
 
 /**
@@ -70,6 +77,8 @@ export interface HandlerDependencies {
   sessionsStore: Store<SessionsData>;
   groupsStore: Store<GroupsData>;
   getWebServer: () => WebServer | null;
+  // System-specific dependencies
+  tunnelManager: TunnelManagerType;
 }
 
 /**
@@ -101,6 +110,13 @@ export function registerAllHandlers(deps: HandlerDependencies): void {
     groupsStore: deps.groupsStore,
     getWebServer: deps.getWebServer,
   });
-  // Future handlers will be registered here:
-  // registerSystemHandlers();
+  registerSystemHandlers({
+    getMainWindow: deps.getMainWindow,
+    app: deps.app,
+    settingsStore: deps.settingsStore,
+    tunnelManager: deps.tunnelManager,
+    getWebServer: deps.getWebServer,
+  });
+  // Setup logger event forwarding to renderer
+  setupLoggerEventForwarding(deps.getMainWindow);
 }

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog, shell } from 'electron';
+import { app, BrowserWindow, ipcMain } from 'electron';
 import path from 'path';
 import os from 'os';
 import fs from 'fs/promises';
@@ -6,15 +6,11 @@ import fsSync from 'fs';
 import { ProcessManager } from './process-manager';
 import { WebServer } from './web-server';
 import { AgentDetector } from './agent-detector';
-import { execFileNoThrow } from './utils/execFile';
 import { logger } from './utils/logger';
-import { detectShells } from './utils/shellDetector';
-import { isCloudflaredInstalled } from './utils/cliDetection';
 import { tunnelManager } from './tunnel-manager';
 import { getThemeById } from './themes';
-import { checkForUpdates } from './update-checker';
 import Store from 'electron-store';
-import { registerGitHandlers, registerAutorunHandlers, registerHistoryHandlers, registerAgentsHandlers, registerProcessHandlers, registerPersistenceHandlers } from './ipc/handlers';
+import { registerGitHandlers, registerAutorunHandlers, registerHistoryHandlers, registerAgentsHandlers, registerProcessHandlers, registerPersistenceHandlers, registerSystemHandlers, setupLoggerEventForwarding } from './ipc/handlers';
 
 // Demo mode: use a separate data directory for fresh demos
 const DEMO_MODE = process.argv.includes('--demo') || !!process.env.MAESTRO_DEMO_DIR;
@@ -977,6 +973,18 @@ function setupIpcHandlers() {
     getWebServer: () => webServer,
   });
 
+  // System operations - extracted to src/main/ipc/handlers/system.ts
+  registerSystemHandlers({
+    getMainWindow: () => mainWindow,
+    app,
+    settingsStore: store,
+    tunnelManager,
+    getWebServer: () => webServer,
+  });
+
+  // Setup logger event forwarding to renderer
+  setupLoggerEventForwarding(() => mainWindow);
+
   // File system operations
   ipcMain.handle('fs:homeDir', () => {
     return os.homedir();
@@ -1174,210 +1182,8 @@ function setupIpcHandlers() {
     return webServer?.getWebClientCount() || 0;
   });
 
-  // Agent management operations - extracted to src/main/ipc/handlers/agents.ts
-
-  // Folder selection dialog
-  ipcMain.handle('dialog:selectFolder', async () => {
-    if (!mainWindow) return null;
-
-    const result = await dialog.showOpenDialog(mainWindow, {
-      properties: ['openDirectory', 'createDirectory'],
-      title: 'Select Working Directory',
-    });
-
-    if (result.canceled || result.filePaths.length === 0) {
-      return null;
-    }
-
-    return result.filePaths[0];
-  });
-
-  // Font detection
-  ipcMain.handle('fonts:detect', async () => {
-    try {
-      // Use fc-list on all platforms (faster than system_profiler on macOS)
-      // macOS: 0.74s (was 8.77s with system_profiler) - 11.9x faster
-      // Linux/Windows: 0.5-0.6s
-      const result = await execFileNoThrow('fc-list', [':', 'family']);
-
-      if (result.exitCode === 0 && result.stdout) {
-        // Parse font list and deduplicate
-        const fonts = result.stdout
-          .split('\n')
-          .filter(Boolean)
-          .map((line: string) => line.trim())
-          .filter(font => font.length > 0);
-
-        // Deduplicate fonts (fc-list can return duplicates)
-        return [...new Set(fonts)];
-      }
-
-      // Fallback if fc-list not available (rare on modern systems)
-      return ['Monaco', 'Menlo', 'Courier New', 'Consolas', 'Roboto Mono', 'Fira Code', 'JetBrains Mono'];
-    } catch (error) {
-      console.error('Font detection error:', error);
-      // Return common monospace fonts as fallback
-      return ['Monaco', 'Menlo', 'Courier New', 'Consolas', 'Roboto Mono', 'Fira Code', 'JetBrains Mono'];
-    }
-  });
-
-  // Shell detection
-  ipcMain.handle('shells:detect', async () => {
-    try {
-      logger.info('Detecting available shells', 'ShellDetector');
-      const shells = await detectShells();
-      logger.info(`Detected ${shells.filter(s => s.available).length} available shells`, 'ShellDetector', {
-        shells: shells.filter(s => s.available).map(s => s.id)
-      });
-      return shells;
-    } catch (error) {
-      logger.error('Shell detection error', 'ShellDetector', error);
-      // Return default shell list with all marked as unavailable
-      return [
-        { id: 'zsh', name: 'Zsh', available: false },
-        { id: 'bash', name: 'Bash', available: false },
-        { id: 'sh', name: 'Bourne Shell (sh)', available: false },
-        { id: 'fish', name: 'Fish', available: false },
-        { id: 'tcsh', name: 'Tcsh', available: false },
-      ];
-    }
-  });
-
-  // Shell operations
-  ipcMain.handle('shell:openExternal', async (_event, url: string) => {
-    await shell.openExternal(url);
-  });
-
-  // Tunnel operations (cloudflared CLI detection and tunnel management)
-  ipcMain.handle('tunnel:isCloudflaredInstalled', async () => {
-    return await isCloudflaredInstalled();
-  });
-
-  ipcMain.handle('tunnel:start', async () => {
-    // Get web server URL (includes the security token)
-    const serverUrl = webServer?.getSecureUrl();
-    if (!serverUrl) {
-      return { success: false, error: 'Web server not running' };
-    }
-
-    // Parse the URL to get port and token path
-    const parsedUrl = new URL(serverUrl);
-    const port = parseInt(parsedUrl.port, 10);
-    const tokenPath = parsedUrl.pathname; // e.g., "/7d7f7162-614c-43e2-bb8a-8a8123c2f56a"
-
-    const result = await tunnelManager.start(port);
-
-    if (result.success && result.url) {
-      // Append the token path to the tunnel URL for security
-      // e.g., "https://xyz.trycloudflare.com" + "/TOKEN" = "https://xyz.trycloudflare.com/TOKEN"
-      const fullTunnelUrl = result.url + tokenPath;
-      return { success: true, url: fullTunnelUrl };
-    }
-
-    return result;
-  });
-
-  ipcMain.handle('tunnel:stop', async () => {
-    await tunnelManager.stop();
-    return { success: true };
-  });
-
-  ipcMain.handle('tunnel:getStatus', async () => {
-    return tunnelManager.getStatus();
-  });
-
-  // DevTools operations
-  ipcMain.handle('devtools:open', async () => {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.openDevTools();
-    }
-  });
-
-  ipcMain.handle('devtools:close', async () => {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.closeDevTools();
-    }
-  });
-
-  ipcMain.handle('devtools:toggle', async () => {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      if (mainWindow.webContents.isDevToolsOpened()) {
-        mainWindow.webContents.closeDevTools();
-      } else {
-        mainWindow.webContents.openDevTools();
-      }
-    }
-  });
-
-  // Update check
-  ipcMain.handle('updates:check', async () => {
-    const currentVersion = app.getVersion();
-    return checkForUpdates(currentVersion);
-  });
-
-  // Logger operations
-  ipcMain.handle('logger:log', async (_event, level: string, message: string, context?: string, data?: unknown) => {
-    const logLevel = level as 'debug' | 'info' | 'warn' | 'error' | 'toast' | 'autorun';
-    switch (logLevel) {
-      case 'debug':
-        logger.debug(message, context, data);
-        break;
-      case 'info':
-        logger.info(message, context, data);
-        break;
-      case 'warn':
-        logger.warn(message, context, data);
-        break;
-      case 'error':
-        logger.error(message, context, data);
-        break;
-      case 'toast':
-        logger.toast(message, context, data);
-        break;
-      case 'autorun':
-        logger.autorun(message, context, data);
-        break;
-    }
-  });
-
-  ipcMain.handle('logger:getLogs', async (_event, filter?: { level?: string; context?: string; limit?: number }) => {
-    const typedFilter = filter ? {
-      level: filter.level as 'debug' | 'info' | 'warn' | 'error' | 'toast' | 'autorun' | undefined,
-      context: filter.context,
-      limit: filter.limit,
-    } : undefined;
-    return logger.getLogs(typedFilter);
-  });
-
-  ipcMain.handle('logger:clearLogs', async () => {
-    logger.clearLogs();
-  });
-
-  ipcMain.handle('logger:setLogLevel', async (_event, level: string) => {
-    const logLevel = level as 'debug' | 'info' | 'warn' | 'error';
-    logger.setLogLevel(logLevel);
-    store.set('logLevel', logLevel);
-  });
-
-  ipcMain.handle('logger:getLogLevel', async () => {
-    return logger.getLogLevel();
-  });
-
-  ipcMain.handle('logger:setMaxLogBuffer', async (_event, max: number) => {
-    logger.setMaxLogBuffer(max);
-    store.set('maxLogBuffer', max);
-  });
-
-  ipcMain.handle('logger:getMaxLogBuffer', async () => {
-    return logger.getMaxLogBuffer();
-  });
-
-  // Subscribe to new log events and forward to renderer
-  logger.on('newLog', (entry) => {
-    if (mainWindow) {
-      mainWindow.webContents.send('logger:newLog', entry);
-    }
-  });
+  // System operations (dialog, fonts, shells, tunnel, devtools, updates, logger)
+  // extracted to src/main/ipc/handlers/system.ts
 
   // Claude Code sessions API
   // Sessions are stored in ~/.claude/projects/<encoded-project-path>/<session-id>.jsonl
