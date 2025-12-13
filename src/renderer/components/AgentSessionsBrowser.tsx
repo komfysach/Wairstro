@@ -5,8 +5,9 @@ import { useLayerStack } from '../contexts/LayerStackContext';
 import { MODAL_PRIORITIES } from '../constants/modalPriorities';
 import { SessionActivityGraph, type ActivityEntry } from './SessionActivityGraph';
 import { formatSize, formatNumber, formatTokens, formatRelativeTime } from '../utils/formatters';
-import { useSessionViewer, type ClaudeSession, type SessionMessage } from '../hooks/useSessionViewer';
+import { useSessionViewer, type ClaudeSession } from '../hooks/useSessionViewer';
 import { useSessionPagination } from '../hooks/useSessionPagination';
+import { useFilteredAndSortedSessions } from '../hooks/useFilteredAndSortedSessions';
 
 type SearchMode = 'title' | 'user' | 'assistant' | 'all';
 
@@ -64,7 +65,6 @@ export function AgentSessionsBrowser({
     handleSessionsScroll,
     sessionsContainerRef,
     updateSession,
-    setSessions,
   } = useSessionPagination({
     cwd: activeSession?.cwd,
     onStarredSessionsLoaded: setStarredSessions,
@@ -345,16 +345,20 @@ export function AgentSessionsBrowser({
     };
   }, [search, searchMode, activeSession?.cwd]);
 
-  // Helper to check if a session should be visible based on filters
-  const isSessionVisible = useCallback((session: ClaudeSession) => {
-    // Named only filter - if enabled, only show sessions with a custom name
-    if (namedOnly && !session.sessionName) {
-      return false;
-    }
-    if (showAllSessions) return true;
-    // Hide sessions that start with "agent-" (only show UUID-style sessions by default)
-    return !session.sessionId.startsWith('agent-');
-  }, [showAllSessions, namedOnly]);
+  // Use hook for filtering and sorting sessions
+  const {
+    filteredSessions,
+    getSearchResultInfo,
+  } = useFilteredAndSortedSessions({
+    sessions,
+    search,
+    searchMode,
+    searchResults,
+    isSearching,
+    starredSessions,
+    showAllSessions,
+    namedOnly,
+  });
 
   // Stats always show totals for ALL sessions (fetched progressively from backend)
   const stats = useMemo(() => {
@@ -370,79 +374,6 @@ export function AgentSessionsBrowser({
       isComplete: aggregateStats.isComplete,
     };
   }, [aggregateStats]);
-
-  // Filter sessions by search - use different strategies based on search mode
-  const filteredSessions = useMemo(() => {
-    // First filter by showAllSessions
-    const visibleSessions = sessions.filter(isSessionVisible);
-
-    // Sort starred sessions to the top, then by modified date
-    const sortWithStarred = (sessionList: ClaudeSession[]) => {
-      return [...sessionList].sort((a, b) => {
-        const aStarred = starredSessions.has(a.sessionId);
-        const bStarred = starredSessions.has(b.sessionId);
-        if (aStarred && !bStarred) return -1;
-        if (!aStarred && bStarred) return 1;
-        // Within same starred status, sort by most recent
-        return new Date(b.modifiedAt).getTime() - new Date(a.modifiedAt).getTime();
-      });
-    };
-
-    if (!search.trim()) {
-      return sortWithStarred(visibleSessions);
-    }
-
-    // For title search, filter locally (fast) - include sessionName, sessionId (UUID), and first octet
-    if (searchMode === 'title') {
-      const searchLower = search.toLowerCase();
-      const searchUpper = search.toUpperCase();
-      const filtered = visibleSessions.filter(s => {
-        // Check firstMessage
-        if (s.firstMessage.toLowerCase().includes(searchLower)) return true;
-        // Check full sessionId (UUID)
-        if (s.sessionId.toLowerCase().includes(searchLower)) return true;
-        // Check first octet (displayed format) - e.g., "D02D0BD6"
-        const firstOctet = s.sessionId.split('-')[0].toUpperCase();
-        if (firstOctet.includes(searchUpper)) return true;
-        // Check sessionName
-        if (s.sessionName && s.sessionName.toLowerCase().includes(searchLower)) return true;
-        return false;
-      });
-      return sortWithStarred(filtered);
-    }
-
-    // For content searches, use backend results to filter sessions
-    // Also include sessions that match by sessionName, sessionId (UUID), or first octet
-    const searchLower = search.toLowerCase();
-    const searchUpper = search.toUpperCase();
-    const matchingIds = new Set(searchResults.map(r => r.sessionId));
-
-    // Add sessions that match by sessionName, sessionId (UUID), or first octet to the results
-    const filtered = visibleSessions.filter(s => {
-      // Check if matched by backend content search
-      if (matchingIds.has(s.sessionId)) return true;
-      // Check sessionName match
-      if (s.sessionName && s.sessionName.toLowerCase().includes(searchLower)) return true;
-      // Check full sessionId (UUID) match
-      if (s.sessionId.toLowerCase().includes(searchLower)) return true;
-      // Check first octet (displayed format) match - e.g., "D02D0BD6"
-      const firstOctet = s.sessionId.split('-')[0].toUpperCase();
-      if (firstOctet.includes(searchUpper)) return true;
-      return false;
-    });
-
-    if (filtered.length > 0) {
-      return sortWithStarred(filtered);
-    }
-
-    // If searching but no results yet, return empty (or all if still loading)
-    return isSearching ? sortWithStarred(visibleSessions) : [];
-  }, [sessions, search, searchMode, searchResults, isSearching, isSessionVisible, starredSessions]);
-
-  // Get search result info for a session (for display purposes)
-  const getSearchResultInfo = useCallback((sessionId: string): SearchResult | undefined => {
-    return searchResults.find(r => r.sessionId === sessionId);
-  }, [searchResults]);
 
   // Reset selected index when search changes
   useEffect(() => {
