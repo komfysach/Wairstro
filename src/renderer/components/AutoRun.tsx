@@ -1,8 +1,6 @@
 import React, { useState, useRef, useEffect, useLayoutEffect, useCallback, memo, useMemo, forwardRef, useImperativeHandle } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { Eye, Edit, Play, Square, HelpCircle, Loader2, Image, X, Search, ChevronDown, ChevronRight, FolderOpen, FileText, RefreshCw, Maximize2 } from 'lucide-react';
 import type { BatchRunState, SessionState, Theme } from '../types';
 import { AutoRunnerHelpModal } from './AutoRunnerHelpModal';
@@ -14,6 +12,7 @@ import { useTemplateAutocomplete } from '../hooks/useTemplateAutocomplete';
 import { useAutoRunUndo } from '../hooks/useAutoRunUndo';
 import { useAutoRunImageHandling, imageCache } from '../hooks/useAutoRunImageHandling';
 import { TemplateAutocompleteDropdown } from './TemplateAutocompleteDropdown';
+import { generateAutoRunProseStyles, createMarkdownComponents } from '../utils/markdownConfig';
 
 // Memoize remarkPlugins array - it never changes
 const REMARK_PLUGINS = [remarkGfm];
@@ -1025,113 +1024,35 @@ const AutoRunInner = forwardRef<AutoRunHandle, AutoRunProps>(function AutoRunInn
   };
 
   // Memoize prose CSS styles - only regenerate when theme changes
-  const proseStyles = useMemo(() => `
-    .prose h1 { color: ${theme.colors.textMain}; font-size: 2em; font-weight: bold; margin: 0.67em 0; }
-    .prose h2 { color: ${theme.colors.textMain}; font-size: 1.5em; font-weight: bold; margin: 0.75em 0; }
-    .prose h3 { color: ${theme.colors.textMain}; font-size: 1.17em; font-weight: bold; margin: 0.83em 0; }
-    .prose h4 { color: ${theme.colors.textMain}; font-size: 1em; font-weight: bold; margin: 1em 0; }
-    .prose h5 { color: ${theme.colors.textMain}; font-size: 0.83em; font-weight: bold; margin: 1.17em 0; }
-    .prose h6 { color: ${theme.colors.textMain}; font-size: 0.67em; font-weight: bold; margin: 1.33em 0; }
-    .prose p { color: ${theme.colors.textMain}; margin: 0.5em 0; }
-    .prose ul, .prose ol { color: ${theme.colors.textMain}; margin: 0.5em 0; padding-left: 1.5em; }
-    .prose ul { list-style-type: disc; }
-    .prose ol { list-style-type: decimal; }
-    .prose li { margin: 0.25em 0; display: list-item; }
-    .prose li::marker { color: ${theme.colors.textMain}; }
-    .prose li:has(> input[type="checkbox"]) { list-style: none; margin-left: -1.5em; }
-    .prose code { background-color: ${theme.colors.bgActivity}; color: ${theme.colors.textMain}; padding: 0.2em 0.4em; border-radius: 3px; font-size: 0.9em; }
-    .prose pre { background-color: ${theme.colors.bgActivity}; color: ${theme.colors.textMain}; padding: 1em; border-radius: 6px; overflow-x: auto; }
-    .prose pre code { background: none; padding: 0; }
-    .prose blockquote { border-left: 4px solid ${theme.colors.border}; padding-left: 1em; margin: 0.5em 0; color: ${theme.colors.textDim}; }
-    .prose a { color: ${theme.colors.accent}; text-decoration: underline; }
-    .prose hr { border: none; border-top: 2px solid ${theme.colors.border}; margin: 1em 0; }
-    .prose table { border-collapse: collapse; width: 100%; margin: 0.5em 0; }
-    .prose th, .prose td { border: 1px solid ${theme.colors.border}; padding: 0.5em; text-align: left; }
-    .prose th { background-color: ${theme.colors.bgActivity}; font-weight: bold; }
-    .prose strong { font-weight: bold; }
-    .prose em { font-style: italic; }
-    .prose input[type="checkbox"] {
-      appearance: none;
-      -webkit-appearance: none;
-      width: 16px;
-      height: 16px;
-      border: 2px solid ${theme.colors.accent};
-      border-radius: 3px;
-      background-color: transparent;
-      cursor: pointer;
-      vertical-align: middle;
-      margin-right: 8px;
-      position: relative;
-    }
-    .prose input[type="checkbox"]:checked {
-      background-color: ${theme.colors.accent};
-      border-color: ${theme.colors.accent};
-    }
-    .prose input[type="checkbox"]:checked::after {
-      content: '';
-      position: absolute;
-      left: 4px;
-      top: 1px;
-      width: 5px;
-      height: 9px;
-      border: solid ${theme.colors.bgMain};
-      border-width: 0 2px 2px 0;
-      transform: rotate(45deg);
-    }
-    .prose input[type="checkbox"]:hover {
-      border-color: ${theme.colors.highlight};
-      box-shadow: 0 0 4px ${theme.colors.accent}40;
-    }
-    .prose li:has(> input[type="checkbox"]) {
-      list-style-type: none;
-      margin-left: -1.5em;
-    }
-  `, [theme]);
+  // Uses shared utility from markdownConfig.ts
+  const proseStyles = useMemo(() => generateAutoRunProseStyles(theme), [theme]);
 
   // Memoize ReactMarkdown components - only regenerate when dependencies change
-  const markdownComponents = useMemo(() => ({
-    code: ({ node, inline, className, children, ...props }: any) => {
-      const match = (className || '').match(/language-(\w+)/);
-      const language = match ? match[1] : 'text';
-      const codeContent = String(children).replace(/\n$/, '');
+  // Uses shared utility from markdownConfig.ts with custom image renderer
+  const markdownComponents = useMemo(() => {
+    // Create base components with mermaid support
+    const baseComponents = createMarkdownComponents({
+      theme,
+      customLanguageRenderers: {
+        mermaid: ({ code, theme: t }) => <MermaidRenderer chart={code} theme={t} />,
+      },
+    });
 
-      // Handle mermaid code blocks
-      if (!inline && language === 'mermaid') {
-        return <MermaidRenderer chart={codeContent} theme={theme} />;
-      }
-
-      return !inline && match ? (
-        <SyntaxHighlighter
-          language={language}
-          style={vscDarkPlus}
-          customStyle={{
-            margin: '0.5em 0',
-            padding: '1em',
-            background: theme.colors.bgActivity,
-            fontSize: '0.9em',
-            borderRadius: '6px',
-          }}
-          PreTag="div"
-        >
-          {codeContent}
-        </SyntaxHighlighter>
-      ) : (
-        <code className={className} {...props}>
-          {children}
-        </code>
-      );
-    },
-    img: ({ src, alt, ...props }: any) => (
-      <AttachmentImage
-        src={src}
-        alt={alt}
-        folderPath={folderPath}
-        theme={theme}
-        onImageClick={openLightboxByFilename}
-        {...props}
-      />
-    )
-  }), [theme, folderPath, openLightboxByFilename]);
+    // Add custom image renderer for AttachmentImage
+    return {
+      ...baseComponents,
+      img: ({ src, alt, ...props }: any) => (
+        <AttachmentImage
+          src={src}
+          alt={alt}
+          folderPath={folderPath}
+          theme={theme}
+          onImageClick={openLightboxByFilename}
+          {...props}
+        />
+      ),
+    };
+  }, [theme, folderPath, openLightboxByFilename]);
 
   return (
     <div
