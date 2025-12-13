@@ -6,6 +6,7 @@ import { MODAL_PRIORITIES } from '../constants/modalPriorities';
 import { AICommandsPanel } from './AICommandsPanel';
 import { formatShortcutKeys } from '../utils/shortcutFormatter';
 import { ToggleButtonGroup, ToggleButtonOption } from './ToggleButtonGroup';
+import { SettingCheckbox } from './SettingCheckbox';
 
 // Feature flags - set to true to enable dormant features
 const FEATURE_FLAGS = {
@@ -1064,60 +1065,26 @@ export const SettingsModal = memo(function SettingsModal(props: SettingsModalPro
               </div>
 
               {/* Default History Toggle */}
-              <div>
-                <label className="block text-xs font-bold opacity-70 uppercase mb-2 flex items-center gap-2">
-                  <History className="w-3 h-3" />
-                  Default History Toggle
-                </label>
-                <label
-                  className="flex items-center gap-3 p-3 rounded border cursor-pointer hover:bg-opacity-10"
-                  style={{ borderColor: theme.colors.border, backgroundColor: theme.colors.bgMain }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={props.defaultSaveToHistory}
-                    onChange={(e) => props.setDefaultSaveToHistory(e.target.checked)}
-                    className="w-4 h-4"
-                    style={{ accentColor: theme.colors.accent }}
-                  />
-                  <div className="flex-1">
-                    <div className="font-medium" style={{ color: theme.colors.textMain }}>
-                      Enable "History" by default for new tabs
-                    </div>
-                    <div className="text-xs opacity-50 mt-0.5" style={{ color: theme.colors.textDim }}>
-                      When enabled, new AI tabs will have the "History" toggle on by default, saving a synopsis after each completion
-                    </div>
-                  </div>
-                </label>
-              </div>
+              <SettingCheckbox
+                icon={History}
+                sectionLabel="Default History Toggle"
+                title="Enable &quot;History&quot; by default for new tabs"
+                description="When enabled, new AI tabs will have the &quot;History&quot; toggle on by default, saving a synopsis after each completion"
+                checked={props.defaultSaveToHistory}
+                onChange={props.setDefaultSaveToHistory}
+                theme={theme}
+              />
 
               {/* Check for Updates on Startup */}
-              <div>
-                <label className="block text-xs font-bold opacity-70 uppercase mb-2 flex items-center gap-2">
-                  <Download className="w-3 h-3" />
-                  Updates
-                </label>
-                <label
-                  className="flex items-center gap-3 p-3 rounded border cursor-pointer hover:bg-opacity-10"
-                  style={{ borderColor: theme.colors.border, backgroundColor: theme.colors.bgMain }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={props.checkForUpdatesOnStartup}
-                    onChange={(e) => props.setCheckForUpdatesOnStartup(e.target.checked)}
-                    className="w-4 h-4"
-                    style={{ accentColor: theme.colors.accent }}
-                  />
-                  <div className="flex-1">
-                    <div className="font-medium" style={{ color: theme.colors.textMain }}>
-                      Check for updates on startup
-                    </div>
-                    <div className="text-xs opacity-50 mt-0.5" style={{ color: theme.colors.textDim }}>
-                      Automatically check for new Maestro versions when the app starts
-                    </div>
-                  </div>
-                </label>
-              </div>
+              <SettingCheckbox
+                icon={Download}
+                sectionLabel="Updates"
+                title="Check for updates on startup"
+                description="Automatically check for new Maestro versions when the app starts"
+                checked={props.checkForUpdatesOnStartup}
+                onChange={props.setCheckForUpdatesOnStartup}
+                theme={theme}
+              />
             </div>
           )}
 
@@ -1271,30 +1238,15 @@ export const SettingsModal = memo(function SettingsModal(props: SettingsModalPro
             <div className="space-y-6">
               {/* OS Notifications */}
               <div>
-                <label className="block text-xs font-bold opacity-70 uppercase mb-2 flex items-center gap-2">
-                  <Bell className="w-3 h-3" />
-                  Operating System Notifications
-                </label>
-                <label
-                  className="flex items-center gap-3 p-3 rounded border cursor-pointer hover:bg-opacity-10"
-                  style={{ borderColor: theme.colors.border, backgroundColor: theme.colors.bgMain }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={props.osNotificationsEnabled}
-                    onChange={(e) => props.setOsNotificationsEnabled(e.target.checked)}
-                    className="w-4 h-4"
-                    style={{ accentColor: theme.colors.accent }}
-                  />
-                  <div className="flex-1">
-                    <div className="font-medium" style={{ color: theme.colors.textMain }}>
-                      Enable OS Notifications
-                    </div>
-                    <div className="text-xs opacity-50 mt-0.5" style={{ color: theme.colors.textDim }}>
-                      Show desktop notifications when tasks complete or require attention
-                    </div>
-                  </div>
-                </label>
+                <SettingCheckbox
+                  icon={Bell}
+                  sectionLabel="Operating System Notifications"
+                  title="Enable OS Notifications"
+                  description="Show desktop notifications when tasks complete or require attention"
+                  checked={props.osNotificationsEnabled}
+                  onChange={props.setOsNotificationsEnabled}
+                  theme={theme}
+                />
                 <button
                   onClick={() => window.maestro.notification.show('Maestro', 'Test notification - notifications are working!')}
                   className="mt-2 px-3 py-1.5 rounded text-xs font-medium transition-all"
@@ -1310,30 +1262,15 @@ export const SettingsModal = memo(function SettingsModal(props: SettingsModalPro
 
               {/* Audio Feedback */}
               <div>
-                <label className="block text-xs font-bold opacity-70 uppercase mb-2 flex items-center gap-2">
-                  <Volume2 className="w-3 h-3" />
-                  Audio Feedback
-                </label>
-                <label
-                  className="flex items-center gap-3 p-3 rounded border cursor-pointer hover:bg-opacity-10"
-                  style={{ borderColor: theme.colors.border, backgroundColor: theme.colors.bgMain }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={props.audioFeedbackEnabled}
-                    onChange={(e) => props.setAudioFeedbackEnabled(e.target.checked)}
-                    className="w-4 h-4"
-                    style={{ accentColor: theme.colors.accent }}
-                  />
-                  <div className="flex-1">
-                    <div className="font-medium" style={{ color: theme.colors.textMain }}>
-                      Enable Audio Feedback
-                    </div>
-                    <div className="text-xs opacity-50 mt-0.5" style={{ color: theme.colors.textDim }}>
-                      Speak the one-sentence feedback synopsis from LLM analysis using text-to-speech
-                    </div>
-                  </div>
-                </label>
+                <SettingCheckbox
+                  icon={Volume2}
+                  sectionLabel="Audio Feedback"
+                  title="Enable Audio Feedback"
+                  description="Speak the one-sentence feedback synopsis from LLM analysis using text-to-speech"
+                  checked={props.audioFeedbackEnabled}
+                  onChange={props.setAudioFeedbackEnabled}
+                  theme={theme}
+                />
 
                 {/* Audio Command Configuration */}
                 <div className="mt-3">
