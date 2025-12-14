@@ -223,6 +223,8 @@ window.maestro.autorun.readDocument(folderPath, filename);
 window.maestro.autorun.saveDocument(folderPath, filename, content);
 ```
 
+**Worktree Support:** Auto Run can operate in a git worktree, allowing users to continue interactive editing in the main repo while Auto Run processes tasks in the background. When `batchRunState.worktreeActive` is true, read-only mode is disabled and a git branch icon appears in the UI. See `useBatchProcessor.ts` for worktree setup logic.
+
 ## Code Conventions
 
 ### TypeScript

@@ -398,14 +398,22 @@ Save your batch configurations for reuse:
 
 ### Git Worktree Support
 
-For parallel work without file conflicts:
+Git worktrees allow Auto Run to operate in an isolated directory while you continue working interactively in the main repository—no read-only restrictions, no waiting.
 
+**Setup:**
 1. Enable **Worktree** in the Batch Runner Modal
-2. Specify a worktree path and branch name
-3. Auto Run operates in the isolated worktree
-4. Optionally create a PR when the batch completes
+2. Select a **Worktree Directory** (base folder for all worktrees)
+3. Enter a **Branch Name** (becomes the worktree subdirectory)
+4. The computed path shows where the worktree will be created
+5. Optionally enable **Create PR on completion** to auto-open a pull request
 
-Without a worktree, Auto Run queues with other write operations to prevent conflicts.
+**Benefits:**
+- **Continue working** in the main repo while Auto Run processes tasks in the background
+- **No read-only mode** — the yellow border and input lock only appear when running without a worktree
+- **Visual indicator** — a git branch icon appears in the AUTO badge, right panel, and status pill when using a worktree
+- **Automatic PR creation** — when enabled, opens a PR from the worktree branch to your target branch
+
+**Without a worktree:** Auto Run queues with other write operations to prevent conflicts, and the editor enters read-only mode until completion.
 
 ### Progress Tracking
 
