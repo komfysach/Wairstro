@@ -58,6 +58,7 @@ import { useInputProcessing, DEFAULT_IMAGE_ONLY_PROMPT } from './hooks/useInputP
 // Import contexts
 import { useLayerStack } from './contexts/LayerStackContext';
 import { useToast } from './contexts/ToastContext';
+import { GitStatusProvider } from './contexts/GitStatusContext';
 import { ToastContainer } from './components/Toast';
 
 // Import services
@@ -4294,6 +4295,7 @@ export default function MaestroConsole() {
   }, [activeFocus, activeRightTab, flatFileList, selectedFileIndex, activeSession?.fileExplorerExpanded, activeSessionId, setSessions, toggleFolder, handleFileClick, hasOpenModal]);
 
   return (
+    <GitStatusProvider sessions={sessions} activeSessionId={activeSessionId}>
       <div className={`flex h-screen w-full font-mono overflow-hidden transition-colors duration-300 ${isMobileLandscape ? 'pt-0' : 'pt-10'}`}
            style={{
              backgroundColor: theme.colors.bgMain,
@@ -5718,6 +5720,7 @@ export default function MaestroConsole() {
       {/* --- TOAST NOTIFICATIONS --- */}
       <ToastContainer theme={theme} onSessionClick={handleToastSessionClick} />
       </div>
+    </GitStatusProvider>
   );
 }
 

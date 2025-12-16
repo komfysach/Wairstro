@@ -10,7 +10,8 @@ import { CONDUCTOR_BADGES, getBadgeForTime } from '../constants/conductorBadges'
 import { getStatusColor, getContextColor, formatActiveTime } from '../utils/theme';
 import { formatShortcutKeys } from '../utils/shortcutFormatter';
 import { SessionItem } from './SessionItem';
-import { useGitStatusPolling, useLiveOverlay, useClickOutside } from '../hooks';
+import { useLiveOverlay, useClickOutside } from '../hooks';
+import { useGitStatus } from '../contexts/GitStatusContext';
 
 // ============================================================================
 // SessionContextMenu - Right-click context menu for session items
@@ -439,8 +440,14 @@ export function SessionList(props: SessionListProps) {
     return () => window.removeEventListener('tour:action', handleTourAction);
   }, []);
 
-  // Track git file change counts per session using extracted hook
-  const { gitFileCounts } = useGitStatusPolling(sessions);
+  // Get git file change counts per session from centralized context
+  // The context is provided by GitStatusProvider in App.tsx and handles all git polling
+  const { gitStatusMap } = useGitStatus();
+  // Create a simple Map<sessionId, fileCount> for backward compatibility with existing code
+  const gitFileCounts = new Map<string, number>();
+  gitStatusMap.forEach((status, sessionId) => {
+    gitFileCounts.set(sessionId, status.fileCount);
+  });
 
   // Filter sessions based on search query (searches session name AND AI tab names)
   const filteredSessions = sessionFilter

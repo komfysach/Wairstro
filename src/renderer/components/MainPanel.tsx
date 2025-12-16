@@ -9,6 +9,7 @@ import { GitStatusWidget } from './GitStatusWidget';
 import { AgentSessionsBrowser } from './AgentSessionsBrowser';
 import { TabBar } from './TabBar';
 import { gitService } from '../services/git';
+import { useGitStatus } from '../contexts/GitStatusContext';
 import { getActiveTab, getBusyTabs } from '../utils/tabHelpers';
 import { formatShortcutKeys } from '../utils/shortcutFormatter';
 import type { Session, Theme, Shortcut, FocusArea, BatchRunState } from '../types';
@@ -270,84 +271,27 @@ export const MainPanel = forwardRef<MainPanelHandle, MainPanelProps>(function Ma
   // Responsive breakpoints for hiding widgets
   const showCostWidget = panelWidth > 500;
 
-  // Git info state
-  const [gitInfo, setGitInfo] = useState<{
-    branch: string;
-    remote: string;
-    behind: number;
-    ahead: number;
-    uncommittedChanges: number;
-  } | null>(null);
+  // Git status from centralized context (replaces local polling)
+  // The context handles polling for all sessions and provides detailed data for the active session
+  const { getStatus, refreshGitStatus } = useGitStatus();
+  const gitStatusData = activeSession ? getStatus(activeSession.id) : undefined;
+
+  // Derive gitInfo format from context data for backward compatibility with existing UI code
+  const gitInfo = gitStatusData && activeSession?.isGitRepo ? {
+    branch: gitStatusData.branch || '',
+    remote: gitStatusData.remote || '',
+    behind: gitStatusData.behind,
+    ahead: gitStatusData.ahead,
+    uncommittedChanges: gitStatusData.fileCount,
+  } : null;
 
   // Copy notification state (centered flash notice)
   const [copyNotification, setCopyNotification] = useState<string | null>(null);
 
-  // Fetch git info - extracted as a callback so it can be triggered manually
-  const fetchGitInfo = useCallback(async () => {
-    if (!activeSession?.isGitRepo) {
-      setGitInfo(null);
-      return;
-    }
-    try {
-      const cwd = activeSession.inputMode === 'terminal' ? (activeSession.shellCwd || activeSession.cwd) : activeSession.cwd;
-      const info = await window.maestro.git.info(cwd);
-      setGitInfo(info);
-    } catch (error) {
-      console.error('Failed to fetch git info:', error);
-      setGitInfo(null);
-    }
-  }, [activeSession?.isGitRepo, activeSession?.inputMode, activeSession?.shellCwd, activeSession?.cwd]);
-
   // Expose methods to parent via ref
   useImperativeHandle(ref, () => ({
-    refreshGitInfo: fetchGitInfo
-  }), [fetchGitInfo]);
-
-  // Fetch git info when session changes or becomes a git repo
-  // Pauses polling when window is hidden to save CPU
-  useEffect(() => {
-    if (!activeSession?.isGitRepo) {
-      setGitInfo(null);
-      return;
-    }
-
-    let interval: ReturnType<typeof setInterval> | null = null;
-
-    const startPolling = () => {
-      if (!interval) {
-        interval = setInterval(fetchGitInfo, 30000);
-      }
-    };
-
-    const stopPolling = () => {
-      if (interval) {
-        clearInterval(interval);
-        interval = null;
-      }
-    };
-
-    const handleVisibilityChange = () => {
-      if (document.hidden) {
-        stopPolling();
-      } else {
-        fetchGitInfo();
-        startPolling();
-      }
-    };
-
-    fetchGitInfo();
-
-    if (!document.hidden) {
-      startPolling();
-    }
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
-    return () => {
-      stopPolling();
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, [activeSession?.id, activeSession?.isGitRepo, fetchGitInfo]);
+    refreshGitInfo: refreshGitStatus
+  }), [refreshGitStatus]);
 
   // Cleanup hover timeouts on unmount
   useEffect(() => {
@@ -621,7 +565,7 @@ export const MainPanel = forwardRef<MainPanelHandle, MainPanelProps>(function Ma
 
               {/* Git Status Widget */}
               <GitStatusWidget
-                cwd={activeSession.inputMode === 'terminal' ? (activeSession.shellCwd || activeSession.cwd) : activeSession.cwd}
+                sessionId={activeSession.id}
                 isGitRepo={activeSession.isGitRepo}
                 theme={theme}
                 onViewDiff={handleViewGitDiff}

@@ -1,32 +1,34 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { GitBranch, Plus, Minus, FileEdit } from 'lucide-react';
 import type { Theme } from '../types';
-import { gitService } from '../services/git';
-
-interface GitFileChange {
-  path: string;
-  status: string;
-  additions: number;
-  deletions: number;
-  modified?: boolean;
-}
+import { useGitStatus, type GitFileChange } from '../contexts/GitStatusContext';
 
 interface GitStatusWidgetProps {
-  cwd: string;
+  /** Session ID to look up git status from context */
+  sessionId: string;
+  /** Whether this session is a git repo */
   isGitRepo: boolean;
   theme: Theme;
   onViewDiff: () => void;
 }
 
-export function GitStatusWidget({ cwd, isGitRepo, theme, onViewDiff }: GitStatusWidgetProps) {
-  const [fileChanges, setFileChanges] = useState<GitFileChange[]>([]);
-  const [additions, setAdditions] = useState(0);
-  const [deletions, setDeletions] = useState(0);
-  const [modified, setModified] = useState(0);
-  const [loading, setLoading] = useState(false);
+/**
+ * GitStatusWidget - Displays git file changes with GitHub-style diff bars
+ *
+ * Consumes git status data from the centralized GitStatusContext instead of
+ * polling independently. This reduces redundant git process spawns.
+ *
+ * The context provides detailed file changes (with line additions/deletions)
+ * only for the active session. Non-active sessions will show basic file counts.
+ */
+export function GitStatusWidget({ sessionId, isGitRepo, theme, onViewDiff }: GitStatusWidgetProps) {
   // Tooltip hover state with timeout for smooth UX
   const [tooltipOpen, setTooltipOpen] = useState(false);
   const tooltipTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Get git status from centralized context
+  const { getStatus } = useGitStatus();
+  const statusData = getStatus(sessionId);
 
   // Cleanup hover timeout on unmount
   useEffect(() => {
@@ -37,129 +39,16 @@ export function GitStatusWidget({ cwd, isGitRepo, theme, onViewDiff }: GitStatus
     };
   }, []);
 
-  useEffect(() => {
-    if (!isGitRepo) {
-      setFileChanges([]);
-      setAdditions(0);
-      setDeletions(0);
-      setModified(0);
-      return;
-    }
-
-    const loadGitStatus = async () => {
-      setLoading(true);
-      try {
-        const [status, numstat] = await Promise.all([
-          gitService.getStatus(cwd),
-          gitService.getNumstat(cwd)
-        ]);
-
-        // Create a map of path -> numstat data
-        const numstatMap = new Map<string, { additions: number; deletions: number }>();
-        numstat.files.forEach(file => {
-          numstatMap.set(file.path, { additions: file.additions, deletions: file.deletions });
-        });
-
-        // Parse porcelain format and merge with numstat
-        const changes: GitFileChange[] = [];
-        let totalAdds = 0;
-        let totalDels = 0;
-        let totalMods = 0;
-
-        status.files.forEach(file => {
-          const statusCode = file.status.trim();
-          const indexStatus = statusCode[0];
-          const workingStatus = statusCode[1] || ' ';
-          const stats = numstatMap.get(file.path) || { additions: 0, deletions: 0 };
-
-          const change: GitFileChange = {
-            path: file.path,
-            status: statusCode,
-            additions: stats.additions,
-            deletions: stats.deletions,
-            modified: false
-          };
-
-          // Accumulate totals
-          totalAdds += stats.additions;
-          totalDels += stats.deletions;
-
-          // Check for modifications
-          if (indexStatus === 'M' || workingStatus === 'M' || indexStatus === 'R' || workingStatus === 'R') {
-            change.modified = true;
-            totalMods++;
-          }
-
-          // Count additions and deletions for the summary
-          if (indexStatus === 'A' || indexStatus === '?' || workingStatus === 'A' || workingStatus === '?') {
-            // New file
-          }
-
-          if (indexStatus === 'D' || workingStatus === 'D') {
-            // Deleted file
-          }
-
-          changes.push(change);
-        });
-
-        setFileChanges(changes);
-        setAdditions(totalAdds);
-        setDeletions(totalDels);
-        setModified(totalMods);
-      } catch (error) {
-        console.error('Failed to load git status:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadGitStatus();
-
-    // Refresh every 30 seconds (reduced from 5s to save CPU)
-    // Also pause polling when window is hidden
-    let interval: ReturnType<typeof setInterval> | null = null;
-
-    const startPolling = () => {
-      if (!interval) {
-        interval = setInterval(loadGitStatus, 30000);
-      }
-    };
-
-    const stopPolling = () => {
-      if (interval) {
-        clearInterval(interval);
-        interval = null;
-      }
-    };
-
-    const handleVisibilityChange = () => {
-      if (document.hidden) {
-        stopPolling();
-      } else {
-        // Refresh immediately when becoming visible, then resume polling
-        loadGitStatus();
-        startPolling();
-      }
-    };
-
-    // Start polling if visible
-    if (!document.hidden) {
-      startPolling();
-    }
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
-    return () => {
-      stopPolling();
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, [cwd, isGitRepo]);
-
-  // Don't render if not a git repo or no changes
-  if (!isGitRepo || fileChanges.length === 0) {
+  // Don't render if not a git repo or no status data or no changes
+  if (!isGitRepo || !statusData || statusData.fileCount === 0) {
     return null;
   }
 
+  // Use detailed file changes if available (active session), otherwise show basic counts
+  const fileChanges = statusData.fileChanges || [];
+  const additions = statusData.totalAdditions;
+  const deletions = statusData.totalDeletions;
+  const modified = statusData.modifiedCount;
   const totalChanges = additions + deletions + modified;
 
   return (
@@ -210,7 +99,7 @@ export function GitStatusWidget({ cwd, isGitRepo, theme, onViewDiff }: GitStatus
       </button>
 
       {/* Hover tooltip showing file list with GitHub-style diff bars */}
-      {tooltipOpen && (
+      {tooltipOpen && fileChanges.length > 0 && (
         <>
           {/* Invisible bridge to prevent hover gap */}
           <div
@@ -253,7 +142,7 @@ export function GitStatusWidget({ cwd, isGitRepo, theme, onViewDiff }: GitStatus
           Changed Files ({totalChanges}) • +{additions} −{deletions}
         </div>
         <div className="max-h-96 overflow-y-auto scrollbar-thin">
-          {fileChanges.map((file, idx) => {
+          {fileChanges.map((file: GitFileChange, idx: number) => {
             const total = file.additions + file.deletions;
             const maxBarWidth = 60; // Max width in pixels for the bar
             const additionsWidth = total > 0 ? (file.additions / total) * maxBarWidth : 0;

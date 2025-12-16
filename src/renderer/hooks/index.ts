@@ -50,7 +50,7 @@ export type { UseInputSyncReturn, UseInputSyncDeps } from './useInputSync';
 export type { UseSessionNavigationReturn, UseSessionNavigationDeps } from './useSessionNavigation';
 export type { UseAutoRunUndoReturn, UseAutoRunUndoDeps, UndoState } from './useAutoRunUndo';
 export type { UseAutoRunImageHandlingReturn, UseAutoRunImageHandlingDeps } from './useAutoRunImageHandling';
-export type { UseGitStatusPollingReturn, UseGitStatusPollingOptions } from './useGitStatusPolling';
+export type { UseGitStatusPollingReturn, UseGitStatusPollingOptions, GitStatusData, GitFileChange } from './useGitStatusPolling';
 export type { UseLiveOverlayReturn, TunnelStatus, UrlTab } from './useLiveOverlay';
 export type { UsePlaybookManagementReturn, UsePlaybookManagementDeps, PlaybookConfigState } from './usePlaybookManagement';
 export type { UseWorktreeValidationReturn, UseWorktreeValidationDeps } from './useWorktreeValidation';
