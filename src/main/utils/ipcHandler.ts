@@ -168,6 +168,43 @@ export function withErrorLogging<TArgs extends unknown[], TResult>(
 }
 
 /**
+ * Creates a simple IPC handler for use with ipcMain.handle() that just wraps
+ * the operation in try-catch and logs errors. Does not transform the return value.
+ *
+ * This is the ipcMain.handle() version of withErrorLogging - it strips the event
+ * argument before calling the handler.
+ *
+ * Usage:
+ * ```typescript
+ * ipcMain.handle('history:getAll', withIpcErrorLogging(
+ *   { context: '[History]', operation: 'getAll' },
+ *   async (projectPath?: string) => {
+ *     return historyManager.getAllEntries();
+ *   }
+ * ));
+ * ```
+ *
+ * @param options - Handler options including log context and operation name
+ * @param handler - Async handler function that receives IPC arguments (without event)
+ * @returns Wrapped handler function compatible with ipcMain.handle
+ */
+export function withIpcErrorLogging<TArgs extends unknown[], TResult>(
+  options: Pick<CreateHandlerOptions, 'context' | 'operation'>,
+  handler: (...args: TArgs) => Promise<TResult>
+): (_event: unknown, ...args: TArgs) => Promise<TResult> {
+  const { context, operation } = options;
+
+  return async (_event: unknown, ...args: TArgs): Promise<TResult> => {
+    try {
+      return await handler(...args);
+    } catch (error) {
+      logger.error(`${operation} error`, context, error);
+      throw error;
+    }
+  };
+}
+
+/**
  * Creates a wrapped IPC handler for use with ipcMain.handle().
  *
  * This is the same as createHandler but returns a function compatible with

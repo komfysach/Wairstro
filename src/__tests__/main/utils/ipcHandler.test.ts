@@ -12,6 +12,7 @@ import {
   createIpcHandler,
   createIpcDataHandler,
   withErrorLogging,
+  withIpcErrorLogging,
   requireProcessManager,
   requireDependency,
   type IpcResponse,
@@ -364,6 +365,115 @@ describe('ipcHandler.ts', () => {
         pid: 1234,
         status: 'running: npm start',
       });
+    });
+  });
+
+  describe('withIpcErrorLogging', () => {
+    it('should strip event argument and pass remaining args to handler', async () => {
+      const handler = withIpcErrorLogging(
+        { context: '[History]', operation: 'getAll' },
+        async (projectPath: string) => [`${projectPath}/entry1`, `${projectPath}/entry2`]
+      );
+
+      // ipcMain.handle passes (event, ...args), simulate this
+      const mockEvent = { sender: {} };
+      const result = await handler(mockEvent, '/test/project');
+
+      expect(result).toEqual(['/test/project/entry1', '/test/project/entry2']);
+    });
+
+    it('should return handler result directly (no wrapping)', async () => {
+      const handler = withIpcErrorLogging(
+        { context: '[Test]', operation: 'direct' },
+        async () => 'direct result'
+      );
+
+      const result = await handler({});
+
+      expect(result).toBe('direct result');
+    });
+
+    it('should handle multiple arguments after event', async () => {
+      const handler = withIpcErrorLogging(
+        { context: '[Test]', operation: 'multi' },
+        async (a: string, b: number, c: boolean) => ({ combined: `${a}-${b}-${c}` })
+      );
+
+      const result = await handler({}, 'str', 42, true);
+
+      expect(result).toEqual({ combined: 'str-42-true' });
+    });
+
+    it('should re-throw errors after logging', async () => {
+      const error = new Error('Operation failed');
+      const handler = withIpcErrorLogging(
+        { context: '[History]', operation: 'getAll' },
+        async () => {
+          throw error;
+        }
+      );
+
+      await expect(handler({})).rejects.toThrow('Operation failed');
+      expect(logger.error).toHaveBeenCalledWith('getAll error', '[History]', error);
+    });
+
+    it('should not log on success', async () => {
+      const handler = withIpcErrorLogging(
+        { context: '[Test]', operation: 'success' },
+        async () => 'ok'
+      );
+
+      await handler({});
+
+      expect(logger.info).not.toHaveBeenCalled();
+      expect(logger.error).not.toHaveBeenCalled();
+    });
+
+    it('should preserve complex return types', async () => {
+      interface HistoryEntry {
+        id: string;
+        timestamp: number;
+        summary: string;
+      }
+
+      const handler = withIpcErrorLogging<[string], HistoryEntry[]>(
+        { context: '[History]', operation: 'getEntries' },
+        async (sessionId: string) => [
+          { id: '1', timestamp: Date.now(), summary: `Entry for ${sessionId}` },
+          { id: '2', timestamp: Date.now(), summary: 'Second entry' },
+        ]
+      );
+
+      const result = await handler({}, 'session-123');
+
+      expect(result).toHaveLength(2);
+      expect(result[0].summary).toBe('Entry for session-123');
+    });
+
+    it('should handle no arguments after event', async () => {
+      const handler = withIpcErrorLogging(
+        { context: '[Test]', operation: 'noArgs' },
+        async () => ['item1', 'item2']
+      );
+
+      const result = await handler({});
+
+      expect(result).toEqual(['item1', 'item2']);
+    });
+
+    it('should handle optional arguments after event', async () => {
+      const handler = withIpcErrorLogging(
+        { context: '[History]', operation: 'clear' },
+        async (projectPath?: string, sessionId?: string) => {
+          if (sessionId) return `cleared session: ${sessionId}`;
+          if (projectPath) return `cleared project: ${projectPath}`;
+          return 'cleared all';
+        }
+      );
+
+      expect(await handler({})).toBe('cleared all');
+      expect(await handler({}, '/project/path')).toBe('cleared project: /project/path');
+      expect(await handler({}, '/project/path', 'session-1')).toBe('cleared session: session-1');
     });
   });
 
