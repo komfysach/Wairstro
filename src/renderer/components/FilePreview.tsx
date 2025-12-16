@@ -864,6 +864,10 @@ export function FilePreview({ file, onClose, theme, markdownEditMode, setMarkdow
       e.stopPropagation();
       setMarkdownEditMode(!markdownEditMode);
     } else if (e.key === 'ArrowUp') {
+      // In edit mode, let the textarea handle arrow keys for cursor movement
+      // Only intercept when NOT in edit mode (preview/code view)
+      if (isMarkdown && markdownEditMode) return;
+
       e.preventDefault();
       const container = contentRef.current;
       if (!container) return;
@@ -879,6 +883,10 @@ export function FilePreview({ file, onClose, theme, markdownEditMode, setMarkdow
         container.scrollTop -= 40;
       }
     } else if (e.key === 'ArrowDown') {
+      // In edit mode, let the textarea handle arrow keys for cursor movement
+      // Only intercept when NOT in edit mode (preview/code view)
+      if (isMarkdown && markdownEditMode) return;
+
       e.preventDefault();
       const container = contentRef.current;
       if (!container) return;
@@ -1241,6 +1249,64 @@ export function FilePreview({ file, onClose, theme, markdownEditMode, setMarkdow
                 e.preventDefault();
                 e.stopPropagation();
                 setMarkdownEditMode(false);
+              }
+              // Handle Cmd+Up: Move cursor to beginning of document
+              else if (e.key === 'ArrowUp' && (e.metaKey || e.ctrlKey)) {
+                e.preventDefault();
+                const textarea = e.currentTarget;
+                textarea.setSelectionRange(0, 0);
+                textarea.scrollTop = 0;
+              }
+              // Handle Cmd+Down: Move cursor to end of document
+              else if (e.key === 'ArrowDown' && (e.metaKey || e.ctrlKey)) {
+                e.preventDefault();
+                const textarea = e.currentTarget;
+                const len = textarea.value.length;
+                textarea.setSelectionRange(len, len);
+                textarea.scrollTop = textarea.scrollHeight;
+              }
+              // Handle Opt+Up: Page up (move cursor up by roughly a page)
+              else if (e.key === 'ArrowUp' && e.altKey) {
+                e.preventDefault();
+                const textarea = e.currentTarget;
+                const lineHeight = parseInt(getComputedStyle(textarea).lineHeight) || 24;
+                const linesPerPage = Math.floor(textarea.clientHeight / lineHeight);
+                const lines = textarea.value.substring(0, textarea.selectionStart).split('\n');
+                const currentLine = lines.length - 1;
+                const targetLine = Math.max(0, currentLine - linesPerPage);
+                // Calculate new cursor position
+                let newPos = 0;
+                for (let i = 0; i < targetLine; i++) {
+                  newPos += lines[i].length + 1; // +1 for newline
+                }
+                // Preserve column position if possible
+                const currentCol = lines[currentLine].length - (lines[currentLine].length - (textarea.selectionStart - (newPos - (currentLine > 0 ? 1 : 0))));
+                const targetLineText = textarea.value.split('\n')[targetLine] || '';
+                newPos = textarea.value.split('\n').slice(0, targetLine).join('\n').length + (targetLine > 0 ? 1 : 0);
+                newPos += Math.min(currentCol, targetLineText.length);
+                textarea.setSelectionRange(newPos, newPos);
+                // Scroll to show the cursor
+                textarea.scrollTop -= textarea.clientHeight;
+              }
+              // Handle Opt+Down: Page down (move cursor down by roughly a page)
+              else if (e.key === 'ArrowDown' && e.altKey) {
+                e.preventDefault();
+                const textarea = e.currentTarget;
+                const lineHeight = parseInt(getComputedStyle(textarea).lineHeight) || 24;
+                const linesPerPage = Math.floor(textarea.clientHeight / lineHeight);
+                const allLines = textarea.value.split('\n');
+                const textBeforeCursor = textarea.value.substring(0, textarea.selectionStart);
+                const currentLine = textBeforeCursor.split('\n').length - 1;
+                const targetLine = Math.min(allLines.length - 1, currentLine + linesPerPage);
+                // Calculate column position in current line
+                const linesBeforeCurrent = textBeforeCursor.split('\n');
+                const currentCol = linesBeforeCurrent[linesBeforeCurrent.length - 1].length;
+                // Calculate new cursor position
+                let newPos = allLines.slice(0, targetLine).join('\n').length + (targetLine > 0 ? 1 : 0);
+                newPos += Math.min(currentCol, allLines[targetLine].length);
+                textarea.setSelectionRange(newPos, newPos);
+                // Scroll to show the cursor
+                textarea.scrollTop += textarea.clientHeight;
               }
             }}
           />
