@@ -65,7 +65,7 @@ export function registerProcessHandlers(deps: ProcessHandlerDependencies): void 
   const { getProcessManager, getAgentDetector, agentConfigsStore, settingsStore } = deps;
 
   // Spawn a new process for a session
-  // Supports agent-specific argument builders for batch mode, JSON output, resume, and read-only mode
+  // Supports agent-specific argument builders for batch mode, JSON output, resume, read-only mode, YOLO mode
   ipcMain.handle(
     'process:spawn',
     withIpcErrorLogging(handlerOpts('spawn'), async (config: {
@@ -81,6 +81,7 @@ export function registerProcessHandlers(deps: ProcessHandlerDependencies): void 
       agentSessionId?: string;  // For session resume
       readOnlyMode?: boolean;   // For read-only/plan mode
       modelId?: string;         // For model selection
+      yoloMode?: boolean;       // For YOLO/full-access mode (bypasses confirmations)
     }) => {
       const processManager = requireProcessManager(getProcessManager);
       const agentDetector = requireDependency(getAgentDetector, 'Agent detector');
@@ -121,6 +122,20 @@ export function registerProcessHandlers(deps: ProcessHandlerDependencies): void 
         if (config.modelId && agent.modelArgs) {
           const modelArgArray = agent.modelArgs(config.modelId);
           finalArgs = [...finalArgs, ...modelArgArray];
+        }
+
+        // Add YOLO mode args if yoloMode is true (bypasses all confirmations)
+        // Note: For Claude Code, YOLO mode is always enabled via base args
+        // For Codex, this adds --dangerously-bypass-approvals-and-sandbox
+        if (config.yoloMode && agent.yoloModeArgs) {
+          finalArgs = [...finalArgs, ...agent.yoloModeArgs];
+        }
+
+        // Add working directory args for agents that support it
+        // For Codex, this adds -C <dir> to set the working directory
+        if (agent.workingDirArgs && config.cwd) {
+          const workingDirArgArray = agent.workingDirArgs(config.cwd);
+          finalArgs = [...finalArgs, ...workingDirArgArray];
         }
       }
 
@@ -166,6 +181,7 @@ export function registerProcessHandlers(deps: ProcessHandlerDependencies): void 
         shell: shellToUse,
         ...(agentSessionId && { agentSessionId }),
         ...(config.readOnlyMode && { readOnlyMode: true }),
+        ...(config.yoloMode && { yoloMode: true }),
         ...(config.modelId && { modelId: config.modelId }),
         ...(config.prompt && { prompt: config.prompt.length > 500 ? config.prompt.substring(0, 500) + '...' : config.prompt })
       });

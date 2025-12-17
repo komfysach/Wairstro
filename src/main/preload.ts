@@ -14,6 +14,7 @@ interface ProcessConfig {
   agentSessionId?: string;  // For session resume (uses agent's resumeArgs builder)
   readOnlyMode?: boolean;   // For read-only/plan mode (uses agent's readOnlyArgs)
   modelId?: string;         // For model selection (uses agent's modelArgs builder)
+  yoloMode?: boolean;       // For YOLO/full-access mode (uses agent's yoloModeArgs)
 }
 
 /**

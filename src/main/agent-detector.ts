@@ -69,13 +69,18 @@ const AGENT_DEFINITIONS: Omit<AgentConfig, 'available' | 'path' | 'capabilities'
     args: [], // Base args (none for Codex - batch mode uses 'exec' subcommand)
     // Codex CLI argument builders
     // Batch mode: codex exec --json [--sandbox read-only|workspace-write] [resume <id>] "prompt"
-    // Note: YOLO mode is not included by default - Codex defaults to workspace-write sandbox
+    // Sandbox modes:
+    //   - Default: workspace-write (can write in project directory)
+    //   - Read-only: read-only (can only read files)
+    //   - YOLO: --dangerously-bypass-approvals-and-sandbox (full system access)
     batchModePrefix: ['exec'], // Codex uses 'exec' subcommand for batch mode
     jsonOutputArgs: ['--json'], // JSON output format (must come before resume subcommand)
     resumeArgs: (sessionId: string) => ['resume', sessionId], // Resume with session/thread ID
     readOnlyArgs: ['--sandbox', 'read-only'], // Read-only/plan mode
     yoloModeArgs: ['--dangerously-bypass-approvals-and-sandbox'], // Full access mode
     workingDirArgs: (dir: string) => ['-C', dir], // Set working directory
+    // Note: Codex CLI defaults to --sandbox workspace-write, so no explicit arg needed for default mode
+    // The sandbox mode is determined by readOnlyMode and yoloMode flags in process handler
   },
   {
     id: 'gemini-cli',
