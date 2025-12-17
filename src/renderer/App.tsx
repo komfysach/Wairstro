@@ -34,6 +34,7 @@ import { MaestroWizard, useWizard, WizardResumeModal, SerializableWizardState, A
 import { TourOverlay } from './components/Wizard/tour';
 import { CONDUCTOR_BADGES, getBadgeForTime } from './constants/conductorBadges';
 import { EmptyStateView } from './components/EmptyStateView';
+import { AgentErrorModal } from './components/AgentErrorModal';
 
 // Import custom hooks
 import { useBatchProcessor } from './hooks/useBatchProcessor';
@@ -54,6 +55,7 @@ import { useCliActivityMonitoring } from './hooks/useCliActivityMonitoring';
 import { useThemeStyles } from './hooks/useThemeStyles';
 import { useSortedSessions, compareNamesIgnoringEmojis } from './hooks/useSortedSessions';
 import { useInputProcessing, DEFAULT_IMAGE_ONLY_PROMPT } from './hooks/useInputProcessing';
+import { useAgentErrorRecovery } from './hooks/useAgentErrorRecovery';
 
 // Import contexts
 import { useLayerStack } from './contexts/LayerStackContext';
@@ -67,7 +69,8 @@ import { gitService } from './services/git';
 // Import types and constants
 import type {
   ToolType, SessionState, RightPanelTab,
-  FocusArea, LogEntry, Session, Group, AITab, UsageStats, QueuedItem, BatchRunConfig
+  FocusArea, LogEntry, Session, Group, AITab, UsageStats, QueuedItem, BatchRunConfig,
+  AgentError
 } from './types';
 import { THEMES } from './constants/themes';
 import { generateId } from './utils/ids';
@@ -327,6 +330,9 @@ export default function MaestroConsole() {
   // Wizard Resume Modal State
   const [wizardResumeModalOpen, setWizardResumeModalOpen] = useState(false);
   const [wizardResumeState, setWizardResumeState] = useState<SerializableWizardState | null>(null);
+
+  // Agent Error Modal State - tracks which session has an active error being shown
+  const [agentErrorModalSessionId, setAgentErrorModalSessionId] = useState<string | null>(null);
 
   // Tab Switcher Modal State
   const [tabSwitcherOpen, setTabSwitcherOpen] = useState(false);
@@ -1396,9 +1402,57 @@ export default function MaestroConsole() {
         totalInputTokens: usageStats.inputTokens,
         totalOutputTokens: usageStats.outputTokens,
         totalCacheReadTokens: usageStats.cacheReadInputTokens,
-        totalCacheCreationTokens: usageStats.cacheCreationInputTokens,
+        totalCacheCreationInputTokens: usageStats.cacheCreationInputTokens,
         totalCostUsd: usageStats.totalCostUsd,
       });
+    });
+
+    // Handle agent errors (auth expired, token exhaustion, rate limits, crashes)
+    const unsubscribeAgentError = window.maestro.process.onAgentError((sessionId: string, error) => {
+      // Parse sessionId to get actual session ID (strip -ai-tabId or -ai suffix)
+      let actualSessionId: string;
+      const aiTabMatch = sessionId.match(/^(.+)-ai(?:-(.+))?$/);
+      if (aiTabMatch) {
+        actualSessionId = aiTabMatch[1];
+      } else if (sessionId.endsWith('-batch')) {
+        // Batch process errors - strip -batch suffix
+        actualSessionId = sessionId.replace(/-batch.*$/, '');
+      } else {
+        actualSessionId = sessionId;
+      }
+
+      console.log('[onAgentError] Agent error received:', {
+        rawSessionId: sessionId,
+        actualSessionId,
+        errorType: error.type,
+        message: error.message,
+        recoverable: error.recoverable,
+      });
+
+      // Cast error to AgentError type (IPC uses plain object)
+      const agentError: AgentError = {
+        type: error.type as AgentError['type'],
+        message: error.message,
+        recoverable: error.recoverable,
+        agentId: error.agentId,
+        sessionId: error.sessionId,
+        timestamp: error.timestamp,
+        raw: error.raw,
+      };
+
+      // Update session with error state
+      setSessions(prev => prev.map(s => {
+        if (s.id !== actualSessionId) return s;
+        return {
+          ...s,
+          agentError,
+          agentErrorPaused: true, // Block new operations until resolved
+          state: 'error' as SessionState,
+        };
+      }));
+
+      // Show the error modal for this session
+      setAgentErrorModalSessionId(actualSessionId);
     });
 
     // Cleanup listeners on unmount
@@ -1410,6 +1464,7 @@ export default function MaestroConsole() {
       unsubscribeStderr();
       unsubscribeCommandExit();
       unsubscribeUsage();
+      unsubscribeAgentError();
     };
   }, []);
 
@@ -1534,6 +1589,95 @@ export default function MaestroConsole() {
 
   // PERF: Memoize hasNoAgents check for SettingsModal (only depends on session count)
   const hasNoAgents = useMemo(() => sessions.length === 0, [sessions.length]);
+
+  // Get the session with the active error (for AgentErrorModal)
+  const errorSession = useMemo(() =>
+    agentErrorModalSessionId ? sessions.find(s => s.id === agentErrorModalSessionId) : null,
+    [agentErrorModalSessionId, sessions]
+  );
+
+  // Handler to clear agent error and resume operations
+  const handleClearAgentError = useCallback((sessionId: string) => {
+    setSessions(prev => prev.map(s => {
+      if (s.id !== sessionId) return s;
+      return {
+        ...s,
+        agentError: undefined,
+        agentErrorPaused: false,
+        state: 'idle' as SessionState,
+      };
+    }));
+    setAgentErrorModalSessionId(null);
+    // Notify main process to clear error state
+    window.maestro.agentError.clearError(sessionId).catch(err => {
+      console.error('Failed to clear agent error:', err);
+    });
+  }, []);
+
+  // Handler to start a new session (recovery action)
+  const handleStartNewSessionAfterError = useCallback((sessionId: string) => {
+    const session = sessions.find(s => s.id === sessionId);
+    if (!session) return;
+
+    // Clear the error state
+    handleClearAgentError(sessionId);
+
+    // Create a new tab in the session to start fresh
+    setSessions(prev => prev.map(s => {
+      if (s.id !== sessionId) return s;
+      const newTab = createTab();
+      return {
+        ...s,
+        aiTabs: [...s.aiTabs, newTab],
+        activeTabId: newTab.id,
+      };
+    }));
+
+    // Focus the input after creating new tab
+    setTimeout(() => inputRef.current?.focus(), 0);
+  }, [sessions, handleClearAgentError]);
+
+  // Handler to retry after error (recovery action)
+  const handleRetryAfterError = useCallback((sessionId: string) => {
+    // Clear the error state and let user retry manually
+    handleClearAgentError(sessionId);
+
+    // Focus the input for retry
+    setTimeout(() => inputRef.current?.focus(), 0);
+  }, [handleClearAgentError]);
+
+  // Handler to restart the agent (recovery action for crashes)
+  const handleRestartAgentAfterError = useCallback(async (sessionId: string) => {
+    const session = sessions.find(s => s.id === sessionId);
+    if (!session) return;
+
+    // Clear the error state
+    handleClearAgentError(sessionId);
+
+    // Kill any existing processes and respawn
+    try {
+      await window.maestro.process.kill(`${sessionId}-ai`);
+    } catch {
+      // Process may not exist
+    }
+
+    // The agent will be respawned when user sends next message
+    // Focus the input
+    setTimeout(() => inputRef.current?.focus(), 0);
+  }, [sessions, handleClearAgentError]);
+
+  // Use the agent error recovery hook to get recovery actions
+  const { recoveryActions } = useAgentErrorRecovery({
+    error: errorSession?.agentError,
+    agentId: errorSession?.toolType || 'claude-code',
+    sessionId: errorSession?.id || '',
+    onNewSession: errorSession ? () => handleStartNewSessionAfterError(errorSession.id) : undefined,
+    onRetry: errorSession ? () => handleRetryAfterError(errorSession.id) : undefined,
+    onClearError: errorSession ? () => handleClearAgentError(errorSession.id) : undefined,
+    onRestartAgent: errorSession ? () => handleRestartAgentAfterError(errorSession.id) : undefined,
+    // Note: onAuthenticate is handled by the default action in useAgentErrorRecovery which
+    // adds a "Use Terminal" option that guides users to run "claude login"
+  });
 
   // Tab completion hook for terminal mode
   const { getSuggestions: getTabCompletionSuggestions } = useTabCompletion(activeSession);
@@ -4558,6 +4702,19 @@ export default function MaestroConsole() {
         <UpdateCheckModal
           theme={theme}
           onClose={() => setUpdateCheckModalOpen(false)}
+        />
+      )}
+
+      {/* --- AGENT ERROR MODAL --- */}
+      {errorSession?.agentError && (
+        <AgentErrorModal
+          theme={theme}
+          error={errorSession.agentError}
+          agentName={errorSession.toolType === 'claude-code' ? 'Claude Code' : errorSession.toolType}
+          sessionName={errorSession.name}
+          recoveryActions={recoveryActions}
+          onDismiss={() => handleClearAgentError(errorSession.id)}
+          dismissible={errorSession.agentError.recoverable}
         />
       )}
 
