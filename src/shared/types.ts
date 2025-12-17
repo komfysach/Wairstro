@@ -41,7 +41,7 @@ export interface HistoryEntry {
   timestamp: number;
   summary: string;
   fullResponse?: string;
-  claudeSessionId?: string;
+  agentSessionId?: string;
   sessionName?: string;
   projectPath: string;
   sessionId?: string;

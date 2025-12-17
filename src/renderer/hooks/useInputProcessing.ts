@@ -184,7 +184,7 @@ export function useInputProcessing(deps: UseInputProcessingDeps): UseInputProces
               commandDescription: matchingCustomCommand.description,
               tabName:
                 activeTab?.name ||
-                (activeTab?.claudeSessionId ? activeTab.claudeSessionId.split('-')[0].toUpperCase() : 'New'),
+                (activeTab?.agentSessionId ? activeTab.agentSessionId.split('-')[0].toUpperCase() : 'New'),
               readOnlyMode: isReadOnlyMode,
             };
 
@@ -303,7 +303,7 @@ export function useInputProcessing(deps: UseInputProcessingDeps): UseInputProces
           images: [...stagedImages],
           tabName:
             activeTab?.name ||
-            (activeTab?.claudeSessionId ? activeTab.claudeSessionId.split('-')[0].toUpperCase() : 'New'),
+            (activeTab?.agentSessionId ? activeTab.agentSessionId.split('-')[0].toUpperCase() : 'New'),
           readOnlyMode: isReadOnlyMode,
         };
 
@@ -436,9 +436,9 @@ export function useInputProcessing(deps: UseInputProcessingDeps): UseInputProces
         }
 
         // Update the active tab's logs and state to 'busy' for write-mode tracking
-        // Also mark as awaitingSessionId if this is a new session (no claudeSessionId yet)
+        // Also mark as awaitingSessionId if this is a new session (no agentSessionId yet)
         // Set thinkingStartTime on the tab for accurate elapsed time tracking (especially for parallel tabs)
-        const isNewSession = !activeTab.claudeSessionId;
+        const isNewSession = !activeTab.agentSessionId;
         const updatedAiTabs = s.aiTabs.map((tab) =>
           tab.id === activeTab.id
             ? {
@@ -533,9 +533,9 @@ export function useInputProcessing(deps: UseInputProcessingDeps): UseInputProces
           if (!freshSession) throw new Error('Session not found');
 
           // Build spawn args with resume if we have a session ID
-          // Use the ACTIVE TAB's claudeSessionId (not the deprecated session-level one)
+          // Use the ACTIVE TAB's agentSessionId (not the deprecated session-level one)
           const freshActiveTab = getActiveTab(freshSession);
-          const tabClaudeSessionId = freshActiveTab?.claudeSessionId;
+          const tabClaudeSessionId = freshActiveTab?.agentSessionId;
           const isNewSession = !tabClaudeSessionId;
           // Check CURRENT session's Auto Run state (not any session's) and respect worktree bypass
           const currentSessionBatchState = getBatchState(activeSessionId);

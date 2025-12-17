@@ -836,7 +836,7 @@ export default function MaestroConsole() {
         groupName: string;
         projectName: string;
         duration: number;
-        claudeSessionId?: string;
+        agentSessionId?: string;
         tabName?: string;
         usageStats?: UsageStats;
         prompt?: string;
@@ -847,7 +847,7 @@ export default function MaestroConsole() {
       } | null = null;
       let queuedItemToProcess: { sessionId: string; item: QueuedItem } | null = null;
       // Track if we need to run synopsis after completion (for /commit and other AI commands)
-      let synopsisData: { sessionId: string; cwd: string; claudeSessionId: string; command: string; groupName: string; projectName: string; tabName?: string; tabId?: string } | null = null;
+      let synopsisData: { sessionId: string; cwd: string; agentSessionId: string; command: string; groupName: string; projectName: string; tabName?: string; tabId?: string } | null = null;
 
       if (isFromAi) {
         const currentSession = sessionsRef.current.find(s => s.id === actualSessionId);
@@ -908,10 +908,10 @@ export default function MaestroConsole() {
             summary = 'Completed successfully';
           }
 
-          // Get the completed tab's claudeSessionId for traceability
-          const claudeSessionId = completedTab?.claudeSessionId || currentSession.claudeSessionId;
-          // Get tab name: prefer tab's name, fallback to short UUID from claudeSessionId
-          const tabName = completedTab?.name || (claudeSessionId ? claudeSessionId.substring(0, 8).toUpperCase() : undefined);
+          // Get the completed tab's agentSessionId for traceability
+          const agentSessionId = completedTab?.agentSessionId || currentSession.agentSessionId;
+          // Get tab name: prefer tab's name, fallback to short UUID from agentSessionId
+          const tabName = completedTab?.name || (agentSessionId ? agentSessionId.substring(0, 8).toUpperCase() : undefined);
 
           toastData = {
             title,
@@ -919,7 +919,7 @@ export default function MaestroConsole() {
             groupName,
             projectName,
             duration,
-            claudeSessionId: claudeSessionId || undefined,
+            agentSessionId: agentSessionId || undefined,
             tabName,
             usageStats: currentSession.usageStats,
             prompt: lastUserLog?.text,
@@ -932,16 +932,16 @@ export default function MaestroConsole() {
           // Check if synopsis should be triggered:
           // 1. Tab has saveToHistory enabled, OR
           // 2. This was a custom AI command (pendingAICommandForSynopsis)
-          // Only trigger when queue is empty (final task complete) and we have a claudeSessionId
+          // Only trigger when queue is empty (final task complete) and we have a agentSessionId
           const shouldSynopsis = currentSession.executionQueue.length === 0 &&
-            (completedTab?.claudeSessionId || currentSession.claudeSessionId) &&
+            (completedTab?.agentSessionId || currentSession.agentSessionId) &&
             (completedTab?.saveToHistory || currentSession.pendingAICommandForSynopsis);
 
           if (shouldSynopsis) {
             synopsisData = {
               sessionId: actualSessionId,
               cwd: currentSession.cwd,
-              claudeSessionId: completedTab?.claudeSessionId || currentSession.claudeSessionId!,
+              agentSessionId: completedTab?.agentSessionId || currentSession.agentSessionId!,
               command: currentSession.pendingAICommandForSynopsis || 'Save to History',
               groupName,
               projectName,
@@ -1126,7 +1126,7 @@ export default function MaestroConsole() {
         setTimeout(() => {
           // Log agent completion for debugging and traceability
           window.maestro.logger.log('info', 'Agent process completed', 'App', {
-            claudeSessionId: toastData!.claudeSessionId,
+            agentSessionId: toastData!.agentSessionId,
             group: toastData!.groupName,
             project: toastData!.projectName,
             durationMs: toastData!.duration,
@@ -1153,7 +1153,7 @@ export default function MaestroConsole() {
               group: toastData!.groupName,
               project: toastData!.projectName,
               taskDuration: toastData!.duration,
-              claudeSessionId: toastData!.claudeSessionId,
+              agentSessionId: toastData!.agentSessionId,
               tabName: toastData!.tabName,
               sessionId: toastData!.sessionId,
               tabId: toastData!.tabId,
@@ -1171,7 +1171,7 @@ export default function MaestroConsole() {
         spawnBackgroundSynopsisRef.current(
           synopsisData.sessionId,
           synopsisData.cwd,
-          synopsisData.claudeSessionId,
+          synopsisData.agentSessionId,
           SYNOPSIS_PROMPT
         ).then(result => {
           const duration = Date.now() - startTime;
@@ -1181,7 +1181,7 @@ export default function MaestroConsole() {
             addHistoryEntryRef.current({
               type: 'USER',
               summary: result.response,
-              claudeSessionId: synopsisData!.claudeSessionId,
+              agentSessionId: synopsisData!.agentSessionId,
               usageStats: result.usageStats,
               sessionId: synopsisData!.sessionId,
               projectPath: synopsisData!.cwd,
@@ -1213,9 +1213,9 @@ export default function MaestroConsole() {
     });
 
     // Handle Claude session ID capture for interactive sessions only
-    const unsubscribeSessionId = window.maestro.process.onSessionId(async (sessionId: string, claudeSessionId: string) => {
+    const unsubscribeSessionId = window.maestro.process.onSessionId(async (sessionId: string, agentSessionId: string) => {
       // Ignore batch sessions - they have their own isolated session IDs that should NOT
-      // contaminate the interactive session's claudeSessionId
+      // contaminate the interactive session's agentSessionId
       if (sessionId.includes('-batch-')) {
         return;
       }
@@ -1241,7 +1241,7 @@ export default function MaestroConsole() {
 
         // Register this as a user-initiated Maestro session (batch sessions are filtered above)
         // Do NOT pass session name - names should only be set when user explicitly renames
-        window.maestro.claude.registerSessionOrigin(session.cwd, claudeSessionId, 'user')
+        window.maestro.claude.registerSessionOrigin(session.cwd, agentSessionId, 'user')
           .catch(err => console.error('[onSessionId] Failed to register session origin:', err));
 
         return prev.map(s => {
@@ -1257,7 +1257,7 @@ export default function MaestroConsole() {
 
           // Fallback: find awaiting tab or active tab (for legacy format)
           if (!targetTab) {
-            const awaitingTab = s.aiTabs?.find(tab => tab.awaitingSessionId && !tab.claudeSessionId);
+            const awaitingTab = s.aiTabs?.find(tab => tab.awaitingSessionId && !tab.agentSessionId);
             targetTab = awaitingTab || getActiveTab(s);
           }
 
@@ -1265,25 +1265,25 @@ export default function MaestroConsole() {
             // No tabs exist - this is a bug, sessions must have aiTabs
             // Still store at session-level for web API compatibility
             console.error('[onSessionId] No target tab found - session has no aiTabs, storing at session level only');
-            return { ...s, claudeSessionId };
+            return { ...s, agentSessionId };
           }
 
-          // Skip if this tab already has a claudeSessionId (prevent overwriting)
-          if (targetTab.claudeSessionId && targetTab.claudeSessionId !== claudeSessionId) {
+          // Skip if this tab already has a agentSessionId (prevent overwriting)
+          if (targetTab.agentSessionId && targetTab.agentSessionId !== agentSessionId) {
             return s;
           }
 
-          // Update the target tab's claudeSessionId, name (if not already set), and clear awaitingSessionId flag
+          // Update the target tab's agentSessionId, name (if not already set), and clear awaitingSessionId flag
           // Generate short UUID for display (first 8 chars, uppercase)
-          const shortUuid = claudeSessionId.substring(0, 8).toUpperCase();
+          const shortUuid = agentSessionId.substring(0, 8).toUpperCase();
           const updatedAiTabs = s.aiTabs.map(tab => {
             if (tab.id !== targetTab.id) return tab;
             // Only set name if it's still the default "New Session"
             const newName = (!tab.name || tab.name === 'New Session') ? shortUuid : tab.name;
-            return { ...tab, claudeSessionId, awaitingSessionId: false, name: newName };
+            return { ...tab, agentSessionId, awaitingSessionId: false, name: newName };
           });
 
-          return { ...s, aiTabs: updatedAiTabs, claudeSessionId }; // Also keep session-level for backwards compatibility
+          return { ...s, aiTabs: updatedAiTabs, agentSessionId }; // Also keep session-level for backwards compatibility
         });
       });
     });
@@ -1304,7 +1304,7 @@ export default function MaestroConsole() {
 
       setSessions(prev => prev.map(s => {
         if (s.id !== actualSessionId) return s;
-        return { ...s, claudeCommands: commands };
+        return { ...s, agentCommands: commands };
       }));
     });
 
@@ -1577,13 +1577,13 @@ export default function MaestroConsole() {
         prompt: cmd.prompt, // Include prompt for execution
       }));
     // Include Claude Code commands from the active session
-    const claudeCommands = (activeSession?.claudeCommands || []).map(cmd => ({
+    const agentCommands = (activeSession?.agentCommands || []).map(cmd => ({
       command: cmd.command,
       description: cmd.description,
       aiOnly: true, // Claude commands are only available in AI mode
     }));
-    return [...slashCommands, ...customCommandsAsSlash, ...claudeCommands];
-  }, [customAICommands, activeSession?.claudeCommands]);
+    return [...slashCommands, ...customCommandsAsSlash, ...agentCommands];
+  }, [customAICommands, activeSession?.agentCommands]);
 
   // Derive current input value and setter based on active session mode
   // For AI mode: use active tab's inputValue (stored per-tab)
@@ -2616,7 +2616,7 @@ export default function MaestroConsole() {
       const initialTabId = generateId();
       const initialTab: AITab = {
         id: initialTabId,
-        claudeSessionId: null,
+        agentSessionId: null,
         name: null,
         starred: false,
         logs: [],
@@ -2741,7 +2741,7 @@ export default function MaestroConsole() {
     const initialTabId = generateId();
     const initialTab: AITab = {
       id: initialTabId,
-      claudeSessionId: null,
+      agentSessionId: null,
       name: null,
       starred: false,
       logs: [],
@@ -2901,10 +2901,10 @@ export default function MaestroConsole() {
     setSessions(prev => prev.map(s => {
       if (s.id !== activeSession.id) return s;
       // Persist starred status to Claude session metadata (async, fire and forget)
-      if (tab.claudeSessionId) {
+      if (tab.agentSessionId) {
         window.maestro.claude.updateSessionStarred(
           s.cwd,
-          tab.claudeSessionId,
+          tab.agentSessionId,
           newStarred
         ).catch(err => console.error('Failed to persist tab starred:', err));
       }
@@ -3001,8 +3001,8 @@ export default function MaestroConsole() {
       const updated = prev.map(s => s.id === sessId ? { ...s, name: newName } : s);
       // Sync the session name to Claude session storage for searchability
       const session = updated.find(s => s.id === sessId);
-      if (session?.claudeSessionId && session.cwd) {
-        window.maestro.claude.updateSessionName(session.cwd, session.claudeSessionId, newName)
+      if (session?.agentSessionId && session.cwd) {
+        window.maestro.claude.updateSessionName(session.cwd, session.agentSessionId, newName)
           .catch(err => console.warn('[finishRenamingSession] Failed to sync session name:', err));
       }
       return updated;
@@ -3042,7 +3042,7 @@ export default function MaestroConsole() {
 
       console.log('[Remote] Found session:', {
         id: session.id,
-        claudeSessionId: session.claudeSessionId || 'none',
+        agentSessionId: session.agentSessionId || 'none',
         state: session.state,
         sessionInputMode: session.inputMode,
         effectiveInputMode,
@@ -3171,9 +3171,9 @@ export default function MaestroConsole() {
         }
 
         // Build spawn args with resume if we have a Claude session ID
-        // Use the ACTIVE TAB's claudeSessionId (not the deprecated session-level one)
+        // Use the ACTIVE TAB's agentSessionId (not the deprecated session-level one)
         const activeTab = getActiveTab(session);
-        const tabClaudeSessionId = activeTab?.claudeSessionId;
+        const tabClaudeSessionId = activeTab?.agentSessionId;
         const isReadOnly = activeTab?.readOnlyMode;
 
         // Filter out --dangerously-skip-permissions when read-only mode is active
@@ -3350,8 +3350,8 @@ export default function MaestroConsole() {
       if (!agent) throw new Error('Claude Code agent not found');
 
       // Build spawn args with resume if we have a session ID
-      // Use the TARGET TAB's claudeSessionId (not the active tab or deprecated session-level one)
-      const tabClaudeSessionId = targetTab?.claudeSessionId;
+      // Use the TARGET TAB's agentSessionId (not the active tab or deprecated session-level one)
+      const tabClaudeSessionId = targetTab?.agentSessionId;
       const isReadOnly = item.readOnlyMode || targetTab?.readOnlyMode;
 
       // Filter out --dangerously-skip-permissions when read-only mode is active
@@ -4362,7 +4362,7 @@ export default function MaestroConsole() {
               const activeTab = activeSession.aiTabs?.find(t => t.id === activeSession.activeTabId);
               if (activeTab) {
                 const tabLabel = activeTab.name ||
-                  (activeTab.claudeSessionId ? activeTab.claudeSessionId.split('-')[0].toUpperCase() : null);
+                  (activeTab.agentSessionId ? activeTab.agentSessionId.split('-')[0].toUpperCase() : null);
                 if (tabLabel) {
                   parts.push(tabLabel);
                 }
@@ -4418,7 +4418,7 @@ export default function MaestroConsole() {
             if (activeSession?.inputMode === 'ai' && activeSession.activeTabId) {
               const activeTab = activeSession.aiTabs?.find(t => t.id === activeSession.activeTabId);
               // Only allow rename if tab has an active Claude session
-              if (activeTab?.claudeSessionId) {
+              if (activeTab?.agentSessionId) {
                 setRenameTabId(activeTab.id);
                 setRenameTabInitialName(activeTab.name || '');
                 setRenameTabModalOpen(true);
@@ -4679,7 +4679,7 @@ export default function MaestroConsole() {
         <RenameTabModal
           theme={theme}
           initialName={renameTabInitialName}
-          claudeSessionId={activeSession?.aiTabs?.find(t => t.id === renameTabId)?.claudeSessionId}
+          agentSessionId={activeSession?.aiTabs?.find(t => t.id === renameTabId)?.agentSessionId}
           onClose={() => {
             setRenameTabModalOpen(false);
             setRenameTabId(null);
@@ -4688,18 +4688,18 @@ export default function MaestroConsole() {
             if (!activeSession || !renameTabId) return;
             setSessions(prev => prev.map(s => {
               if (s.id !== activeSession.id) return s;
-              // Find the tab to get its claudeSessionId for persistence
+              // Find the tab to get its agentSessionId for persistence
               const tab = s.aiTabs.find(t => t.id === renameTabId);
-              if (tab?.claudeSessionId) {
+              if (tab?.agentSessionId) {
                 // Persist name to Claude session metadata (async, fire and forget)
                 window.maestro.claude.updateSessionName(
                   s.cwd,
-                  tab.claudeSessionId,
+                  tab.agentSessionId,
                   newName || ''
                 ).catch(err => console.error('Failed to persist tab name:', err));
-                // Also update past history entries with this claudeSessionId
+                // Also update past history entries with this agentSessionId
                 window.maestro.history.updateSessionName(
-                  tab.claudeSessionId,
+                  tab.agentSessionId,
                   newName || ''
                 ).catch(err => console.error('Failed to update history session names:', err));
               }
@@ -4858,9 +4858,9 @@ export default function MaestroConsole() {
         setLogViewerOpen={setLogViewerOpen}
         setAgentSessionsOpen={setAgentSessionsOpen}
         setActiveClaudeSessionId={setActiveClaudeSessionId}
-        onResumeClaudeSession={(claudeSessionId: string, messages: LogEntry[], sessionName?: string, starred?: boolean) => {
+        onResumeClaudeSession={(agentSessionId: string, messages: LogEntry[], sessionName?: string, starred?: boolean) => {
           // Opens the Claude session as a new tab (or switches to existing tab if duplicate)
-          handleResumeSession(claudeSessionId, messages, sessionName, starred);
+          handleResumeSession(agentSessionId, messages, sessionName, starred);
         }}
         onNewClaudeSession={() => {
           // Create a fresh AI tab
@@ -4977,13 +4977,13 @@ export default function MaestroConsole() {
           if (isAIMode && activeTab) {
             // For AI mode, also delete from the Claude session JSONL file
             // This ensures the context is actually removed for future interactions
-            // Use the active tab's claudeSessionId, not the deprecated session-level one
-            const claudeSessionId = activeTab.claudeSessionId;
-            if (claudeSessionId && activeSession.cwd) {
+            // Use the active tab's agentSessionId, not the deprecated session-level one
+            const agentSessionId = activeTab.agentSessionId;
+            if (agentSessionId && activeSession.cwd) {
               // Delete asynchronously - don't block the UI update
               window.maestro.claude.deleteMessagePair(
                 activeSession.cwd,
-                claudeSessionId,
+                agentSessionId,
                 logId, // This is the UUID if loaded from Claude session
                 log.text // Fallback: match by content if UUID doesn't match
               ).then(result => {
@@ -5074,13 +5074,13 @@ export default function MaestroConsole() {
           // Update tab state
           setSessions(prev => prev.map(s => {
             if (s.id !== activeSession.id) return s;
-            // Find the tab to get its claudeSessionId for persistence
+            // Find the tab to get its agentSessionId for persistence
             const tab = s.aiTabs.find(t => t.id === tabId);
-            if (tab?.claudeSessionId) {
+            if (tab?.agentSessionId) {
               // Persist name to Claude session metadata (async, fire and forget)
               window.maestro.claude.updateSessionName(
                 s.cwd,
-                tab.claudeSessionId,
+                tab.agentSessionId,
                 newName || ''
               ).catch(err => console.error('Failed to persist tab name:', err));
             }
@@ -5122,18 +5122,18 @@ export default function MaestroConsole() {
             return { ...s, aiTabs: [tabToKeep], activeTabId: tabId };
           }));
         }}
-        onUpdateTabByClaudeSessionId={(claudeSessionId: string, updates: { name?: string | null; starred?: boolean }) => {
+        onUpdateTabByClaudeSessionId={(agentSessionId: string, updates: { name?: string | null; starred?: boolean }) => {
           // Update the AITab that matches this Claude session ID
           // This is called when a session is renamed or starred in the AgentSessionsBrowser
           if (!activeSession) return;
           setSessions(prev => prev.map(s => {
             if (s.id !== activeSession.id) return s;
-            const tabIndex = s.aiTabs.findIndex(tab => tab.claudeSessionId === claudeSessionId);
+            const tabIndex = s.aiTabs.findIndex(tab => tab.agentSessionId === agentSessionId);
             if (tabIndex === -1) return s; // Session not open as a tab
             return {
               ...s,
               aiTabs: s.aiTabs.map(tab =>
-                tab.claudeSessionId === claudeSessionId
+                tab.agentSessionId === agentSessionId
                   ? {
                       ...tab,
                       ...(updates.name !== undefined ? { name: updates.name } : {}),
@@ -5148,13 +5148,13 @@ export default function MaestroConsole() {
           if (!activeSession) return;
           setSessions(prev => prev.map(s => {
             if (s.id !== activeSession.id) return s;
-            // Find the tab to get its claudeSessionId for persistence
+            // Find the tab to get its agentSessionId for persistence
             const tab = s.aiTabs.find(t => t.id === tabId);
-            if (tab?.claudeSessionId) {
+            if (tab?.agentSessionId) {
               // Persist starred status to Claude session metadata (async, fire and forget)
               window.maestro.claude.updateSessionStarred(
                 s.cwd,
-                tab.claudeSessionId,
+                tab.agentSessionId,
                 starred
               ).catch(err => console.error('Failed to persist tab starred:', err));
             }
@@ -5450,9 +5450,9 @@ export default function MaestroConsole() {
               s.id === activeSession.id ? { ...s, activeTabId: tabId } : s
             ));
           }}
-          onNamedSessionSelect={(claudeSessionId, _projectPath, sessionName, starred) => {
+          onNamedSessionSelect={(agentSessionId, _projectPath, sessionName, starred) => {
             // Open a closed named session as a new tab - use handleResumeSession to properly load messages
-            handleResumeSession(claudeSessionId, [], sessionName, starred);
+            handleResumeSession(agentSessionId, [], sessionName, starred);
             // Focus input so user can start interacting immediately
             setActiveFocus('main');
             setTimeout(() => inputRef.current?.focus(), 50);

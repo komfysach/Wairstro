@@ -25,9 +25,9 @@ interface AgentSessionsBrowserProps {
   activeSession: Session | undefined;
   activeClaudeSessionId: string | null;
   onClose: () => void;
-  onResumeSession: (claudeSessionId: string, messages: LogEntry[], sessionName?: string, starred?: boolean) => void;
+  onResumeSession: (agentSessionId: string, messages: LogEntry[], sessionName?: string, starred?: boolean) => void;
   onNewSession: () => void;
-  onUpdateTab?: (claudeSessionId: string, updates: { name?: string | null; starred?: boolean }) => void;
+  onUpdateTab?: (agentSessionId: string, updates: { name?: string | null; starred?: boolean }) => void;
 }
 
 export function AgentSessionsBrowser({

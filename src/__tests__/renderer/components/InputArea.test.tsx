@@ -57,7 +57,7 @@ const createMockSession = (overrides: Partial<Session> = {}): Session => ({
   aiTabs: [{
     id: 'tab-1',
     logs: [],
-    claudeSessionId: null,
+    agentSessionId: null,
     lastActivityAt: 0,
     scrollTop: 0,
     busyStartTime: null,
@@ -72,7 +72,7 @@ const createMockSession = (overrides: Partial<Session> = {}): Session => ({
   activeTabId: 'tab-1',
   shellLogs: [],
   usageStats: { inputTokens: 0, outputTokens: 0, totalCost: 0 },
-  claudeSessionId: null,
+  agentSessionId: null,
   isGitRepo: false,
   fileTree: [],
   fileExplorerExpanded: [],

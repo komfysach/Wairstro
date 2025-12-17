@@ -57,7 +57,7 @@ const createMockGroup = (overrides: Partial<Group> = {}): Group => ({
 // Helper to create a mock AI tab
 const createMockAITab = (overrides: Partial<AITab> = {}): AITab => ({
   id: `tab-${Date.now()}-${Math.random()}`,
-  claudeSessionId: null,
+  agentSessionId: null,
   name: null,
   starred: false,
   logs: [],

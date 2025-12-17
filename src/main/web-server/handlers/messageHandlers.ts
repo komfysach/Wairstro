@@ -52,7 +52,7 @@ export interface WebClient {
 export interface SessionDetailForHandler {
   state: string;
   inputMode: string;
-  claudeSessionId?: string;
+  agentSessionId?: string;
 }
 
 /**
@@ -60,7 +60,7 @@ export interface SessionDetailForHandler {
  */
 export interface LiveSessionInfo {
   sessionId: string;
-  claudeSessionId?: string;
+  agentSessionId?: string;
   enabledAt: number;
 }
 
@@ -82,7 +82,7 @@ export interface MessageHandlerCallbacks {
     state: string;
     inputMode: string;
     cwd: string;
-    claudeSessionId?: string | null;
+    agentSessionId?: string | null;
     [key: string]: unknown;
   }>;
   getLiveSessionInfo: (sessionId: string) => LiveSessionInfo | undefined;
@@ -229,7 +229,7 @@ export class WebSocketMessageHandler {
     const effectiveMode = clientInputMode || sessionDetail.inputMode;
     const isAiMode = effectiveMode === 'ai';
     const mode = isAiMode ? 'AI' : 'CLI';
-    const claudeId = sessionDetail.claudeSessionId || 'none';
+    const claudeId = sessionDetail.agentSessionId || 'none';
 
     // Log all web interface commands prominently
     logger.info(`[Web Command] Mode: ${mode} | Session: ${sessionId}${isAiMode ? ` | Claude: ${claudeId}` : ''} | Message: ${command}`, LOG_CONTEXT);
@@ -380,7 +380,7 @@ export class WebSocketMessageHandler {
         const liveInfo = this.callbacks.getLiveSessionInfo!(s.id);
         return {
           ...s,
-          claudeSessionId: liveInfo?.claudeSessionId || s.claudeSessionId,
+          agentSessionId: liveInfo?.agentSessionId || s.agentSessionId,
           liveEnabledAt: liveInfo?.enabledAt,
           isLive: this.callbacks.isSessionLive!(s.id),
         };

@@ -76,7 +76,7 @@ export function useRemoteIntegration(deps: UseRemoteIntegrationDeps): UseRemoteI
 
       console.log('[Remote] Received command from web interface:', {
         maestroSessionId: sessionId,
-        claudeSessionId: targetSession?.claudeSessionId || 'none',
+        agentSessionId: targetSession?.agentSessionId || 'none',
         state: targetSession?.state || 'NOT_FOUND',
         sessionInputMode: targetSession?.inputMode || 'unknown',
         webInputMode: inputMode || 'not provided',
@@ -321,7 +321,7 @@ export function useRemoteIntegration(deps: UseRemoteIntegrationDeps): UseRemoteI
         // Broadcast to web clients
         const tabsForBroadcast = session.aiTabs.map(tab => ({
           id: tab.id,
-          claudeSessionId: tab.claudeSessionId,
+          agentSessionId: tab.agentSessionId,
           name: tab.name,
           starred: tab.starred,
           inputValue: tab.inputValue,

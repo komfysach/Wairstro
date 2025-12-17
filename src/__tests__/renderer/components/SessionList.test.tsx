@@ -2054,13 +2054,13 @@ describe('SessionList', () => {
   // ============================================================================
 
   describe('Claude Session Status', () => {
-    it('shows hollow indicator for claude type without claudeSessionId', () => {
+    it('shows hollow indicator for claude type without agentSessionId', () => {
       const sessions = [
         createMockSession({
           id: 's1',
           name: 'Claude Session',
           toolType: 'claude',
-          claudeSessionId: undefined,
+          agentSessionId: undefined,
         }),
       ];
       const props = createDefaultProps({
@@ -2075,13 +2075,13 @@ describe('SessionList', () => {
       expect(indicator).toBeInTheDocument();
     });
 
-    it('shows solid indicator for claude type with claudeSessionId', () => {
+    it('shows solid indicator for claude type with agentSessionId', () => {
       const sessions = [
         createMockSession({
           id: 's1',
           name: 'Claude Session',
           toolType: 'claude',
-          claudeSessionId: 'session-123',
+          agentSessionId: 'session-123',
         }),
       ];
       const props = createDefaultProps({
@@ -2102,7 +2102,7 @@ describe('SessionList', () => {
           id: 's1',
           name: 'Claude Session',
           toolType: 'claude',
-          claudeSessionId: undefined,
+          agentSessionId: undefined,
         }),
       ];
       const props = createDefaultProps({

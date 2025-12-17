@@ -197,15 +197,15 @@ export function registerHistoryHandlers(): void {
     )
   );
 
-  // Update sessionName for all entries matching a claudeSessionId (used when renaming tabs)
+  // Update sessionName for all entries matching a agentSessionId (used when renaming tabs)
   ipcMain.handle(
     'history:updateSessionName',
     withIpcErrorLogging(
       handlerOpts('updateSessionName'),
-      async (claudeSessionId: string, sessionName: string) => {
-        const count = historyManager.updateSessionNameByClaudeSessionId(claudeSessionId, sessionName);
+      async (agentSessionId: string, sessionName: string) => {
+        const count = historyManager.updateSessionNameByClaudeSessionId(agentSessionId, sessionName);
         logger.info(
-          `Updated sessionName for ${count} history entries with claudeSessionId ${claudeSessionId}`,
+          `Updated sessionName for ${count} history entries with agentSessionId ${agentSessionId}`,
           LOG_CONTEXT
         );
         return count;

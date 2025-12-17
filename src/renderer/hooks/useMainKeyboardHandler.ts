@@ -339,7 +339,7 @@ export function useMainKeyboardHandler(): UseMainKeyboardHandlerReturn {
           e.preventDefault();
           const activeTab = ctx.getActiveTab(ctx.activeSession);
           // Only allow rename if tab has an active Claude session
-          if (activeTab?.claudeSessionId) {
+          if (activeTab?.agentSessionId) {
             ctx.setRenameTabId(activeTab.id);
             ctx.setRenameTabInitialName(activeTab.name || '');
             ctx.setRenameTabModalOpen(true);

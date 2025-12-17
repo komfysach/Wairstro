@@ -131,7 +131,7 @@ interface ClaudeSessionOriginInfo {
   starred?: boolean;    // Whether the session is starred
 }
 interface ClaudeSessionOriginsData {
-  // Map of projectPath -> { claudeSessionId -> origin info }
+  // Map of projectPath -> { agentSessionId -> origin info }
   origins: Record<string, Record<string, ClaudeSessionOrigin | ClaudeSessionOriginInfo>>;
 }
 
@@ -199,7 +199,7 @@ function createWebServer(): WebServer {
       // Map aiTabs to web-safe format (strip logs to reduce payload)
       const aiTabs = s.aiTabs?.map((tab: any) => ({
         id: tab.id,
-        claudeSessionId: tab.claudeSessionId || null,
+        agentSessionId: tab.agentSessionId || null,
         name: tab.name || null,
         starred: tab.starred || false,
         inputValue: tab.inputValue || '',
@@ -221,7 +221,7 @@ function createWebServer(): WebServer {
         groupEmoji: group?.emoji || null,
         usageStats: s.usageStats || null,
         lastResponse,
-        claudeSessionId: s.claudeSessionId || null,
+        agentSessionId: s.agentSessionId || null,
         thinkingStartTime: s.thinkingStartTime || null,
         aiTabs,
         activeTabId: s.activeTabId || (aiTabs.length > 0 ? aiTabs[0].id : undefined),
@@ -256,7 +256,7 @@ function createWebServer(): WebServer {
       aiLogs,
       shellLogs: session.shellLogs || [],
       usageStats: session.usageStats,
-      claudeSessionId: session.claudeSessionId,
+      agentSessionId: session.agentSessionId,
       isGitRepo: session.isGitRepo,
       activeTabId: targetTabId,
     };
@@ -338,12 +338,12 @@ function createWebServer(): WebServer {
     // Look up the session to get Claude session ID for logging
     const sessions = sessionsStore.get('sessions', []);
     const session = sessions.find((s: any) => s.id === sessionId);
-    const claudeSessionId = session?.claudeSessionId || 'none';
+    const agentSessionId = session?.agentSessionId || 'none';
 
     // Forward to renderer - it will handle spawn, state, and everything else
     // This ensures web commands go through exact same code path as desktop commands
     // Pass inputMode so renderer uses the web's intended mode (avoids sync issues)
-    logger.info(`[Web → Renderer] Forwarding command | Maestro: ${sessionId} | Claude: ${claudeSessionId} | Mode: ${inputMode || 'auto'} | Command: ${command.substring(0, 100)}`, 'WebServer');
+    logger.info(`[Web → Renderer] Forwarding command | Maestro: ${sessionId} | Claude: ${agentSessionId} | Mode: ${inputMode || 'auto'} | Command: ${command.substring(0, 100)}`, 'WebServer');
     mainWindow.webContents.send('remote:executeCommand', sessionId, command, inputMode);
     return true;
   });
@@ -839,7 +839,7 @@ function setupIpcHandlers() {
   });
 
   // Live session management - toggle sessions as live/offline in web interface
-  ipcMain.handle('live:toggle', async (_, sessionId: string, claudeSessionId?: string) => {
+  ipcMain.handle('live:toggle', async (_, sessionId: string, agentSessionId?: string) => {
     if (!webServer) {
       throw new Error('Web server not initialized');
     }
@@ -866,8 +866,8 @@ function setupIpcHandlers() {
       return { live: false, url: null };
     } else {
       // Turn on live mode
-      logger.info(`Enabling live mode for session ${sessionId} (claude: ${claudeSessionId || 'none'})`, 'Live');
-      webServer.setSessionLive(sessionId, claudeSessionId);
+      logger.info(`Enabling live mode for session ${sessionId} (claude: ${agentSessionId || 'none'})`, 'Live');
+      webServer.setSessionLive(sessionId, agentSessionId);
       const url = webServer.getSessionUrl(sessionId);
       logger.info(`Session ${sessionId} is now live at ${url}`, 'Live');
       return { live: true, url };
@@ -1594,8 +1594,8 @@ function setupProcessListeners() {
       }
     });
 
-    processManager.on('session-id', (sessionId: string, claudeSessionId: string) => {
-      mainWindow?.webContents.send('process:session-id', sessionId, claudeSessionId);
+    processManager.on('session-id', (sessionId: string, agentSessionId: string) => {
+      mainWindow?.webContents.send('process:session-id', sessionId, agentSessionId);
     });
 
     // Handle slash commands from Claude Code init message

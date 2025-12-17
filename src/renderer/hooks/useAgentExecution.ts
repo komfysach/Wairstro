@@ -9,7 +9,7 @@ import { generateId } from '../utils/ids';
 export interface AgentSpawnResult {
   success: boolean;
   response?: string;
-  claudeSessionId?: string;
+  agentSessionId?: string;
   usageStats?: UsageStats;
 }
 
@@ -119,7 +119,7 @@ export function useAgentExecution(
 
       // Create a promise that resolves when the agent completes
       return new Promise((resolve) => {
-        let claudeSessionId: string | undefined;
+        let agentSessionId: string | undefined;
         let responseText = '';
         let taskUsageStats: UsageStats | undefined;
 
@@ -145,7 +145,7 @@ export function useAgentExecution(
 
         cleanupSessionId = window.maestro.process.onSessionId((sid: string, capturedId: string) => {
           if (sid === targetSessionId) {
-            claudeSessionId = capturedId;
+            agentSessionId = capturedId;
           }
         });
 
@@ -276,7 +276,7 @@ export function useAgentExecution(
                 const checkSession = sessionsRef.current.find(s => s.id === sessionId);
                 if (!checkSession || checkSession.state === 'idle' || checkSession.executionQueue.length === 0) {
                   // Queue drained or session idle - safe to continue batch
-                  resolve({ success: true, response: responseText, claudeSessionId, usageStats: taskUsageStats });
+                  resolve({ success: true, response: responseText, agentSessionId, usageStats: taskUsageStats });
                 } else {
                   // Queue still processing - check again
                   setTimeout(waitForQueueDrain, 100);
@@ -286,7 +286,7 @@ export function useAgentExecution(
               setTimeout(waitForQueueDrain, 50);
             } else {
               // No queued items or worktree mode - resolve immediately
-              resolve({ success: true, response: responseText, claudeSessionId, usageStats: taskUsageStats });
+              resolve({ success: true, response: responseText, agentSessionId, usageStats: taskUsageStats });
             }
           }
         });
@@ -345,7 +345,7 @@ export function useAgentExecution(
       const targetSessionId = `${sessionId}-synopsis-${Date.now()}`;
 
       return new Promise((resolve) => {
-        let claudeSessionId: string | undefined;
+        let agentSessionId: string | undefined;
         let responseText = '';
         let synopsisUsageStats: UsageStats | undefined;
 
@@ -369,7 +369,7 @@ export function useAgentExecution(
 
         cleanupSessionId = window.maestro.process.onSessionId((sid: string, capturedId: string) => {
           if (sid === targetSessionId) {
-            claudeSessionId = capturedId;
+            agentSessionId = capturedId;
           }
         });
 
@@ -395,7 +395,7 @@ export function useAgentExecution(
         cleanupExit = window.maestro.process.onExit((sid: string) => {
           if (sid === targetSessionId) {
             cleanup();
-            resolve({ success: true, response: responseText, claudeSessionId, usageStats: synopsisUsageStats });
+            resolve({ success: true, response: responseText, agentSessionId, usageStats: synopsisUsageStats });
           }
         });
 

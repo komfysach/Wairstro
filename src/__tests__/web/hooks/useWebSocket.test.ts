@@ -1064,7 +1064,7 @@ describe('useWebSocket', () => {
       const aiTabs: AITabData[] = [
         {
           id: 'tab-1',
-          claudeSessionId: 'claude-session-1',
+          agentSessionId: 'claude-session-1',
           name: 'Tab 1',
           starred: false,
           inputValue: '',
@@ -1073,7 +1073,7 @@ describe('useWebSocket', () => {
         },
         {
           id: 'tab-2',
-          claudeSessionId: 'claude-session-2',
+          agentSessionId: 'claude-session-2',
           name: 'Tab 2',
           starred: true,
           inputValue: 'test input',
@@ -2052,7 +2052,7 @@ describe('Type Exports', () => {
   it('exports AITabData interface correctly', () => {
     const tab: AITabData = {
       id: 'tab-1',
-      claudeSessionId: 'claude-123',
+      agentSessionId: 'claude-123',
       name: 'Test Tab',
       starred: true,
       inputValue: 'test input',

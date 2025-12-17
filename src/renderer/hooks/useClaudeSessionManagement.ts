@@ -11,7 +11,7 @@ export interface HistoryEntryInput {
   type: 'AUTO' | 'USER';
   summary: string;
   fullResponse?: string;
-  claudeSessionId?: string;
+  agentSessionId?: string;
   usageStats?: UsageStats;
   /** Optional override for background operations (prevents cross-agent bleed) */
   sessionId?: string;
@@ -57,10 +57,10 @@ export interface UseClaudeSessionManagementReturn {
   /** Ref to startNewClaudeSession for use in callbacks that need latest version */
   startNewClaudeSessionRef: React.MutableRefObject<(() => void) | null>;
   /** Jump to a specific Claude session in the browser */
-  handleJumpToClaudeSession: (claudeSessionId: string) => void;
+  handleJumpToClaudeSession: (agentSessionId: string) => void;
   /** Resume a Claude session, opening as a new tab or switching to existing */
   handleResumeSession: (
-    claudeSessionId: string,
+    agentSessionId: string,
     providedMessages?: LogEntry[],
     sessionName?: string,
     starred?: boolean
@@ -120,7 +120,7 @@ export function useClaudeSessionManagement(
       timestamp: Date.now(),
       summary: entry.summary,
       fullResponse: entry.fullResponse,
-      claudeSessionId: entry.claudeSessionId,
+      agentSessionId: entry.agentSessionId,
       sessionId: targetSessionId,
       sessionName: sessionName,
       projectPath: targetProjectPath,
@@ -160,7 +160,7 @@ export function useClaudeSessionManagement(
         : s.aiTabs;
       return {
         ...s,
-        claudeSessionId: undefined,
+        agentSessionId: undefined,
         aiLogs: [],
         state: 'idle' as SessionState,
         busySource: undefined,
@@ -174,10 +174,10 @@ export function useClaudeSessionManagement(
   /**
    * Jump to a specific Claude session in the agent sessions browser.
    */
-  const handleJumpToClaudeSession = useCallback((claudeSessionId: string) => {
+  const handleJumpToClaudeSession = useCallback((agentSessionId: string) => {
     // Set the Claude session ID and load its messages
     if (activeSession) {
-      setActiveClaudeSessionId(claudeSessionId);
+      setActiveClaudeSessionId(agentSessionId);
       // Open the agent sessions browser to show the selected session
       setAgentSessionsOpen(true);
     }
@@ -188,15 +188,15 @@ export function useClaudeSessionManagement(
    * Loads messages from the session and looks up metadata (starred, name).
    */
   const handleResumeSession = useCallback(async (
-    claudeSessionId: string,
+    agentSessionId: string,
     providedMessages?: LogEntry[],
     sessionName?: string,
     starred?: boolean
   ) => {
     if (!activeSession?.cwd) return;
 
-    // Check if a tab with this claudeSessionId already exists
-    const existingTab = activeSession.aiTabs?.find(tab => tab.claudeSessionId === claudeSessionId);
+    // Check if a tab with this agentSessionId already exists
+    const existingTab = activeSession.aiTabs?.find(tab => tab.agentSessionId === agentSessionId);
     if (existingTab) {
       // Switch to the existing tab instead of creating a duplicate
       setSessions(prev => prev.map(s =>
@@ -204,7 +204,7 @@ export function useClaudeSessionManagement(
           ? { ...s, activeTabId: existingTab.id, inputMode: 'ai' }
           : s
       ));
-      setActiveClaudeSessionId(claudeSessionId);
+      setActiveClaudeSessionId(agentSessionId);
       return;
     }
 
@@ -217,7 +217,7 @@ export function useClaudeSessionManagement(
         // Load the session messages
         const result = await window.maestro.claude.readSessionMessages(
           activeSession.cwd,
-          claudeSessionId,
+          agentSessionId,
           { offset: 0, limit: 100 }
         );
 
@@ -238,7 +238,7 @@ export function useClaudeSessionManagement(
         try {
           // Look up session metadata from Claude session origins (name and starred)
           const origins = await window.maestro.claude.getSessionOrigins(activeSession.cwd);
-          const originData = origins[claudeSessionId];
+          const originData = origins[agentSessionId];
           if (originData && typeof originData === 'object') {
             if (originData.sessionName) {
               name = originData.sessionName;
@@ -259,7 +259,7 @@ export function useClaudeSessionManagement(
 
         // Create tab from the CURRENT session state (not stale closure value)
         const { session: updatedSession } = createTab(s, {
-          claudeSessionId,
+          agentSessionId,
           logs: messages,
           name,
           starred: isStarred,
@@ -268,7 +268,7 @@ export function useClaudeSessionManagement(
 
         return { ...updatedSession, inputMode: 'ai' };
       }));
-      setActiveClaudeSessionId(claudeSessionId);
+      setActiveClaudeSessionId(agentSessionId);
     } catch (error) {
       console.error('Failed to resume session:', error);
     }

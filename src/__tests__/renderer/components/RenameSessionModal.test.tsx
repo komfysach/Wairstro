@@ -53,7 +53,7 @@ const createMockSessions = (): Session[] => [
     isGitRepo: false,
     fileTree: [],
     fileExplorerExpanded: [],
-    claudeSessionId: 'claude-123',
+    agentSessionId: 'claude-123',
   },
   {
     id: 'session-2',
@@ -540,7 +540,7 @@ describe('RenameSessionModal', () => {
   });
 
   describe('Claude Session Name Update', () => {
-    it('updates Claude session name when session has claudeSessionId and cwd', () => {
+    it('updates Claude session name when session has agentSessionId and cwd', () => {
       render(
         <TestWrapper>
           <RenameSessionModal
@@ -564,7 +564,7 @@ describe('RenameSessionModal', () => {
       );
     });
 
-    it('does not update Claude session name when session has no claudeSessionId', () => {
+    it('does not update Claude session name when session has no agentSessionId', () => {
       render(
         <TestWrapper>
           <RenameSessionModal

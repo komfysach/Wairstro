@@ -259,10 +259,10 @@ export interface OnboardingStats {
 }
 
 // AI Tab for multi-tab support within a Maestro session
-// Each tab represents a separate Claude Code conversation
+// Each tab represents a separate AI agent conversation (Claude Code, OpenCode, etc.)
 export interface AITab {
   id: string;                      // Unique tab ID (generated UUID)
-  claudeSessionId: string | null;  // Claude Code session UUID (null for new tabs)
+  agentSessionId: string | null;   // Agent session UUID (null for new tabs)
   name: string | null;             // User-defined name (null = show UUID octet)
   starred: boolean;                // Whether session is starred (for pill display)
   logs: LogEntry[];                // Conversation history
@@ -271,7 +271,7 @@ export interface AITab {
   usageStats?: UsageStats;         // Token usage for this tab
   createdAt: number;               // Timestamp for ordering
   state: 'idle' | 'busy';          // Tab-level state for write-mode tracking
-  readOnlyMode?: boolean;          // When true, Claude operates in plan/read-only mode
+  readOnlyMode?: boolean;          // When true, agent operates in plan/read-only mode
   saveToHistory?: boolean;         // When true, synopsis is requested after each completion and saved to History
   awaitingSessionId?: boolean;     // True when this tab sent a message and is awaiting its session ID
   thinkingStartTime?: number;      // Timestamp when tab started thinking (for elapsed time display)
@@ -330,9 +330,9 @@ export interface Session {
   // Command history (separate for each mode)
   aiCommandHistory?: string[];
   shellCommandHistory?: string[];
-  // Claude Code session ID for conversation continuity
-  // DEPRECATED: Use aiTabs[activeIndex].claudeSessionId instead
-  claudeSessionId?: string;
+  // Agent session ID for conversation continuity
+  // DEPRECATED: Use aiTabs[activeIndex].agentSessionId instead
+  agentSessionId?: string;
   // Pending jump path for /jump command (relative path within file tree)
   pendingJumpPath?: string;
   // Custom status message for the thinking indicator (e.g., "Agent is synopsizing...")
@@ -351,8 +351,8 @@ export interface Session {
   executionQueue: QueuedItem[];
   // Active time tracking - cumulative milliseconds of active use
   activeTimeMs: number;
-  // Claude Code slash commands available for this session (fetched per session based on cwd)
-  claudeCommands?: { command: string; description: string; }[];
+  // Agent slash commands available for this session (fetched per session based on cwd)
+  agentCommands?: { command: string; description: string; }[];
   // Bookmark flag - bookmarked sessions appear in a dedicated section at the top
   bookmarked?: boolean;
   // Pending AI command that will trigger a synopsis on completion (e.g., '/commit')

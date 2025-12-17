@@ -30,7 +30,7 @@ interface AgentSessionsModalProps {
   theme: Theme;
   activeSession: Session | undefined;
   onClose: () => void;
-  onResumeSession: (claudeSessionId: string) => void;
+  onResumeSession: (agentSessionId: string) => void;
 }
 
 export function AgentSessionsModal({

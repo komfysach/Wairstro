@@ -35,7 +35,7 @@ export interface UsageStats {
  */
 export interface AITabData {
   id: string;
-  claudeSessionId: string | null;
+  agentSessionId: string | null;
   name: string | null;
   starred: boolean;
   inputValue: string;
@@ -71,7 +71,7 @@ export interface SessionData {
   groupEmoji?: string | null;
   usageStats?: UsageStats | null;
   lastResponse?: LastResponsePreview | null;
-  claudeSessionId?: string | null;
+  agentSessionId?: string | null;
   thinkingStartTime?: number | null; // Timestamp when AI started thinking (for elapsed time display)
   aiTabs?: AITabData[];
   activeTabId?: string;

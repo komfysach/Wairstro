@@ -56,7 +56,7 @@ function createMockCallbacks(): MessageHandlerCallbacks {
     getSessionDetail: vi.fn().mockReturnValue({
       state: 'idle',
       inputMode: 'ai',
-      claudeSessionId: 'claude-123',
+      agentSessionId: 'claude-123',
     }),
     executeCommand: vi.fn().mockResolvedValue(true),
     switchMode: vi.fn().mockResolvedValue(true),
@@ -447,7 +447,7 @@ describe('WebSocketMessageHandler', () => {
     it('should return sessions list with live info', () => {
       (callbacks.getLiveSessionInfo as any).mockReturnValue({
         sessionId: 'session-1',
-        claudeSessionId: 'live-claude-456',
+        agentSessionId: 'live-claude-456',
         enabledAt: 123456789,
       });
       (callbacks.isSessionLive as any).mockReturnValue(true);
@@ -457,7 +457,7 @@ describe('WebSocketMessageHandler', () => {
       const response = JSON.parse((client.socket.send as any).mock.calls[0][0]);
       expect(response.type).toBe('sessions_list');
       expect(response.sessions).toHaveLength(1);
-      expect(response.sessions[0].claudeSessionId).toBe('live-claude-456');
+      expect(response.sessions[0].agentSessionId).toBe('live-claude-456');
       expect(response.sessions[0].isLive).toBe(true);
     });
   });

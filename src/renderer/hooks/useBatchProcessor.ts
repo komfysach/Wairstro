@@ -65,8 +65,8 @@ interface UseBatchProcessorProps {
   sessions: Session[];
   groups: Group[];
   onUpdateSession: (sessionId: string, updates: Partial<Session>) => void;
-  onSpawnAgent: (sessionId: string, prompt: string, cwdOverride?: string) => Promise<{ success: boolean; response?: string; claudeSessionId?: string; usageStats?: UsageStats }>;
-  onSpawnSynopsis: (sessionId: string, cwd: string, claudeSessionId: string, prompt: string) => Promise<{ success: boolean; response?: string }>;
+  onSpawnAgent: (sessionId: string, prompt: string, cwdOverride?: string) => Promise<{ success: boolean; response?: string; agentSessionId?: string; usageStats?: UsageStats }>;
+  onSpawnSynopsis: (sessionId: string, cwd: string, agentSessionId: string, prompt: string) => Promise<{ success: boolean; response?: string }>;
   onAddHistoryEntry: (entry: Omit<HistoryEntry, 'id'>) => void;
   onComplete?: (info: BatchCompleteInfo) => void;
   // Callback for PR creation results (success or failure)
@@ -586,7 +586,7 @@ ${docList}
     setCustomPrompts(prev => ({ ...prev, [sessionId]: prompt }));
 
     // Collect Claude session IDs and track completion
-    const claudeSessionIds: string[] = [];
+    const agentSessionIds: string[] = [];
     let totalCompletedTasks = 0;
     let loopIteration = 0;
 
@@ -772,11 +772,11 @@ ${docList}
             // Capture elapsed time
             const elapsedTimeMs = Date.now() - taskStartTime;
 
-            if (result.claudeSessionId) {
-              claudeSessionIds.push(result.claudeSessionId);
+            if (result.agentSessionId) {
+              agentSessionIds.push(result.agentSessionId);
               // Register as auto-initiated Maestro session
               // Use effectiveCwd (worktree path when active) so session can be found later
-              window.maestro.claude.registerSessionOrigin(effectiveCwd, result.claudeSessionId, 'auto')
+              window.maestro.claude.registerSessionOrigin(effectiveCwd, result.agentSessionId, 'auto')
                 .catch(err => console.error('[BatchProcessor] Failed to register session origin:', err));
             }
 
@@ -828,7 +828,7 @@ ${docList}
                 // Legacy fields
                 completedTasks: totalCompletedTasks,
                 currentTaskIndex: totalCompletedTasks,
-                sessionIds: [...(prev[sessionId]?.sessionIds || []), result.claudeSessionId || '']
+                sessionIds: [...(prev[sessionId]?.sessionIds || []), result.agentSessionId || '']
               }
             }));
 
@@ -836,14 +836,14 @@ ${docList}
             let shortSummary = `[${docEntry.filename}] Task completed`;
             let fullSynopsis = shortSummary;
 
-            if (result.success && result.claudeSessionId) {
+            if (result.success && result.agentSessionId) {
               // Request a synopsis from the agent by resuming the session
               // Use effectiveCwd (worktree path when active) to find the session
               try {
                 const synopsisResult = await onSpawnSynopsis(
                   sessionId,
                   effectiveCwd,
-                  result.claudeSessionId,
+                  result.agentSessionId,
                   BATCH_SYNOPSIS_PROMPT
                 );
 
@@ -867,7 +867,7 @@ ${docList}
               timestamp: Date.now(),
               summary: shortSummary,
               fullResponse: fullSynopsis,
-              claudeSessionId: result.claudeSessionId,
+              agentSessionId: result.agentSessionId,
               projectPath: effectiveCwd,
               sessionId: sessionId,
               success: result.success,
@@ -1352,7 +1352,7 @@ ${docList}
         completedTasks: 0,
         currentTaskIndex: 0,
         originalContent: '',
-        sessionIds: claudeSessionIds
+        sessionIds: agentSessionIds
       }
     }));
 

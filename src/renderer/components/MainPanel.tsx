@@ -77,7 +77,7 @@ interface MainPanelProps {
   setLogViewerOpen: (open: boolean) => void;
   setAgentSessionsOpen: (open: boolean) => void;
   setActiveClaudeSessionId: (id: string | null) => void;
-  onResumeClaudeSession: (claudeSessionId: string, messages: import('../types').LogEntry[], sessionName?: string, starred?: boolean) => void;
+  onResumeClaudeSession: (agentSessionId: string, messages: import('../types').LogEntry[], sessionName?: string, starred?: boolean) => void;
   onNewClaudeSession: () => void;
   setActiveFocus: (focus: FocusArea) => void;
   setOutputSearchOpen: (open: boolean) => void;
@@ -146,7 +146,7 @@ interface MainPanelProps {
   onCloseOtherTabs?: (tabId: string) => void;
   onTabStar?: (tabId: string, starred: boolean) => void;
   onTabMarkUnread?: (tabId: string) => void;
-  onUpdateTabByClaudeSessionId?: (claudeSessionId: string, updates: { name?: string | null; starred?: boolean }) => void;
+  onUpdateTabByClaudeSessionId?: (agentSessionId: string, updates: { name?: string | null; starred?: boolean }) => void;
   onToggleTabReadOnlyMode?: () => void;
   onToggleTabSaveToHistory?: () => void;
   showUnreadOnly?: boolean;
@@ -610,30 +610,30 @@ export const MainPanel = forwardRef<MainPanelHandle, MainPanelProps>(function Ma
 
             <div className="flex items-center gap-3 min-w-[200px] justify-end">
               {/* Session UUID Pill - click to copy full UUID, left-most of session stats */}
-              {activeSession.inputMode === 'ai' && activeTab?.claudeSessionId && (
+              {activeSession.inputMode === 'ai' && activeTab?.agentSessionId && (
                 <button
                   className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border transition-colors hover:opacity-80"
                   style={{ backgroundColor: theme.colors.accent + '20', color: theme.colors.accent, borderColor: theme.colors.accent + '30' }}
-                  title={activeTab.name ? `${activeTab.name}\nClick to copy: ${activeTab.claudeSessionId}` : `Click to copy: ${activeTab.claudeSessionId}`}
+                  title={activeTab.name ? `${activeTab.name}\nClick to copy: ${activeTab.agentSessionId}` : `Click to copy: ${activeTab.agentSessionId}`}
                   onClick={(e) => {
                     e.stopPropagation();
-                    copyToClipboard(activeTab.claudeSessionId!, 'Session ID Copied to Clipboard');
+                    copyToClipboard(activeTab.agentSessionId!, 'Session ID Copied to Clipboard');
                   }}
                 >
-                  {activeTab.claudeSessionId.split('-')[0].toUpperCase()}
+                  {activeTab.agentSessionId.split('-')[0].toUpperCase()}
                 </button>
               )}
 
 
               {/* Cost Tracker - styled as pill (hidden when panel is narrow) - shows active tab's cost */}
-              {showCostWidget && activeSession.inputMode === 'ai' && activeTab?.claudeSessionId && (
+              {showCostWidget && activeSession.inputMode === 'ai' && activeTab?.agentSessionId && (
                 <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-full border border-green-500/30 text-green-500 bg-green-500/10">
                   ${(activeTab?.usageStats?.totalCostUsd ?? 0).toFixed(2)}
                 </span>
               )}
 
               {/* Context Window Widget with Tooltip - only show for tabs with Claude session */}
-              {activeSession.inputMode === 'ai' && activeTab?.claudeSessionId && (
+              {activeSession.inputMode === 'ai' && activeTab?.agentSessionId && (
               <div
                 className="flex flex-col items-end mr-2 relative cursor-pointer"
                 onMouseEnter={() => {

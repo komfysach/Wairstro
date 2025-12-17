@@ -101,8 +101,8 @@ contextBridge.exposeInMainWorld('maestro', {
       ipcRenderer.on('process:exit', handler);
       return () => ipcRenderer.removeListener('process:exit', handler);
     },
-    onSessionId: (callback: (sessionId: string, claudeSessionId: string) => void) => {
-      const handler = (_: any, sessionId: string, claudeSessionId: string) => callback(sessionId, claudeSessionId);
+    onSessionId: (callback: (sessionId: string, agentSessionId: string) => void) => {
+      const handler = (_: any, sessionId: string, agentSessionId: string) => callback(sessionId, agentSessionId);
       ipcRenderer.on('process:session-id', handler);
       return () => ipcRenderer.removeListener('process:session-id', handler);
     },
@@ -216,7 +216,7 @@ contextBridge.exposeInMainWorld('maestro', {
     // Broadcast tab changes to web clients (for tab sync)
     broadcastTabsChange: (sessionId: string, aiTabs: Array<{
       id: string;
-      claudeSessionId: string | null;
+      agentSessionId: string | null;
       name: string | null;
       starred: boolean;
       inputValue: string;
@@ -312,8 +312,8 @@ contextBridge.exposeInMainWorld('maestro', {
 
   // Live Session API - toggle sessions as live/offline in web interface
   live: {
-    toggle: (sessionId: string, claudeSessionId?: string) =>
-      ipcRenderer.invoke('live:toggle', sessionId, claudeSessionId),
+    toggle: (sessionId: string, agentSessionId?: string) =>
+      ipcRenderer.invoke('live:toggle', sessionId, agentSessionId),
     getStatus: (sessionId: string) => ipcRenderer.invoke('live:getStatus', sessionId),
     getDashboardUrl: () => ipcRenderer.invoke('live:getDashboardUrl'),
     getLiveSessions: () => ipcRenderer.invoke('live:getLiveSessions'),
@@ -494,17 +494,17 @@ contextBridge.exposeInMainWorld('maestro', {
     getCommands: (projectPath: string) =>
       ipcRenderer.invoke('claude:getCommands', projectPath),
     // Session origin tracking (distinguishes Maestro sessions from CLI sessions)
-    registerSessionOrigin: (projectPath: string, claudeSessionId: string, origin: 'user' | 'auto', sessionName?: string) =>
-      ipcRenderer.invoke('claude:registerSessionOrigin', projectPath, claudeSessionId, origin, sessionName),
-    updateSessionName: (projectPath: string, claudeSessionId: string, sessionName: string) =>
-      ipcRenderer.invoke('claude:updateSessionName', projectPath, claudeSessionId, sessionName),
-    updateSessionStarred: (projectPath: string, claudeSessionId: string, starred: boolean) =>
-      ipcRenderer.invoke('claude:updateSessionStarred', projectPath, claudeSessionId, starred),
+    registerSessionOrigin: (projectPath: string, agentSessionId: string, origin: 'user' | 'auto', sessionName?: string) =>
+      ipcRenderer.invoke('claude:registerSessionOrigin', projectPath, agentSessionId, origin, sessionName),
+    updateSessionName: (projectPath: string, agentSessionId: string, sessionName: string) =>
+      ipcRenderer.invoke('claude:updateSessionName', projectPath, agentSessionId, sessionName),
+    updateSessionStarred: (projectPath: string, agentSessionId: string, starred: boolean) =>
+      ipcRenderer.invoke('claude:updateSessionStarred', projectPath, agentSessionId, starred),
     getSessionOrigins: (projectPath: string) =>
       ipcRenderer.invoke('claude:getSessionOrigins', projectPath),
     getAllNamedSessions: () =>
       ipcRenderer.invoke('claude:getAllNamedSessions') as Promise<Array<{
-        claudeSessionId: string;
+        agentSessionId: string;
         projectPath: string;
         sessionName: string;
         starred?: boolean;
@@ -540,7 +540,7 @@ contextBridge.exposeInMainWorld('maestro', {
       timestamp: number;
       summary: string;
       fullResponse?: string;
-      claudeSessionId?: string;
+      agentSessionId?: string;
       projectPath: string;
       sessionId?: string;
       sessionName?: string;
@@ -564,9 +564,9 @@ contextBridge.exposeInMainWorld('maestro', {
       ipcRenderer.invoke('history:delete', entryId, sessionId),
     update: (entryId: string, updates: { validated?: boolean }, sessionId?: string) =>
       ipcRenderer.invoke('history:update', entryId, updates, sessionId),
-    // Update sessionName for all entries matching a claudeSessionId (used when renaming tabs)
-    updateSessionName: (claudeSessionId: string, sessionName: string) =>
-      ipcRenderer.invoke('history:updateSessionName', claudeSessionId, sessionName),
+    // Update sessionName for all entries matching a agentSessionId (used when renaming tabs)
+    updateSessionName: (agentSessionId: string, sessionName: string) =>
+      ipcRenderer.invoke('history:updateSessionName', agentSessionId, sessionName),
     // NEW: Get history file path for AI context integration
     getFilePath: (sessionId: string) =>
       ipcRenderer.invoke('history:getFilePath', sessionId),
@@ -758,7 +758,7 @@ export interface MaestroAPI {
     }>>;
     onData: (callback: (sessionId: string, data: string) => void) => () => void;
     onExit: (callback: (sessionId: string, code: number) => void) => () => void;
-    onSessionId: (callback: (sessionId: string, claudeSessionId: string) => void) => () => void;
+    onSessionId: (callback: (sessionId: string, agentSessionId: string) => void) => () => void;
     onSlashCommands: (callback: (sessionId: string, slashCommands: string[]) => void) => () => void;
     onRemoteCommand: (callback: (sessionId: string, command: string) => void) => () => void;
     onRemoteSwitchMode: (callback: (sessionId: string, mode: 'ai' | 'terminal') => void) => () => void;
@@ -861,10 +861,10 @@ export interface MaestroAPI {
     getConnectedClients: () => Promise<number>;
   };
   live: {
-    toggle: (sessionId: string, claudeSessionId?: string) => Promise<{ live: boolean; url: string | null }>;
+    toggle: (sessionId: string, agentSessionId?: string) => Promise<{ live: boolean; url: string | null }>;
     getStatus: (sessionId: string) => Promise<{ live: boolean; url: string | null }>;
     getDashboardUrl: () => Promise<string | null>;
-    getLiveSessions: () => Promise<Array<{ sessionId: string; claudeSessionId?: string; enabledAt: number }>>;
+    getLiveSessions: () => Promise<Array<{ sessionId: string; agentSessionId?: string; enabledAt: number }>>;
     broadcastActiveSession: (sessionId: string) => Promise<void>;
     disableAll: () => Promise<{ success: boolean; count: number }>;
     startServer: () => Promise<{ success: boolean; url?: string; error?: string }>;
@@ -1044,9 +1044,9 @@ export interface MaestroAPI {
       command: string;
       description: string;
     }>>;
-    registerSessionOrigin: (projectPath: string, claudeSessionId: string, origin: 'user' | 'auto', sessionName?: string) => Promise<boolean>;
-    updateSessionName: (projectPath: string, claudeSessionId: string, sessionName: string) => Promise<boolean>;
-    updateSessionStarred: (projectPath: string, claudeSessionId: string, starred: boolean) => Promise<boolean>;
+    registerSessionOrigin: (projectPath: string, agentSessionId: string, origin: 'user' | 'auto', sessionName?: string) => Promise<boolean>;
+    updateSessionName: (projectPath: string, agentSessionId: string, sessionName: string) => Promise<boolean>;
+    updateSessionStarred: (projectPath: string, agentSessionId: string, starred: boolean) => Promise<boolean>;
     getSessionOrigins: (projectPath: string) => Promise<Record<string, 'user' | 'auto' | { origin: 'user' | 'auto'; sessionName?: string; starred?: boolean }>>;
     deleteMessagePair: (projectPath: string, sessionId: string, userMessageUuid: string, fallbackContent?: string) => Promise<{ success: boolean; linesRemoved?: number; error?: string }>;
   };
@@ -1062,7 +1062,7 @@ export interface MaestroAPI {
       timestamp: number;
       summary: string;
       fullResponse?: string;
-      claudeSessionId?: string;
+      agentSessionId?: string;
       projectPath: string;
       sessionId?: string;
       sessionName?: string;
@@ -1090,7 +1090,7 @@ export interface MaestroAPI {
         timestamp: number;
         summary: string;
         fullResponse?: string;
-        claudeSessionId?: string;
+        agentSessionId?: string;
         projectPath: string;
         sessionId?: string;
         sessionName?: string;
@@ -1118,7 +1118,7 @@ export interface MaestroAPI {
       timestamp: number;
       summary: string;
       fullResponse?: string;
-      claudeSessionId?: string;
+      agentSessionId?: string;
       projectPath: string;
       sessionId?: string;
       sessionName?: string;
@@ -1138,8 +1138,8 @@ export interface MaestroAPI {
     clear: (projectPath?: string) => Promise<boolean>;
     delete: (entryId: string, sessionId?: string) => Promise<boolean>;
     update: (entryId: string, updates: { validated?: boolean }, sessionId?: string) => Promise<boolean>;
-    // Update sessionName for all entries matching a claudeSessionId (used when renaming tabs)
-    updateSessionName: (claudeSessionId: string, sessionName: string) => Promise<number>;
+    // Update sessionName for all entries matching a agentSessionId (used when renaming tabs)
+    updateSessionName: (agentSessionId: string, sessionName: string) => Promise<number>;
     onExternalChange: (handler: () => void) => () => void;
     reload: () => Promise<boolean>;
     // NEW: Get history file path for AI context integration

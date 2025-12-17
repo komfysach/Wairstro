@@ -187,7 +187,7 @@ interface AITab {
   id: string;
   name: string;
   logs: LogEntry[];           // Tab-specific history
-  claudeSessionId?: string;   // Claude session continuity
+  agentSessionId?: string;    // Agent session continuity
 }
 
 // Tab operations
@@ -315,7 +315,7 @@ interface AITab {
   id: string;
   name: string;
   logs: LogEntry[];             // Tab-specific conversation history
-  claudeSessionId?: string;     // Claude session for this tab
+  agentSessionId?: string;      // Agent session for this tab
   scrollTop?: number;
   draftInput?: string;
 }

@@ -55,7 +55,7 @@ export type { UseGitStatusPollingReturn, UseGitStatusPollingOptions, GitStatusDa
 export type { UseLiveOverlayReturn, TunnelStatus, UrlTab } from './useLiveOverlay';
 export type { UsePlaybookManagementReturn, UsePlaybookManagementDeps, PlaybookConfigState } from './usePlaybookManagement';
 export type { UseWorktreeValidationReturn, UseWorktreeValidationDeps } from './useWorktreeValidation';
-export type { UseSessionViewerReturn, UseSessionViewerDeps, ClaudeSession, SessionMessage } from './useSessionViewer';
+export type { UseSessionViewerReturn, UseSessionViewerDeps, AgentSession, ClaudeSession, SessionMessage } from './useSessionViewer';
 export type { UseSessionPaginationReturn, UseSessionPaginationDeps } from './useSessionPagination';
 export type {
   UseFilteredAndSortedSessionsReturn,

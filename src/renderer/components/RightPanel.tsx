@@ -85,9 +85,9 @@ interface RightPanelProps {
   currentSessionBatchState?: BatchRunState | null;  // For locking editor (current session only)
   onOpenBatchRunner?: () => void;
   onStopBatchRun?: () => void;
-  onJumpToClaudeSession?: (claudeSessionId: string) => void;
-  onResumeSession?: (claudeSessionId: string) => void;
-  onOpenSessionAsTab?: (claudeSessionId: string) => void;
+  onJumpToClaudeSession?: (agentSessionId: string) => void;
+  onResumeSession?: (agentSessionId: string) => void;
+  onOpenSessionAsTab?: (agentSessionId: string) => void;
   onOpenAboutModal?: () => void;  // For opening About/achievements panel from history entries
 }
 

@@ -107,7 +107,7 @@ export function registerProcessHandlers(deps: ProcessHandlerDependencies): void 
 
       // Extract Claude session ID from --resume arg if present
       const resumeArgIndex = finalArgs.indexOf('--resume');
-      const claudeSessionId = resumeArgIndex !== -1 ? finalArgs[resumeArgIndex + 1] : undefined;
+      const agentSessionId = resumeArgIndex !== -1 ? finalArgs[resumeArgIndex + 1] : undefined;
 
       logger.info(`Spawning process: ${config.command}`, LOG_CONTEXT, {
         sessionId: config.sessionId,
@@ -117,7 +117,7 @@ export function registerProcessHandlers(deps: ProcessHandlerDependencies): void 
         args: finalArgs,
         requiresPty: agent?.requiresPty || false,
         shell: shellToUse,
-        ...(claudeSessionId && { claudeSessionId }),
+        ...(agentSessionId && { agentSessionId }),
         ...(config.prompt && { prompt: config.prompt.length > 500 ? config.prompt.substring(0, 500) + '...' : config.prompt })
       });
 

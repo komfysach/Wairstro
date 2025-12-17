@@ -212,7 +212,7 @@ describe('MainPanel', () => {
     messageQueue: [],
     aiTabs: [{
       id: 'tab-1',
-      claudeSessionId: 'claude-session-1',
+      agentSessionId: 'claude-session-1',
       name: 'Tab 1',
       isUnread: false,
       createdAt: Date.now(),
@@ -606,7 +606,7 @@ describe('MainPanel', () => {
         inputMode: 'ai',
         aiTabs: [{
           id: 'tab-1',
-          claudeSessionId: 'abc12345-def6-7890-ghij-klmnopqrstuv',
+          agentSessionId: 'abc12345-def6-7890-ghij-klmnopqrstuv',
           name: 'Tab 1',
           isUnread: false,
           createdAt: Date.now(),
@@ -628,7 +628,7 @@ describe('MainPanel', () => {
         inputMode: 'ai',
         aiTabs: [{
           id: 'tab-1',
-          claudeSessionId: 'abc12345-def6-7890-ghij-klmnopqrstuv',
+          agentSessionId: 'abc12345-def6-7890-ghij-klmnopqrstuv',
           name: 'Tab 1',
           isUnread: false,
           createdAt: Date.now(),
@@ -648,7 +648,7 @@ describe('MainPanel', () => {
         inputMode: 'terminal',
         aiTabs: [{
           id: 'tab-1',
-          claudeSessionId: 'abc12345-def6-7890',
+          agentSessionId: 'abc12345-def6-7890',
           name: 'Tab 1',
           isUnread: false,
           createdAt: Date.now(),
@@ -674,7 +674,7 @@ describe('MainPanel', () => {
         inputMode: 'ai',
         aiTabs: [{
           id: 'tab-1',
-          claudeSessionId: 'claude-1',
+          agentSessionId: 'claude-1',
           name: 'Tab 1',
           isUnread: false,
           createdAt: Date.now(),
@@ -957,7 +957,7 @@ describe('MainPanel', () => {
       const session = createSession({
         aiTabs: [{
           id: 'tab-1',
-          claudeSessionId: 'claude-1',
+          agentSessionId: 'claude-1',
           name: 'Tab 1',
           isUnread: false,
           createdAt: Date.now(),
@@ -1039,7 +1039,7 @@ describe('MainPanel', () => {
         inputMode: 'ai',
         aiTabs: [{
           id: 'tab-1',
-          claudeSessionId: 'abc12345-def6-7890',
+          agentSessionId: 'abc12345-def6-7890',
           name: 'Tab 1',
           isUnread: false,
           createdAt: Date.now(),
@@ -1064,7 +1064,7 @@ describe('MainPanel', () => {
         inputMode: 'ai',
         aiTabs: [{
           id: 'tab-1',
-          claudeSessionId: 'abc12345-def6-7890',
+          agentSessionId: 'abc12345-def6-7890',
           name: 'Tab 1',
           isUnread: false,
           createdAt: Date.now(),
@@ -1134,7 +1134,7 @@ describe('MainPanel', () => {
       const session = createSession({
         aiTabs: [{
           id: 'tab-1',
-          claudeSessionId: 'claude-1',
+          agentSessionId: 'claude-1',
           name: 'Tab 1',
           isUnread: false,
           createdAt: Date.now(),
@@ -1454,7 +1454,7 @@ describe('MainPanel', () => {
       const session = createSession({
         aiTabs: [{
           id: 'tab-1',
-          claudeSessionId: 'claude-1',
+          agentSessionId: 'claude-1',
           name: 'Tab 1',
           isUnread: false,
           createdAt: Date.now(),
@@ -1492,7 +1492,7 @@ describe('MainPanel', () => {
         inputMode: 'ai',
         aiTabs: [{
           id: 'tab-1',
-          claudeSessionId: 'abc12345-def6-7890',
+          agentSessionId: 'abc12345-def6-7890',
           name: 'Tab 1',
           isUnread: false,
           createdAt: Date.now(),
@@ -1534,7 +1534,7 @@ describe('MainPanel', () => {
       const session = createSession({
         aiTabs: [{
           id: 'tab-1',
-          claudeSessionId: 'claude-1',
+          agentSessionId: 'claude-1',
           name: 'Tab 1',
           isUnread: false,
           createdAt: Date.now(),
@@ -1561,7 +1561,7 @@ describe('MainPanel', () => {
       const session = createSession({
         aiTabs: [{
           id: 'tab-1',
-          claudeSessionId: 'claude-1',
+          agentSessionId: 'claude-1',
           name: 'Tab 1',
           isUnread: false,
           createdAt: Date.now(),
