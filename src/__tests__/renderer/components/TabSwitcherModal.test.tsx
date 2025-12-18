@@ -85,7 +85,7 @@ describe('TabSwitcherModal', () => {
     Element.prototype.scrollIntoView = vi.fn();
 
     // Reset the mocks for each test
-    vi.mocked(window.maestro.claude.getAllNamedSessions).mockResolvedValue([]);
+    vi.mocked(window.maestro.agentSessions.getAllNamedSessions).mockResolvedValue([]);
     vi.mocked(window.maestro.agentSessions.updateSessionName).mockResolvedValue(undefined);
   });
 
@@ -868,7 +868,7 @@ describe('TabSwitcherModal', () => {
     it('switches to All Named mode on pill click', async () => {
       const tabs = [createTestTab({ name: 'Open Tab' })];
 
-      vi.mocked(window.maestro.claude.getAllNamedSessions).mockResolvedValue([
+      vi.mocked(window.maestro.agentSessions.getAllNamedSessions).mockResolvedValue([
         {
           agentSessionId: 'closed-123-abc-def-789',
           projectPath: '/test',
@@ -891,7 +891,7 @@ describe('TabSwitcherModal', () => {
 
       // Wait for named sessions to load
       await waitFor(() => {
-        expect(window.maestro.claude.getAllNamedSessions).toHaveBeenCalled();
+        expect(window.maestro.agentSessions.getAllNamedSessions).toHaveBeenCalled();
       });
 
       // Click All Named pill
@@ -927,7 +927,7 @@ describe('TabSwitcherModal', () => {
     });
 
     it('shows "Closed" badge for closed named sessions', async () => {
-      vi.mocked(window.maestro.claude.getAllNamedSessions).mockResolvedValue([
+      vi.mocked(window.maestro.agentSessions.getAllNamedSessions).mockResolvedValue([
         {
           agentSessionId: 'closed-session-id',
           projectPath: '/test',
@@ -949,7 +949,7 @@ describe('TabSwitcherModal', () => {
 
       // Wait for load
       await waitFor(() => {
-        expect(window.maestro.claude.getAllNamedSessions).toHaveBeenCalled();
+        expect(window.maestro.agentSessions.getAllNamedSessions).toHaveBeenCalled();
       });
 
       fireEvent.click(screen.getByText(/All Named/));
@@ -960,7 +960,7 @@ describe('TabSwitcherModal', () => {
     });
 
     it('filters named sessions by current project', async () => {
-      vi.mocked(window.maestro.claude.getAllNamedSessions).mockResolvedValue([
+      vi.mocked(window.maestro.agentSessions.getAllNamedSessions).mockResolvedValue([
         {
           agentSessionId: 'same-project-id',
           projectPath: '/test',
@@ -986,7 +986,7 @@ describe('TabSwitcherModal', () => {
       );
 
       await waitFor(() => {
-        expect(window.maestro.claude.getAllNamedSessions).toHaveBeenCalled();
+        expect(window.maestro.agentSessions.getAllNamedSessions).toHaveBeenCalled();
       });
 
       fireEvent.click(screen.getByText(/All Named/));
@@ -1001,7 +1001,7 @@ describe('TabSwitcherModal', () => {
       const starredTab = createTestTab({ name: 'Starred Tab', starred: true });
       const unstarredTab = createTestTab({ name: 'Unstarred Tab', starred: false });
 
-      vi.mocked(window.maestro.claude.getAllNamedSessions).mockResolvedValue([
+      vi.mocked(window.maestro.agentSessions.getAllNamedSessions).mockResolvedValue([
         {
           agentSessionId: 'starred-closed-123',
           projectPath: '/test',
@@ -1029,7 +1029,7 @@ describe('TabSwitcherModal', () => {
       );
 
       await waitFor(() => {
-        expect(window.maestro.claude.getAllNamedSessions).toHaveBeenCalled();
+        expect(window.maestro.agentSessions.getAllNamedSessions).toHaveBeenCalled();
       });
 
       // Click Starred pill (use exact pattern to avoid matching list items)
@@ -1049,7 +1049,7 @@ describe('TabSwitcherModal', () => {
     });
 
     it('shows "No starred sessions" when there are no starred items', async () => {
-      vi.mocked(window.maestro.claude.getAllNamedSessions).mockResolvedValue([]);
+      vi.mocked(window.maestro.agentSessions.getAllNamedSessions).mockResolvedValue([]);
 
       renderWithLayerStack(
         <TabSwitcherModal
@@ -1064,7 +1064,7 @@ describe('TabSwitcherModal', () => {
       );
 
       await waitFor(() => {
-        expect(window.maestro.claude.getAllNamedSessions).toHaveBeenCalled();
+        expect(window.maestro.agentSessions.getAllNamedSessions).toHaveBeenCalled();
       });
 
       fireEvent.click(screen.getByRole('button', { name: /Starred \(\d+\)/ }));
@@ -1079,7 +1079,7 @@ describe('TabSwitcherModal', () => {
       const starredTab2 = createTestTab({ name: 'Starred 2', starred: true });
       const unstarredTab = createTestTab({ name: 'Unstarred', starred: false });
 
-      vi.mocked(window.maestro.claude.getAllNamedSessions).mockResolvedValue([
+      vi.mocked(window.maestro.agentSessions.getAllNamedSessions).mockResolvedValue([
         {
           agentSessionId: 'starred-closed-abc',
           projectPath: '/test',
@@ -1101,7 +1101,7 @@ describe('TabSwitcherModal', () => {
       );
 
       await waitFor(() => {
-        expect(window.maestro.claude.getAllNamedSessions).toHaveBeenCalled();
+        expect(window.maestro.agentSessions.getAllNamedSessions).toHaveBeenCalled();
       });
 
       // Should show count of 3: 2 open starred + 1 closed starred
@@ -1555,7 +1555,7 @@ describe('TabSwitcherModal', () => {
     });
 
     it('calls onNamedSessionSelect when clicking a closed named session', async () => {
-      vi.mocked(window.maestro.claude.getAllNamedSessions).mockResolvedValue([
+      vi.mocked(window.maestro.agentSessions.getAllNamedSessions).mockResolvedValue([
         {
           agentSessionId: 'closed-abc-123',
           projectPath: '/test',
@@ -1580,7 +1580,7 @@ describe('TabSwitcherModal', () => {
       );
 
       await waitFor(() => {
-        expect(window.maestro.claude.getAllNamedSessions).toHaveBeenCalled();
+        expect(window.maestro.agentSessions.getAllNamedSessions).toHaveBeenCalled();
       });
 
       fireEvent.click(screen.getByText(/All Named/));

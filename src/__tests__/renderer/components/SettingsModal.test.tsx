@@ -253,8 +253,8 @@ describe('SettingsModal', () => {
         await vi.advanceTimersByTimeAsync(50);
       });
 
-      // General tab content should show the Default AI Agent label
-      expect(screen.getByText('Default AI Agent')).toBeInTheDocument();
+      // General tab content should show the Font Size label
+      expect(screen.getByText('Font Size')).toBeInTheDocument();
     });
 
     it('should respect initialTab prop', async () => {
@@ -326,7 +326,7 @@ describe('SettingsModal', () => {
       });
 
       // Start on general tab
-      expect(screen.getByText('Default AI Agent')).toBeInTheDocument();
+      expect(screen.getByText('Font Size')).toBeInTheDocument();
 
       // Press Cmd+Shift+] to go to shortcuts
       fireEvent.keyDown(window, { key: ']', metaKey: true, shiftKey: true });
@@ -355,7 +355,7 @@ describe('SettingsModal', () => {
         await vi.advanceTimersByTimeAsync(100);
       });
 
-      expect(screen.getByText('Default AI Agent')).toBeInTheDocument();
+      expect(screen.getByText('Font Size')).toBeInTheDocument();
     });
 
     it('should wrap around when navigating past last tab', async () => {
@@ -375,7 +375,7 @@ describe('SettingsModal', () => {
         await vi.advanceTimersByTimeAsync(100);
       });
 
-      expect(screen.getByText('Default AI Agent')).toBeInTheDocument();
+      expect(screen.getByText('Font Size')).toBeInTheDocument();
     });
 
     it('should wrap around when navigating before first tab', async () => {
@@ -386,7 +386,7 @@ describe('SettingsModal', () => {
       });
 
       // Start on general tab (first tab)
-      expect(screen.getByText('Default AI Agent')).toBeInTheDocument();
+      expect(screen.getByText('Font Size')).toBeInTheDocument();
 
       // Press Cmd+Shift+[ to wrap to AI Commands
       fireEvent.keyDown(window, { key: '[', metaKey: true, shiftKey: true });
@@ -415,64 +415,6 @@ describe('SettingsModal', () => {
 
       fireEvent.click(closeButton!);
       expect(onClose).toHaveBeenCalled();
-    });
-  });
-
-  describe('General tab - Agent settings', () => {
-    it('should load agents on modal open', async () => {
-      render(<SettingsModal {...createDefaultProps()} />);
-
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(100);
-      });
-
-      expect(window.maestro.agents.detect).toHaveBeenCalled();
-    });
-
-    it('should display available agents', async () => {
-      render(<SettingsModal {...createDefaultProps()} />);
-
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(100);
-      });
-
-      expect(screen.getByText('Claude Code')).toBeInTheDocument();
-      expect(screen.getByText('OpenAI Codex')).toBeInTheDocument();
-    });
-
-    it('should show Available badge for available agents', async () => {
-      render(<SettingsModal {...createDefaultProps()} />);
-
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(100);
-      });
-
-      expect(screen.getByText('Available')).toBeInTheDocument();
-    });
-
-    it('should call setDefaultAgent when agent is selected', async () => {
-      const setDefaultAgent = vi.fn();
-      render(<SettingsModal {...createDefaultProps({ setDefaultAgent })} />);
-
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(100);
-      });
-
-      const agentButton = screen.getByText('Claude Code').closest('button');
-      fireEvent.click(agentButton!);
-
-      expect(setDefaultAgent).toHaveBeenCalledWith('claude-code');
-    });
-
-    it('should disable agents that are not claude-code or not available', async () => {
-      render(<SettingsModal {...createDefaultProps()} />);
-
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(100);
-      });
-
-      const codexButton = screen.getByText('OpenAI Codex').closest('button');
-      expect(codexButton).toBeDisabled();
     });
   });
 
@@ -1265,52 +1207,7 @@ describe('SettingsModal', () => {
     });
   });
 
-  describe('agent custom paths', () => {
-    it('should display custom path input for claude-code', async () => {
-      render(<SettingsModal {...createDefaultProps()} />);
-
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(100);
-      });
-
-      expect(screen.getByPlaceholderText('/path/to/claude')).toBeInTheDocument();
-    });
-
-    it('should save custom path on blur', async () => {
-      render(<SettingsModal {...createDefaultProps()} />);
-
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(100);
-      });
-
-      const customPathInput = screen.getByPlaceholderText('/path/to/claude');
-      fireEvent.change(customPathInput, { target: { value: '/custom/path/claude' } });
-      fireEvent.blur(customPathInput);
-
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(100);
-      });
-
-      expect((window.maestro as any).agents.setCustomPath).toHaveBeenCalledWith('claude-code', '/custom/path/claude');
-    });
-  });
-
   describe('edge cases', () => {
-    it('should handle agent detection failure gracefully', async () => {
-      vi.mocked(window.maestro.agents.detect).mockRejectedValue(new Error('Detection failed'));
-
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-
-      render(<SettingsModal {...createDefaultProps()} />);
-
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(100);
-      });
-
-      expect(consoleSpy).toHaveBeenCalled();
-      consoleSpy.mockRestore();
-    });
-
     it('should handle font detection failure gracefully', async () => {
       (window.maestro as any).fonts.detect.mockRejectedValue(new Error('Font detection failed'));
 
@@ -1842,30 +1739,6 @@ describe('SettingsModal', () => {
 
       // shells.detect should only have been called once
       expect(window.maestro.shells.detect).toHaveBeenCalledTimes(1);
-    });
-  });
-
-  describe('Custom agent path clear button', () => {
-    it('should clear custom agent path when clear button is clicked', async () => {
-      (window.maestro as any).agents.getAllCustomPaths.mockResolvedValue({ 'claude-code': '/custom/path/to/claude' });
-
-      render(<SettingsModal {...createDefaultProps()} />);
-
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(100);
-      });
-
-      // Find the Clear button in the agent path section
-      const clearButtons = screen.getAllByText('Clear');
-      const agentPathClearButton = clearButtons[0]; // First Clear button is for agent path
-
-      fireEvent.click(agentPathClearButton);
-
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(100);
-      });
-
-      expect((window.maestro as any).agents.setCustomPath).toHaveBeenCalledWith('claude-code', null);
     });
   });
 });
