@@ -6,6 +6,14 @@ export { isValidThemeId } from '../../shared/theme-types';
 
 // Re-export error types from shared location
 export type { AgentError, AgentErrorType, AgentErrorRecovery } from '../../shared/types';
+
+// Re-export group chat types from shared location
+export type {
+  GroupChat,
+  GroupChatParticipant,
+  GroupChatMessage,
+  GroupChatState,
+} from '../../shared/group-chat-types';
 // Import AgentError for use within this file
 import type { AgentError } from '../../shared/types';
 

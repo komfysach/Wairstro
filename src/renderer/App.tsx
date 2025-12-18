@@ -71,7 +71,7 @@ import { gitService } from './services/git';
 import type {
   ToolType, SessionState, RightPanelTab,
   FocusArea, LogEntry, Session, Group, AITab, UsageStats, QueuedItem, BatchRunConfig,
-  AgentError, BatchRunState
+  AgentError, BatchRunState, GroupChat, GroupChatMessage, GroupChatState
 } from './types';
 import { THEMES } from './constants/themes';
 import { generateId } from './utils/ids';
@@ -196,6 +196,12 @@ export default function MaestroConsole() {
   // --- STATE ---
   const [sessions, setSessions] = useState<Session[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
+
+  // --- GROUP CHAT STATE ---
+  const [groupChats, setGroupChats] = useState<GroupChat[]>([]);
+  const [activeGroupChatId, setActiveGroupChatId] = useState<string | null>(null);
+  const [groupChatMessages, setGroupChatMessages] = useState<GroupChatMessage[]>([]);
+  const [groupChatState, setGroupChatState] = useState<GroupChatState>('idle');
 
   // --- BATCHED SESSION UPDATES (reduces React re-renders during AI streaming) ---
   const batchedUpdater = useBatchedSessionUpdates(setSessions);
@@ -4785,6 +4791,19 @@ export default function MaestroConsole() {
           onEditAgent={(session) => {
             setEditAgentSession(session);
             setEditAgentModalOpen(true);
+          }}
+          isLiveMode={isLiveMode}
+          onToggleRemoteControl={async () => {
+            await toggleGlobalLive();
+            // Show flash notification based on the NEW state (opposite of current)
+            if (isLiveMode) {
+              // Was live, now offline
+              setSuccessFlashNotification('Remote Control: OFFLINE — See indicator at top of left panel');
+            } else {
+              // Was offline, now live
+              setSuccessFlashNotification('Remote Control: LIVE — See LIVE indicator at top of left panel for QR code');
+            }
+            setTimeout(() => setSuccessFlashNotification(null), 4000);
           }}
         />
       )}
