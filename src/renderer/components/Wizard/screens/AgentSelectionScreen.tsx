@@ -13,10 +13,11 @@
  */
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { Check, X } from 'lucide-react';
+import { Check, X, Settings, ArrowLeft } from 'lucide-react';
 import type { Theme, AgentConfig } from '../../../types';
 import { useWizard } from '../WizardContext';
 import { ScreenReaderAnnouncement } from '../ScreenReaderAnnouncement';
+import { AgentConfigPanel } from '../../shared/AgentConfigPanel';
 
 interface AgentSelectionScreenProps {
   theme: Theme;
@@ -296,6 +297,20 @@ export function AgentSelectionScreen({ theme }: AgentSelectionScreenProps): JSX.
   const [announcement, setAnnouncement] = useState('');
   const [announcementKey, setAnnouncementKey] = useState(0);
 
+  // Configuration panel state
+  const [viewMode, setViewMode] = useState<'grid' | 'config'>('grid');
+  const [configuringAgentId, setConfiguringAgentId] = useState<string | null>(null);
+  const [isTransitioning, setIsTransitioning] = useState(false);
+
+  // Configuration form state
+  const [customPath, setCustomPath] = useState('');
+  const [customArgs, setCustomArgs] = useState('');
+  const [customEnvVars, setCustomEnvVars] = useState<Record<string, string>>({});
+  const [agentConfig, setAgentConfig] = useState<Record<string, any>>({});
+  const [availableModels, setAvailableModels] = useState<string[]>([]);
+  const [loadingModels, setLoadingModels] = useState(false);
+  const [refreshingAgent, setRefreshingAgent] = useState(false);
+
   // Refs
   const containerRef = useRef<HTMLDivElement>(null);
   const nameInputRef = useRef<HTMLInputElement>(null);
@@ -526,6 +541,118 @@ export function AgentSelectionScreen({ theme }: AgentSelectionScreenProps): JSX.
     return detected?.available ?? false;
   }, [detectedAgents]);
 
+  /**
+   * Open the configuration panel for an agent
+   */
+  const handleOpenConfig = useCallback(async (agentId: string) => {
+    // Load current config for this agent
+    const [path, args, envVars, config] = await Promise.all([
+      window.maestro.agents.getCustomPath(agentId),
+      window.maestro.agents.getCustomArgs(agentId),
+      window.maestro.agents.getCustomEnvVars(agentId),
+      window.maestro.agents.getConfig(agentId),
+    ]);
+
+    setCustomPath(path || '');
+    setCustomArgs(args || '');
+    setCustomEnvVars(envVars || {});
+    setAgentConfig(config || {});
+    setConfiguringAgentId(agentId);
+
+    // Load models if agent supports it
+    const agent = detectedAgents.find(a => a.id === agentId);
+    if (agent?.capabilities?.supportsModelSelection) {
+      setLoadingModels(true);
+      try {
+        const models = await window.maestro.agents.getModels(agentId);
+        setAvailableModels(models);
+      } catch (err) {
+        console.error('Failed to load models:', err);
+      } finally {
+        setLoadingModels(false);
+      }
+    }
+
+    // Auto-select this agent when opening config
+    setSelectedAgent(agentId as any);
+
+    // Trigger transition
+    setIsTransitioning(true);
+    setTimeout(() => {
+      setViewMode('config');
+      setIsTransitioning(false);
+    }, 150);
+
+    // Announce opening config panel
+    const tile = AGENT_TILES.find(t => t.id === agentId);
+    setAnnouncement(`Configuring ${tile?.name || agentId}`);
+    setAnnouncementKey((prev) => prev + 1);
+  }, [detectedAgents, setSelectedAgent]);
+
+  /**
+   * Close the configuration panel and return to grid
+   */
+  const handleCloseConfig = useCallback(() => {
+    setIsTransitioning(true);
+    setTimeout(() => {
+      setViewMode('grid');
+      setConfiguringAgentId(null);
+      setIsTransitioning(false);
+      // Focus the tile that was being configured
+      const index = AGENT_TILES.findIndex(t => t.id === configuringAgentId);
+      if (index !== -1) {
+        setFocusedTileIndex(index);
+        tileRefs.current[index]?.focus();
+      }
+    }, 150);
+
+    setAnnouncement('Returned to agent selection');
+    setAnnouncementKey((prev) => prev + 1);
+  }, [configuringAgentId]);
+
+  /**
+   * Refresh agent detection after config changes
+   */
+  const refreshAgentDetection = useCallback(async () => {
+    const agents = await window.maestro.agents.detect();
+    const visibleAgents = agents.filter((a: AgentConfig) => !a.hidden);
+    setDetectedAgents(visibleAgents);
+    setAvailableAgents(visibleAgents);
+  }, [setAvailableAgents]);
+
+  /**
+   * Handle refresh for single agent in config panel
+   */
+  const handleRefreshAgent = useCallback(async () => {
+    if (!configuringAgentId) return;
+    setRefreshingAgent(true);
+    try {
+      await refreshAgentDetection();
+    } finally {
+      setRefreshingAgent(false);
+    }
+  }, [configuringAgentId, refreshAgentDetection]);
+
+  /**
+   * Handle model refresh in config panel
+   */
+  const handleRefreshModels = useCallback(async () => {
+    if (!configuringAgentId) return;
+    setLoadingModels(true);
+    try {
+      const models = await window.maestro.agents.getModels(configuringAgentId, true);
+      setAvailableModels(models);
+    } catch (err) {
+      console.error('Failed to refresh models:', err);
+    } finally {
+      setLoadingModels(false);
+    }
+  }, [configuringAgentId]);
+
+  // Get the agent being configured
+  const configuringAgent = detectedAgents.find(a => a.id === configuringAgentId);
+  const configuringTile = AGENT_TILES.find(t => t.id === configuringAgentId);
+
   // Loading state
   if (isDetecting) {
     return (
@@ -544,10 +671,145 @@ export function AgentSelectionScreen({ theme }: AgentSelectionScreenProps): JSX.
     );
   }
 
+  // Render configuration panel view
+  if (viewMode === 'config' && configuringAgent && configuringTile) {
+    return (
+      <div
+        ref={containerRef}
+        className={`flex flex-col flex-1 min-h-0 px-8 py-6 overflow-y-auto transition-opacity duration-150 ${
+          isTransitioning ? 'opacity-0' : 'opacity-100'
+        }`}
+        tabIndex={-1}
+      >
+        {/* Screen reader announcements */}
+        <ScreenReaderAnnouncement
+          message={announcement}
+          announceKey={announcementKey}
+          politeness="polite"
+        />
+
+        {/* Header with Back button */}
+        <div className="flex items-center justify-between mb-6">
+          <button
+            onClick={handleCloseConfig}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-white/10 transition-colors"
+            style={{ color: theme.colors.textDim }}
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back
+          </button>
+          <h3
+            className="text-xl font-semibold"
+            style={{ color: theme.colors.textMain }}
+          >
+            Configure {configuringTile.name}
+          </h3>
+          <div className="w-20" /> {/* Spacer for centering */}
+        </div>
+
+        {/* Configuration Panel */}
+        <div className="flex-1 flex justify-center overflow-y-auto">
+          <div className="w-full max-w-xl">
+            <AgentConfigPanel
+              theme={theme}
+              agent={configuringAgent}
+              customPath={customPath}
+              onCustomPathChange={setCustomPath}
+              onCustomPathBlur={async () => {
+                const path = customPath.trim() || null;
+                await window.maestro.agents.setCustomPath(configuringAgentId!, path);
+                await refreshAgentDetection();
+              }}
+              onCustomPathClear={async () => {
+                setCustomPath('');
+                await window.maestro.agents.setCustomPath(configuringAgentId!, null);
+                await refreshAgentDetection();
+              }}
+              customArgs={customArgs}
+              onCustomArgsChange={setCustomArgs}
+              onCustomArgsBlur={async () => {
+                const args = customArgs.trim() || null;
+                await window.maestro.agents.setCustomArgs(configuringAgentId!, args);
+              }}
+              onCustomArgsClear={async () => {
+                setCustomArgs('');
+                await window.maestro.agents.setCustomArgs(configuringAgentId!, null);
+              }}
+              customEnvVars={customEnvVars}
+              onEnvVarKeyChange={(oldKey, newKey, value) => {
+                const newVars = { ...customEnvVars };
+                delete newVars[oldKey];
+                newVars[newKey] = value;
+                setCustomEnvVars(newVars);
+              }}
+              onEnvVarValueChange={(key, value) => {
+                setCustomEnvVars(prev => ({ ...prev, [key]: value }));
+              }}
+              onEnvVarRemove={async (key) => {
+                const newVars = { ...customEnvVars };
+                delete newVars[key];
+                setCustomEnvVars(newVars);
+                if (Object.keys(newVars).length > 0) {
+                  await window.maestro.agents.setCustomEnvVars(configuringAgentId!, newVars);
+                } else {
+                  await window.maestro.agents.setCustomEnvVars(configuringAgentId!, null);
+                }
+              }}
+              onEnvVarAdd={() => {
+                let newKey = 'NEW_VAR';
+                let counter = 1;
+                while (customEnvVars[newKey]) {
+                  newKey = `NEW_VAR_${counter}`;
+                  counter++;
+                }
+                setCustomEnvVars(prev => ({ ...prev, [newKey]: '' }));
+              }}
+              onEnvVarsBlur={async () => {
+                if (Object.keys(customEnvVars).length > 0) {
+                  await window.maestro.agents.setCustomEnvVars(configuringAgentId!, customEnvVars);
+                }
+              }}
+              agentConfig={agentConfig}
+              onConfigChange={(key, value) => {
+                setAgentConfig(prev => ({ ...prev, [key]: value }));
+              }}
+              onConfigBlur={async () => {
+                await window.maestro.agents.setConfig(configuringAgentId!, agentConfig);
+              }}
+              availableModels={availableModels}
+              loadingModels={loadingModels}
+              onRefreshModels={handleRefreshModels}
+              onRefreshAgent={handleRefreshAgent}
+              refreshingAgent={refreshingAgent}
+              compact
+            />
+          </div>
+        </div>
+
+        {/* Done button */}
+        <div className="flex justify-center mt-6">
+          <button
+            onClick={handleCloseConfig}
+            className="px-8 py-2.5 rounded-lg font-medium transition-all outline-none"
+            style={{
+              backgroundColor: theme.colors.accent,
+              color: theme.colors.accentForeground,
+            }}
+          >
+            Done
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Render grid view
   return (
     <div
       ref={containerRef}
-      className="flex flex-col flex-1 min-h-0 px-8 py-6 overflow-y-auto justify-between"
+      className={`flex flex-col flex-1 min-h-0 px-8 py-6 overflow-y-auto justify-between transition-opacity duration-150 ${
+        isTransitioning ? 'opacity-0' : 'opacity-100'
+      }`}
       onKeyDown={handleKeyDown}
       tabIndex={-1}
     >
@@ -698,6 +960,23 @@ export function AgentSelectionScreen({ theme }: AgentSelectionScreenProps): JSX.
                   >
                     New
                   </span>
+                )}
+
+                {/* Customize button for supported agents */}
+                {isSupported && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleOpenConfig(tile.id);
+                    }}
+                    className="absolute bottom-2 right-2 flex items-center gap-1 px-2 py-1 rounded text-[10px] hover:bg-white/10 transition-colors"
+                    style={{ color: theme.colors.textDim }}
+                    title="Customize agent settings"
+                    tabIndex={-1}
+                  >
+                    <Settings className="w-3 h-3" />
+                    Customize
+                  </button>
                 )}
               </button>
             );

@@ -30,6 +30,12 @@ vi.mock('lucide-react', () => ({
   AlertCircle: ({ className, style }: { className?: string; style?: React.CSSProperties }) => (
     <span data-testid="alert-circle-icon" className={className} style={style}>⚠</span>
   ),
+  Plus: ({ className, style }: { className?: string; style?: React.CSSProperties }) => (
+    <span data-testid="plus-icon" className={className} style={style}>+</span>
+  ),
+  Trash2: ({ className, style }: { className?: string; style?: React.CSSProperties }) => (
+    <span data-testid="trash-icon" className={className} style={style}>🗑</span>
+  ),
 }));
 
 // Mock layer stack context

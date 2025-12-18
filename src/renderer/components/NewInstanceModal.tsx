@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { Folder, RefreshCw, ChevronRight, Plus, Trash2 } from 'lucide-react';
+import { Folder, RefreshCw, ChevronRight } from 'lucide-react';
 import type { AgentConfig, Session, ToolType } from '../types';
 import { MODAL_PRIORITIES } from '../constants/modalPriorities';
 import { validateNewSession, validateEditSession } from '../utils/sessionValidation';
 import { FormInput } from './ui/FormInput';
 import { Modal, ModalFooter } from './ui/Modal';
+import { AgentConfigPanel } from './shared/AgentConfigPanel';
 
 // Maximum character length for nudge message
 const NUDGE_MESSAGE_MAX_LENGTH = 1000;
@@ -371,352 +372,119 @@ export function NewInstanceModal({ isOpen, onClose, onCreate, theme, existingSes
 
                       {/* Expanded details for supported agents */}
                       {isSupported && isExpanded && (
-                        <div className="px-3 pb-3 pt-2 space-y-3">
-                          {/* Show detected path if available */}
-                          {agent.path && (
-                            <div
-                              className="text-xs font-mono px-3 py-2 rounded"
-                              style={{ backgroundColor: theme.colors.bgActivity, color: theme.colors.textDim }}
-                            >
-                              <span className="opacity-60">Detected:</span> {agent.path}
-                            </div>
-                          )}
-                          {/* Custom path input */}
-                          <div
-                            className="p-3 rounded border"
-                            style={{ borderColor: theme.colors.border, backgroundColor: theme.colors.bgMain }}
-                          >
-                            <label className="block text-xs font-medium mb-2" style={{ color: theme.colors.textDim }}>
-                              Custom Path (optional)
-                            </label>
-                            <div className="flex gap-2">
-                              <input
-                                type="text"
-                                value={customAgentPaths[agent.id] || ''}
-                                onChange={(e) => {
-                                  const newPaths = { ...customAgentPaths, [agent.id]: e.target.value };
-                                  setCustomAgentPaths(newPaths);
-                                }}
-                                onBlur={async () => {
-                                  const path = customAgentPaths[agent.id]?.trim() || null;
-                                  await window.maestro.agents.setCustomPath(agent.id, path);
-                                  loadAgents();
-                                }}
-                                onClick={(e) => e.stopPropagation()}
-                                placeholder={`/path/to/${agent.binaryName}`}
-                                className="flex-1 p-2 rounded border bg-transparent outline-none text-xs font-mono"
-                                style={{ borderColor: theme.colors.border, color: theme.colors.textMain }}
-                              />
-                              {customAgentPaths[agent.id] && (
-                                <button
-                                  onClick={async (e) => {
-                                    e.stopPropagation();
-                                    const newPaths = { ...customAgentPaths };
-                                    delete newPaths[agent.id];
-                                    setCustomAgentPaths(newPaths);
-                                    await window.maestro.agents.setCustomPath(agent.id, null);
-                                    loadAgents();
-                                  }}
-                                  className="px-2 py-1.5 rounded text-xs"
-                                  style={{ backgroundColor: theme.colors.bgActivity, color: theme.colors.textDim }}
-                                >
-                                  Clear
-                                </button>
-                              )}
-                            </div>
-                            <p className="text-xs opacity-50 mt-2">
-                              Specify a custom path if the agent is not in your PATH
-                            </p>
-                          </div>
-                          {/* Custom CLI arguments input */}
-                          <div
-                            className="p-3 rounded border"
-                            style={{ borderColor: theme.colors.border, backgroundColor: theme.colors.bgMain }}
-                          >
-                            <label className="block text-xs font-medium mb-2" style={{ color: theme.colors.textDim }}>
-                              Custom Arguments (optional)
-                            </label>
-                            <div className="flex gap-2">
-                              <input
-                                type="text"
-                                value={customAgentArgs[agent.id] || ''}
-                                onChange={(e) => {
-                                  const newArgs = { ...customAgentArgs, [agent.id]: e.target.value };
-                                  setCustomAgentArgs(newArgs);
-                                }}
-                                onBlur={async () => {
-                                  const args = customAgentArgs[agent.id]?.trim() || null;
-                                  await window.maestro.agents.setCustomArgs(agent.id, args);
-                                }}
-                                onClick={(e) => e.stopPropagation()}
-                                placeholder="--flag value --another-flag"
-                                className="flex-1 p-2 rounded border bg-transparent outline-none text-xs font-mono"
-                                style={{ borderColor: theme.colors.border, color: theme.colors.textMain }}
-                              />
-                              {customAgentArgs[agent.id] && (
-                                <button
-                                  onClick={async (e) => {
-                                    e.stopPropagation();
-                                    const newArgs = { ...customAgentArgs };
-                                    delete newArgs[agent.id];
-                                    setCustomAgentArgs(newArgs);
-                                    await window.maestro.agents.setCustomArgs(agent.id, null);
-                                  }}
-                                  className="px-2 py-1.5 rounded text-xs"
-                                  style={{ backgroundColor: theme.colors.bgActivity, color: theme.colors.textDim }}
-                                >
-                                  Clear
-                                </button>
-                              )}
-                            </div>
-                            <p className="text-xs opacity-50 mt-2">
-                              Additional CLI arguments appended to all calls to this agent
-                            </p>
-                          </div>
-
-                          {/* Custom environment variables input */}
-                          <div
-                            className="p-3 rounded border"
-                            style={{ borderColor: theme.colors.border, backgroundColor: theme.colors.bgMain }}
-                          >
-                            <label className="block text-xs font-medium mb-2" style={{ color: theme.colors.textDim }}>
-                              Environment Variables (optional)
-                            </label>
-                            <div className="space-y-2">
-                              {/* Existing env vars */}
-                              {Object.entries(customAgentEnvVars[agent.id] || {}).map(([key, value]) => (
-                                <div key={key} className="flex gap-2">
-                                  <input
-                                    type="text"
-                                    value={key}
-                                    onChange={(e) => {
-                                      const newKey = e.target.value;
-                                      const currentVars = { ...customAgentEnvVars[agent.id] };
-                                      delete currentVars[key];
-                                      currentVars[newKey] = value;
-                                      setCustomAgentEnvVars(prev => ({
-                                        ...prev,
-                                        [agent.id]: currentVars
-                                      }));
-                                    }}
-                                    onBlur={async () => {
-                                      const vars = customAgentEnvVars[agent.id];
-                                      if (vars && Object.keys(vars).length > 0) {
-                                        await window.maestro.agents.setCustomEnvVars(agent.id, vars);
-                                      }
-                                    }}
-                                    onClick={(e) => e.stopPropagation()}
-                                    placeholder="VARIABLE_NAME"
-                                    className="flex-1 p-2 rounded border bg-transparent outline-none text-xs font-mono"
-                                    style={{ borderColor: theme.colors.border, color: theme.colors.textMain }}
-                                  />
-                                  <span className="flex items-center text-xs" style={{ color: theme.colors.textDim }}>=</span>
-                                  <input
-                                    type="text"
-                                    value={value}
-                                    onChange={(e) => {
-                                      setCustomAgentEnvVars(prev => ({
-                                        ...prev,
-                                        [agent.id]: {
-                                          ...prev[agent.id],
-                                          [key]: e.target.value
-                                        }
-                                      }));
-                                    }}
-                                    onBlur={async () => {
-                                      const vars = customAgentEnvVars[agent.id];
-                                      if (vars && Object.keys(vars).length > 0) {
-                                        await window.maestro.agents.setCustomEnvVars(agent.id, vars);
-                                      }
-                                    }}
-                                    onClick={(e) => e.stopPropagation()}
-                                    placeholder="value"
-                                    className="flex-[2] p-2 rounded border bg-transparent outline-none text-xs font-mono"
-                                    style={{ borderColor: theme.colors.border, color: theme.colors.textMain }}
-                                  />
-                                  <button
-                                    onClick={async (e) => {
-                                      e.stopPropagation();
-                                      const currentVars = { ...customAgentEnvVars[agent.id] };
-                                      delete currentVars[key];
-                                      if (Object.keys(currentVars).length > 0) {
-                                        setCustomAgentEnvVars(prev => ({
-                                          ...prev,
-                                          [agent.id]: currentVars
-                                        }));
-                                        await window.maestro.agents.setCustomEnvVars(agent.id, currentVars);
-                                      } else {
-                                        setCustomAgentEnvVars(prev => {
-                                          const newVars = { ...prev };
-                                          delete newVars[agent.id];
-                                          return newVars;
-                                        });
-                                        await window.maestro.agents.setCustomEnvVars(agent.id, null);
-                                      }
-                                    }}
-                                    className="p-2 rounded hover:bg-white/10 transition-colors"
-                                    title="Remove variable"
-                                    style={{ color: theme.colors.textDim }}
-                                  >
-                                    <Trash2 className="w-3 h-3" />
-                                  </button>
-                                </div>
-                              ))}
-                              {/* Add new env var button */}
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  // Find a unique key name
-                                  const currentVars = customAgentEnvVars[agent.id] || {};
-                                  let newKey = 'NEW_VAR';
-                                  let counter = 1;
-                                  while (currentVars[newKey]) {
-                                    newKey = `NEW_VAR_${counter}`;
-                                    counter++;
-                                  }
-                                  setCustomAgentEnvVars(prev => ({
-                                    ...prev,
-                                    [agent.id]: {
-                                      ...prev[agent.id],
-                                      [newKey]: ''
-                                    }
-                                  }));
-                                }}
-                                className="flex items-center gap-1 px-2 py-1.5 rounded text-xs hover:bg-white/10 transition-colors"
-                                style={{ color: theme.colors.textDim }}
-                              >
-                                <Plus className="w-3 h-3" />
-                                Add Variable
-                              </button>
-                            </div>
-                            <p className="text-xs opacity-50 mt-2">
-                              Environment variables passed to all calls to this agent
-                            </p>
-                          </div>
-
-                          {/* Agent-specific configuration options (contextWindow, model, etc.) */}
-                          {agent.configOptions && agent.configOptions.length > 0 && agent.configOptions.map((option: any) => (
-                            <div
-                              key={option.key}
-                              className="p-3 rounded border"
-                              style={{ borderColor: theme.colors.border, backgroundColor: theme.colors.bgMain }}
-                            >
-                              <label className="block text-xs font-medium mb-2" style={{ color: theme.colors.textDim }}>
-                                {option.label}
-                              </label>
-                              {option.type === 'number' && (
-                                <input
-                                  type="number"
-                                  value={agentConfigs[agent.id]?.[option.key] ?? option.default}
-                                  onChange={(e) => {
-                                    const value = e.target.value === '' ? 0 : parseInt(e.target.value, 10);
-                                    const newConfig = {
-                                      ...agentConfigs[agent.id],
-                                      [option.key]: isNaN(value) ? 0 : value
-                                    };
-                                    setAgentConfigs(prev => ({
-                                      ...prev,
-                                      [agent.id]: newConfig
-                                    }));
-                                  }}
-                                  onBlur={() => {
-                                    const currentConfig = agentConfigs[agent.id] || {};
-                                    window.maestro.agents.setConfig(agent.id, currentConfig);
-                                  }}
-                                  onClick={(e) => e.stopPropagation()}
-                                  placeholder={option.default?.toString() || '0'}
-                                  min={0}
-                                  className="w-full p-2 rounded border bg-transparent outline-none text-xs font-mono"
-                                  style={{ borderColor: theme.colors.border, color: theme.colors.textMain }}
-                                />
-                              )}
-                              {option.type === 'text' && (
-                                <>
-                                  <div className="flex gap-2">
-                                    <input
-                                      type="text"
-                                      list={option.key === 'model' ? `models-${agent.id}` : undefined}
-                                      value={agentConfigs[agent.id]?.[option.key] ?? option.default}
-                                      onChange={(e) => {
-                                        const newConfig = {
-                                          ...agentConfigs[agent.id],
-                                          [option.key]: e.target.value
-                                        };
-                                        setAgentConfigs(prev => ({
-                                          ...prev,
-                                          [agent.id]: newConfig
-                                        }));
-                                      }}
-                                      onBlur={() => {
-                                        const currentConfig = agentConfigs[agent.id] || {};
-                                        window.maestro.agents.setConfig(agent.id, currentConfig);
-                                      }}
-                                      onClick={(e) => e.stopPropagation()}
-                                      placeholder={option.default || ''}
-                                      className="flex-1 p-2 rounded border bg-transparent outline-none text-xs font-mono"
-                                      style={{ borderColor: theme.colors.border, color: theme.colors.textMain }}
-                                    />
-                                    {option.key === 'model' && agent.capabilities?.supportsModelSelection && (
-                                      <button
-                                        onClick={async (e) => {
-                                          e.stopPropagation();
-                                          await loadModelsForAgent(agent.id, true);
-                                        }}
-                                        className="p-2 rounded border hover:bg-white/10 transition-colors"
-                                        title="Refresh available models"
-                                        style={{ borderColor: theme.colors.border, color: theme.colors.textDim }}
-                                      >
-                                        <RefreshCw className={`w-3 h-3 ${loadingModels[agent.id] ? 'animate-spin' : ''}`} />
-                                      </button>
-                                    )}
-                                  </div>
-                                  {/* Datalist for model autocomplete */}
-                                  {option.key === 'model' && availableModels[agent.id]?.length > 0 && (
-                                    <datalist id={`models-${agent.id}`}>
-                                      {availableModels[agent.id].map((model) => (
-                                        <option key={model} value={model} />
-                                      ))}
-                                    </datalist>
-                                  )}
-                                  {option.key === 'model' && loadingModels[agent.id] && (
-                                    <p className="text-xs mt-1" style={{ color: theme.colors.textDim }}>
-                                      Loading available models...
-                                    </p>
-                                  )}
-                                  {option.key === 'model' && !loadingModels[agent.id] && availableModels[agent.id]?.length > 0 && (
-                                    <p className="text-xs mt-1" style={{ color: theme.colors.textDim }}>
-                                      {availableModels[agent.id].length} model{availableModels[agent.id].length !== 1 ? 's' : ''} available
-                                    </p>
-                                  )}
-                                </>
-                              )}
-                              {option.type === 'checkbox' && (
-                                <label className="flex items-center gap-2 cursor-pointer" onClick={(e) => e.stopPropagation()}>
-                                  <input
-                                    type="checkbox"
-                                    checked={agentConfigs[agent.id]?.[option.key] ?? option.default}
-                                    onChange={(e) => {
-                                      const newConfig = {
-                                        ...agentConfigs[agent.id],
-                                        [option.key]: e.target.checked
-                                      };
-                                      setAgentConfigs(prev => ({
-                                        ...prev,
-                                        [agent.id]: newConfig
-                                      }));
-                                      window.maestro.agents.setConfig(agent.id, newConfig);
-                                    }}
-                                    className="w-4 h-4"
-                                    style={{ accentColor: theme.colors.accent }}
-                                  />
-                                  <span className="text-xs" style={{ color: theme.colors.textMain }}>Enabled</span>
-                                </label>
-                              )}
-                              <p className="text-xs opacity-50 mt-2">
-                                {option.description}
-                              </p>
-                            </div>
-                          ))}
+                        <div className="px-3 pb-3 pt-2">
+                          <AgentConfigPanel
+                            theme={theme}
+                            agent={agent}
+                            customPath={customAgentPaths[agent.id] || ''}
+                            onCustomPathChange={(value) => {
+                              setCustomAgentPaths(prev => ({ ...prev, [agent.id]: value }));
+                            }}
+                            onCustomPathBlur={async () => {
+                              const path = customAgentPaths[agent.id]?.trim() || null;
+                              await window.maestro.agents.setCustomPath(agent.id, path);
+                              loadAgents();
+                            }}
+                            onCustomPathClear={async () => {
+                              const newPaths = { ...customAgentPaths };
+                              delete newPaths[agent.id];
+                              setCustomAgentPaths(newPaths);
+                              await window.maestro.agents.setCustomPath(agent.id, null);
+                              loadAgents();
+                            }}
+                            customArgs={customAgentArgs[agent.id] || ''}
+                            onCustomArgsChange={(value) => {
+                              setCustomAgentArgs(prev => ({ ...prev, [agent.id]: value }));
+                            }}
+                            onCustomArgsBlur={async () => {
+                              const args = customAgentArgs[agent.id]?.trim() || null;
+                              await window.maestro.agents.setCustomArgs(agent.id, args);
+                            }}
+                            onCustomArgsClear={async () => {
+                              const newArgs = { ...customAgentArgs };
+                              delete newArgs[agent.id];
+                              setCustomAgentArgs(newArgs);
+                              await window.maestro.agents.setCustomArgs(agent.id, null);
+                            }}
+                            customEnvVars={customAgentEnvVars[agent.id] || {}}
+                            onEnvVarKeyChange={(oldKey, newKey, value) => {
+                              const currentVars = { ...customAgentEnvVars[agent.id] };
+                              delete currentVars[oldKey];
+                              currentVars[newKey] = value;
+                              setCustomAgentEnvVars(prev => ({
+                                ...prev,
+                                [agent.id]: currentVars
+                              }));
+                            }}
+                            onEnvVarValueChange={(key, value) => {
+                              setCustomAgentEnvVars(prev => ({
+                                ...prev,
+                                [agent.id]: {
+                                  ...prev[agent.id],
+                                  [key]: value
+                                }
+                              }));
+                            }}
+                            onEnvVarRemove={async (key) => {
+                              const currentVars = { ...customAgentEnvVars[agent.id] };
+                              delete currentVars[key];
+                              if (Object.keys(currentVars).length > 0) {
+                                setCustomAgentEnvVars(prev => ({
+                                  ...prev,
+                                  [agent.id]: currentVars
+                                }));
+                                await window.maestro.agents.setCustomEnvVars(agent.id, currentVars);
+                              } else {
+                                setCustomAgentEnvVars(prev => {
+                                  const newVars = { ...prev };
+                                  delete newVars[agent.id];
+                                  return newVars;
+                                });
+                                await window.maestro.agents.setCustomEnvVars(agent.id, null);
+                              }
+                            }}
+                            onEnvVarAdd={() => {
+                              const currentVars = customAgentEnvVars[agent.id] || {};
+                              let newKey = 'NEW_VAR';
+                              let counter = 1;
+                              while (currentVars[newKey]) {
+                                newKey = `NEW_VAR_${counter}`;
+                                counter++;
+                              }
+                              setCustomAgentEnvVars(prev => ({
+                                ...prev,
+                                [agent.id]: {
+                                  ...prev[agent.id],
+                                  [newKey]: ''
+                                }
+                              }));
+                            }}
+                            onEnvVarsBlur={async () => {
+                              const vars = customAgentEnvVars[agent.id];
+                              if (vars && Object.keys(vars).length > 0) {
+                                await window.maestro.agents.setCustomEnvVars(agent.id, vars);
+                              }
+                            }}
+                            agentConfig={agentConfigs[agent.id] || {}}
+                            onConfigChange={(key, value) => {
+                              setAgentConfigs(prev => ({
+                                ...prev,
+                                [agent.id]: {
+                                  ...prev[agent.id],
+                                  [key]: value
+                                }
+                              }));
+                            }}
+                            onConfigBlur={() => {
+                              const currentConfig = agentConfigs[agent.id] || {};
+                              window.maestro.agents.setConfig(agent.id, currentConfig);
+                            }}
+                            availableModels={availableModels[agent.id] || []}
+                            loadingModels={loadingModels[agent.id] || false}
+                            onRefreshModels={() => loadModelsForAgent(agent.id, true)}
+                            onRefreshAgent={() => handleRefreshAgent(agent.id)}
+                            refreshingAgent={refreshingAgent === agent.id}
+                          />
                         </div>
                       )}
                     </div>

@@ -92,6 +92,18 @@ vi.mock('lucide-react', () => ({
   MessageCircle: ({ className, style }: { className?: string; style?: React.CSSProperties }) => (
     <svg data-testid="message-circle-icon" className={className} style={style} />
   ),
+  Settings: ({ className, style }: { className?: string; style?: React.CSSProperties }) => (
+    <svg data-testid="settings-icon" className={className} style={style} />
+  ),
+  ArrowLeft: ({ className, style }: { className?: string; style?: React.CSSProperties }) => (
+    <svg data-testid="arrow-left-icon" className={className} style={style} />
+  ),
+  Plus: ({ className, style }: { className?: string; style?: React.CSSProperties }) => (
+    <svg data-testid="plus-icon" className={className} style={style} />
+  ),
+  Trash2: ({ className, style }: { className?: string; style?: React.CSSProperties }) => (
+    <svg data-testid="trash-icon" className={className} style={style} />
+  ),
 }));
 
 // Mock react-markdown
