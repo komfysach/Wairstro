@@ -4,7 +4,7 @@
  * Appears below the Ungrouped Agents section in the left sidebar.
  */
 
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Plus, MessageSquare, ChevronDown, ChevronRight, Edit3, Trash2 } from 'lucide-react';
 import type { Theme, GroupChat } from '../types';
 import { useClickOutside } from '../hooks';
@@ -102,6 +102,10 @@ interface GroupChatListProps {
   onNewGroupChat: () => void;
   onRenameGroupChat: (id: string) => void;
   onDeleteGroupChat: (id: string) => void;
+  /** Controlled expanded state (lifted to parent for keyboard navigation) */
+  isExpanded?: boolean;
+  /** Callback when expanded state changes */
+  onExpandedChange?: (expanded: boolean) => void;
 }
 
 export function GroupChatList({
@@ -112,9 +116,23 @@ export function GroupChatList({
   onNewGroupChat,
   onRenameGroupChat,
   onDeleteGroupChat,
+  isExpanded: controlledIsExpanded,
+  onExpandedChange,
 }: GroupChatListProps): JSX.Element {
-  // Default to collapsed if no group chats, expanded if there are any
-  const [isExpanded, setIsExpanded] = useState(groupChats.length > 0);
+  // Support both controlled and uncontrolled modes
+  // If isExpanded prop is provided, use it as controlled state
+  // Otherwise, use internal state (default: expanded if there are group chats)
+  const [internalIsExpanded, setInternalIsExpanded] = useState(groupChats.length > 0);
+  const isExpanded = controlledIsExpanded !== undefined ? controlledIsExpanded : internalIsExpanded;
+
+  const setIsExpanded = useCallback((expanded: boolean) => {
+    if (onExpandedChange) {
+      onExpandedChange(expanded);
+    } else {
+      setInternalIsExpanded(expanded);
+    }
+  }, [onExpandedChange]);
+
   const [contextMenu, setContextMenu] = useState<{
     x: number;
     y: number;
@@ -131,12 +149,19 @@ export function GroupChatList({
       setIsExpanded(true);
     }
     prevCountRef.current = groupChats.length;
-  }, [groupChats.length]);
+  }, [groupChats.length, setIsExpanded]);
 
   const handleContextMenu = (e: React.MouseEvent, chatId: string) => {
     e.preventDefault();
     setContextMenu({ x: e.clientX, y: e.clientY, chatId });
   };
+
+  // Sort group chats alphabetically by name (case-insensitive)
+  const sortedGroupChats = useMemo(() => {
+    return [...groupChats].sort((a, b) =>
+      a.name.toLowerCase().localeCompare(b.name.toLowerCase())
+    );
+  }, [groupChats]);
 
   return (
     <div className="border-t mt-4" style={{ borderColor: theme.colors.border }}>
@@ -195,7 +220,7 @@ export function GroupChatList({
             </div>
           ) : (
             <div className="flex flex-col border-l ml-4" style={{ borderColor: theme.colors.border }}>
-              {groupChats.map((chat) => {
+              {sortedGroupChats.map((chat) => {
                 const isActive = activeGroupChatId === chat.id;
                 return (
                   <div

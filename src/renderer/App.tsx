@@ -211,6 +211,7 @@ export default function MaestroConsole() {
 
   // --- GROUP CHAT STATE ---
   const [groupChats, setGroupChats] = useState<GroupChat[]>([]);
+  const [groupChatsExpanded, setGroupChatsExpanded] = useState(true);
   const [activeGroupChatId, setActiveGroupChatId] = useState<string | null>(null);
   const [groupChatMessages, setGroupChatMessages] = useState<GroupChatMessage[]>([]);
   const [groupChatState, setGroupChatState] = useState<GroupChatState>('idle');
@@ -3004,18 +3005,24 @@ export default function MaestroConsole() {
 
   // --- ACTIONS ---
   const cycleSession = (dir: 'next' | 'prev') => {
-    // Build the visual order of sessions as they appear in the sidebar.
+    // Build the visual order of items as they appear in the sidebar.
     // This matches the actual rendering order in SessionList.tsx:
     // 1. Bookmarks section (if open) - sorted alphabetically
     // 2. Groups (sorted alphabetically) - each with sessions sorted alphabetically
     // 3. Ungrouped sessions - sorted alphabetically
+    // 4. Group Chats section (if expanded) - sorted alphabetically
     //
     // A bookmarked session visually appears in BOTH the bookmarks section AND its
     // regular location (group or ungrouped). The same session can appear twice in
     // the visual order. We track the current position with cyclePositionRef to
     // allow cycling through duplicate occurrences correctly.
 
-    const visualOrder: Session[] = [];
+    // Visual order item can be either a session or a group chat
+    type VisualOrderItem =
+      | { type: 'session'; id: string; name: string }
+      | { type: 'groupChat'; id: string; name: string };
+
+    const visualOrder: VisualOrderItem[] = [];
 
     if (leftSidebarOpen) {
       // Bookmarks section (if expanded and has bookmarked sessions)
@@ -3023,7 +3030,7 @@ export default function MaestroConsole() {
         const bookmarkedSessions = sessions
           .filter(s => s.bookmarked)
           .sort((a, b) => compareNamesIgnoringEmojis(a.name, b.name));
-        visualOrder.push(...bookmarkedSessions);
+        visualOrder.push(...bookmarkedSessions.map(s => ({ type: 'session' as const, id: s.id, name: s.name })));
       }
 
       // Groups (sorted alphabetically), with each group's sessions
@@ -3033,7 +3040,7 @@ export default function MaestroConsole() {
           const groupSessions = sessions
             .filter(s => s.groupId === group.id)
             .sort((a, b) => compareNamesIgnoringEmojis(a.name, b.name));
-          visualOrder.push(...groupSessions);
+          visualOrder.push(...groupSessions.map(s => ({ type: 'session' as const, id: s.id, name: s.name })));
         }
       }
 
@@ -3042,29 +3049,50 @@ export default function MaestroConsole() {
         const ungroupedSessions = sessions
           .filter(s => !s.groupId)
           .sort((a, b) => compareNamesIgnoringEmojis(a.name, b.name));
-        visualOrder.push(...ungroupedSessions);
+        visualOrder.push(...ungroupedSessions.map(s => ({ type: 'session' as const, id: s.id, name: s.name })));
+      }
+
+      // Group Chats section (if expanded and has group chats)
+      if (groupChatsExpanded && groupChats.length > 0) {
+        const sortedGroupChats = [...groupChats].sort((a, b) =>
+          a.name.toLowerCase().localeCompare(b.name.toLowerCase())
+        );
+        visualOrder.push(...sortedGroupChats.map(gc => ({ type: 'groupChat' as const, id: gc.id, name: gc.name })));
       }
     } else {
       // Sidebar collapsed: cycle through all sessions in their sorted order
-      visualOrder.push(...sortedSessions);
+      visualOrder.push(...sortedSessions.map(s => ({ type: 'session' as const, id: s.id, name: s.name })));
     }
 
     if (visualOrder.length === 0) return;
 
+    // Determine what is currently active (session or group chat)
+    const currentActiveId = activeGroupChatId || activeSessionId;
+    const currentIsGroupChat = activeGroupChatId !== null;
+
     // Determine current position in visual order
-    // If cyclePositionRef is valid and points to our current session, use it
-    // Otherwise, find the first occurrence of our current session
+    // If cyclePositionRef is valid and points to our current item, use it
+    // Otherwise, find the first occurrence of our current item
     let currentIndex = cyclePositionRef.current;
     if (currentIndex < 0 || currentIndex >= visualOrder.length ||
-        visualOrder[currentIndex].id !== activeSessionId) {
-      // Position is invalid or doesn't match current session - find first occurrence
-      currentIndex = visualOrder.findIndex(s => s.id === activeSessionId);
+        visualOrder[currentIndex].id !== currentActiveId) {
+      // Position is invalid or doesn't match current item - find first occurrence
+      currentIndex = visualOrder.findIndex(item =>
+        item.id === currentActiveId &&
+        (currentIsGroupChat ? item.type === 'groupChat' : item.type === 'session')
+      );
     }
 
     if (currentIndex === -1) {
-      // Current session not visible, select first visible session
+      // Current item not visible, select first visible item
       cyclePositionRef.current = 0;
-      setActiveSessionIdInternal(visualOrder[0].id);
+      const firstItem = visualOrder[0];
+      if (firstItem.type === 'session') {
+        setActiveGroupChatId(null);
+        setActiveSessionIdInternal(firstItem.id);
+      } else {
+        setActiveGroupChatId(firstItem.id);
+      }
       return;
     }
 
@@ -3077,7 +3105,13 @@ export default function MaestroConsole() {
     }
 
     cyclePositionRef.current = nextIndex;
-    setActiveSessionIdInternal(visualOrder[nextIndex].id);
+    const nextItem = visualOrder[nextIndex];
+    if (nextItem.type === 'session') {
+      setActiveGroupChatId(null);
+      setActiveSessionIdInternal(nextItem.id);
+    } else {
+      setActiveGroupChatId(nextItem.id);
+    }
   };
 
   const showConfirmation = (message: string, onConfirm: () => void) => {
@@ -5566,6 +5600,8 @@ export default function MaestroConsole() {
             onNewGroupChat={() => setShowNewGroupChatModal(true)}
             onRenameGroupChat={(id) => setShowRenameGroupChatModal(id)}
             onDeleteGroupChat={(id) => setShowDeleteGroupChatModal(id)}
+            groupChatsExpanded={groupChatsExpanded}
+            onGroupChatsExpandedChange={setGroupChatsExpanded}
             sidebarContainerRef={sidebarContainerRef}
           />
         </ErrorBoundary>

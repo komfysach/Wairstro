@@ -135,7 +135,7 @@ export function ParticipantCard({
 
       {/* Stats row: message count + last time (left), agent type (right) */}
       <div
-        className="text-xs mt-1 ml-4 flex items-center justify-between"
+        className="text-xs mt-1 flex items-center justify-between"
         style={{ color: theme.colors.textDim }}
       >
         <div className="flex items-center gap-2">

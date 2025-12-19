@@ -354,6 +354,10 @@ interface SessionListProps {
   onNewGroupChat?: () => void;
   onRenameGroupChat?: (id: string) => void;
   onDeleteGroupChat?: (id: string) => void;
+  /** Controlled expanded state for group chats (lifted to parent for keyboard navigation) */
+  groupChatsExpanded?: boolean;
+  /** Callback when group chats expanded state changes */
+  onGroupChatsExpandedChange?: (expanded: boolean) => void;
 }
 
 export function SessionList(props: SessionListProps) {
@@ -387,7 +391,9 @@ export function SessionList(props: SessionListProps) {
     onOpenGroupChat,
     onNewGroupChat,
     onRenameGroupChat,
-    onDeleteGroupChat
+    onDeleteGroupChat,
+    groupChatsExpanded,
+    onGroupChatsExpandedChange,
   } = props;
 
   const [sessionFilter, setSessionFilter] = useState('');
@@ -1995,6 +2001,8 @@ export function SessionList(props: SessionListProps) {
               onNewGroupChat={onNewGroupChat}
               onRenameGroupChat={onRenameGroupChat}
               onDeleteGroupChat={onDeleteGroupChat}
+              isExpanded={groupChatsExpanded}
+              onExpandedChange={onGroupChatsExpandedChange}
             />
           )}
         </div>

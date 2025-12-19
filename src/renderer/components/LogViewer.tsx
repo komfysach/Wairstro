@@ -112,24 +112,31 @@ export function LogViewer({ theme, onClose, logLevel = 'info', savedSelectedLeve
   const allExpanded = expandableIndices.length > 0 && expandableIndices.every(i => expandedData.has(i));
   const allCollapsed = expandedData.size === 0;
 
+  // Track the max log buffer for trimming real-time updates
+  const [maxLogBuffer, setMaxLogBuffer] = useState(1000);
+
   // Load logs on mount and subscribe to new logs
   useEffect(() => {
-    loadLogs();
+    // Get max buffer setting first, then load logs
+    window.maestro.logger.getMaxLogBuffer().then(max => {
+      setMaxLogBuffer(max || 1000);
+      loadLogs();
+    });
 
     // Subscribe to new log entries
     const unsubscribe = window.maestro.logger.onNewLog((newLog: SystemLogEntry) => {
       setLogs(prevLogs => {
         // Add new log at the beginning (newest first)
         const updated = [newLog, ...prevLogs];
-        // Keep only the last 50 logs (matching the initial load limit)
-        return updated.slice(0, 50);
+        // Trim to max buffer size (main process also trims, but keep UI in sync)
+        return updated.slice(0, maxLogBuffer);
       });
     });
 
     return () => {
       unsubscribe();
     };
-  }, []);
+  }, [maxLogBuffer]);
 
   // Filter logs whenever search query or selected levels changes
   // Optimized: Uses lazy evaluation to avoid expensive JSON.stringify unless needed
@@ -221,7 +228,9 @@ export function LogViewer({ theme, onClose, logLevel = 'info', savedSelectedLeve
 
   const loadLogs = async () => {
     try {
-      const systemLogs = await window.maestro.logger.getLogs({ limit: 50 });
+      // Get the configured max log buffer size, default to 1000 if not set
+      const maxBuffer = await window.maestro.logger.getMaxLogBuffer() || 1000;
+      const systemLogs = await window.maestro.logger.getLogs({ limit: maxBuffer });
       // Reverse to show newest first
       setLogs(systemLogs.reverse());
     } catch (error) {

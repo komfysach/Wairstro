@@ -314,6 +314,7 @@ ${message}`;
           args,
           readOnlyMode: true,
           prompt: fullPrompt,
+          customEnvVars: chat.moderatorConfig?.customEnvVars,
         });
       } catch (error) {
         console.error(`[GroupChatRouter] Failed to spawn moderator for ${groupChatId}:`, error);

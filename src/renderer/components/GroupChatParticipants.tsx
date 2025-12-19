@@ -2,12 +2,12 @@
  * GroupChatParticipants.tsx
  *
  * Right panel component that displays all participants in a group chat.
- * Shows participant cards with their status, agent type, and context usage.
+ * Shows moderator card at top, then participant cards sorted alphabetically.
  * This panel replaces the RightPanel when a group chat is active.
  */
 
 import { useMemo } from 'react';
-import { PanelRightClose, PanelRightOpen } from 'lucide-react';
+import { PanelRightClose } from 'lucide-react';
 import type { Theme, GroupChatParticipant, SessionState, Shortcut } from '../types';
 import { ParticipantCard } from './ParticipantCard';
 import { formatShortcutKeys } from '../utils/shortcutFormatter';
@@ -22,6 +22,10 @@ interface GroupChatParticipantsProps {
   width: number;
   setWidthState: (width: number) => void;
   shortcuts: Record<string, Shortcut>;
+  /** Moderator agent ID (e.g., 'claude-code') */
+  moderatorAgentId: string;
+  /** Moderator session ID */
+  moderatorSessionId: string;
 }
 
 export function GroupChatParticipants({
@@ -33,11 +37,26 @@ export function GroupChatParticipants({
   width,
   setWidthState,
   shortcuts,
+  moderatorAgentId,
+  moderatorSessionId,
 }: GroupChatParticipantsProps): JSX.Element {
-  // Generate consistent colors for all participants
+  // Generate consistent colors for all participants (including "Moderator" for the moderator card)
   const participantColors = useMemo(() => {
-    return buildParticipantColorMap(participants.map(p => p.name), theme);
+    return buildParticipantColorMap(['Moderator', ...participants.map(p => p.name)], theme);
   }, [participants, theme]);
+
+  // Create a synthetic moderator participant for display
+  const moderatorParticipant: GroupChatParticipant = useMemo(() => ({
+    name: 'Moderator',
+    agentId: moderatorAgentId,
+    sessionId: moderatorSessionId,
+    addedAt: Date.now(),
+  }), [moderatorAgentId, moderatorSessionId]);
+
+  // Sort participants alphabetically by name
+  const sortedParticipants = useMemo(() => {
+    return [...participants].sort((a, b) => a.name.localeCompare(b.name));
+  }, [participants]);
 
   if (!isOpen) return null;
 
