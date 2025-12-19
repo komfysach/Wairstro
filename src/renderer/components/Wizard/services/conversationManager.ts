@@ -16,7 +16,6 @@ import {
   type StructuredAgentResponse,
   type ParsedResponse,
   type ExistingDocument,
-  type ProjectFileInfo,
   READY_CONFIDENCE_THRESHOLD,
 } from './wizardPrompts';
 
@@ -32,8 +31,6 @@ export interface ConversationConfig {
   projectName: string;
   /** Existing Auto Run documents (when continuing from previous session) */
   existingDocs?: ExistingDocument[];
-  /** Files in the project directory for context (auto-fetched if not provided) */
-  projectFiles?: ProjectFileInfo[];
 }
 
 /**
