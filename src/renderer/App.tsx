@@ -4486,14 +4486,16 @@ export default function MaestroConsole() {
               // Ignore git errors
             }
           }
-          let substitutedPrompt = substituteTemplateVariables(
+          const substitutedPrompt = substituteTemplateVariables(
             matchingCommand.prompt,
             { session, gitBranch }
           );
 
           // For NEW sessions (no agentSessionId), prepend Maestro system prompt
           // This introduces Maestro and sets directory restrictions for the agent
+          // Keep original prompt separate for user log (don't show system prompt in chat)
           const isNewSessionForCommand = !tabAgentSessionId;
+          let promptForAgent = substitutedPrompt;
           if (isNewSessionForCommand && maestroSystemPrompt) {
             // Substitute template variables in the system prompt
             const substitutedSystemPrompt = substituteTemplateVariables(maestroSystemPrompt, {
@@ -4501,12 +4503,12 @@ export default function MaestroConsole() {
               gitBranch,
             });
 
-            // Prepend system prompt to command's prompt
-            substitutedPrompt = `${substitutedSystemPrompt}\n\n---\n\n# User Request\n\n${substitutedPrompt}`;
+            // Prepend system prompt to command's prompt (for agent only)
+            promptForAgent = `${substitutedSystemPrompt}\n\n---\n\n# User Request\n\n${substitutedPrompt}`;
           }
 
           // Add user log showing the command with its interpolated prompt
-          // Use target tab (from queued item), not active tab
+          // Use original substitutedPrompt (without system context) for display
           addLogToTab(sessionId, {
             source: 'user',
             text: substitutedPrompt,
@@ -4525,14 +4527,14 @@ export default function MaestroConsole() {
             };
           }));
 
-          // Spawn agent with the substituted prompt
+          // Spawn agent with the prompt (includes system context for new sessions)
           await window.maestro.process.spawn({
             sessionId: targetSessionId,
             toolType: session.toolType,
             cwd: session.cwd,
             command: commandToUse,
             args: spawnArgs,
-            prompt: substitutedPrompt,
+            prompt: promptForAgent,
             // Generic spawn options - main process builds agent-specific args
             agentSessionId: tabAgentSessionId,
             readOnlyMode: isReadOnly,
