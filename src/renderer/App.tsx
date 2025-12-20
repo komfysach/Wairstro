@@ -31,6 +31,7 @@ import { LeaderboardRegistrationModal } from './components/LeaderboardRegistrati
 import { PlaygroundPanel } from './components/PlaygroundPanel';
 import { AutoRunSetupModal } from './components/AutoRunSetupModal';
 import { DebugWizardModal } from './components/DebugWizardModal';
+import { DebugPackageModal } from './components/DebugPackageModal';
 import { MaestroWizard, useWizard, WizardResumeModal, SerializableWizardState, AUTO_RUN_FOLDER_NAME } from './components/Wizard';
 import { TourOverlay } from './components/Wizard/tour';
 import { CONDUCTOR_BADGES, getBadgeForTime } from './constants/conductorBadges';
@@ -326,12 +327,14 @@ export default function MaestroConsole() {
   const [processMonitorOpen, setProcessMonitorOpen] = useState(false);
   const [playgroundOpen, setPlaygroundOpen] = useState(false);
   const [debugWizardModalOpen, setDebugWizardModalOpen] = useState(false);
+  const [debugPackageModalOpen, setDebugPackageModalOpen] = useState(false);
 
   // Stable callbacks for memoized modals (prevents re-renders from callback reference changes)
   // NOTE: These must be declared AFTER the state they reference
   const handleCloseGitDiff = useCallback(() => setGitDiffPreview(null), []);
   const handleCloseGitLog = useCallback(() => setGitLogOpen(false), []);
   const handleCloseSettings = useCallback(() => setSettingsModalOpen(false), []);
+  const handleCloseDebugPackage = useCallback(() => setDebugPackageModalOpen(false), []);
 
   // Confirmation Modal State
   const [confirmModalOpen, setConfirmModalOpen] = useState(false);
@@ -3789,21 +3792,9 @@ export default function MaestroConsole() {
     }
   };
 
-  const handleCreateDebugPackage = async () => {
-    addToast({ type: 'info', title: 'Debug Package', message: 'Creating debug package...' });
-    try {
-      const result = await window.maestro.debug.createPackage();
-      if (result.success && result.path) {
-        addToast({ type: 'success', title: 'Debug Package Created', message: `Saved to ${result.path}` });
-      } else if (result.error === 'Cancelled by user') {
-        // User cancelled, no need to show error
-      } else {
-        addToast({ type: 'error', title: 'Debug Package Failed', message: result.error || 'Unknown error' });
-      }
-    } catch (error) {
-      addToast({ type: 'error', title: 'Debug Package Failed', message: error instanceof Error ? error.message : 'Unknown error' });
-    }
-  };
+  const handleCreateDebugPackage = useCallback(() => {
+    setDebugPackageModalOpen(true);
+  }, []);
 
 
   // startRenamingSession now accepts a unique key (e.g., 'bookmark-id', 'group-gid-id', 'ungrouped-id')
@@ -5558,6 +5549,7 @@ export default function MaestroConsole() {
           openWizard={openWizardModal}
           wizardGoToStep={wizardGoToStep}
           setDebugWizardModalOpen={setDebugWizardModalOpen}
+          setDebugPackageModalOpen={setDebugPackageModalOpen}
           startTour={() => {
             setTourFromWizard(false);
             setTourOpen(true);
@@ -5680,6 +5672,13 @@ export default function MaestroConsole() {
           onClose={() => setUpdateCheckModalOpen(false)}
         />
       )}
+
+      {/* --- DEBUG PACKAGE MODAL --- */}
+      <DebugPackageModal
+        theme={theme}
+        isOpen={debugPackageModalOpen}
+        onClose={handleCloseDebugPackage}
+      />
 
       {/* --- AGENT ERROR MODAL --- */}
       {errorSession?.agentError && (

@@ -68,6 +68,7 @@ interface QuickActionsModalProps {
   openWizard?: () => void;
   wizardGoToStep?: (step: WizardStep) => void;
   setDebugWizardModalOpen?: (open: boolean) => void;
+  setDebugPackageModalOpen?: (open: boolean) => void;
   startTour?: () => void;
   setFuzzyFileSearchOpen?: (open: boolean) => void;
   onEditAgent?: (session: Session) => void;
@@ -93,7 +94,7 @@ export function QuickActionsModal(props: QuickActionsModalProps) {
     setShortcutsHelpOpen, setAboutModalOpen, setLogViewerOpen, setProcessMonitorOpen,
     setAgentSessionsOpen, setActiveAgentSessionId, setGitDiffPreview, setGitLogOpen,
     onRenameTab, onToggleReadOnlyMode, onOpenTabSwitcher, tabShortcuts, isAiMode, setPlaygroundOpen, onRefreshGitFileState,
-    onDebugReleaseQueuedItem, markdownEditMode, onToggleMarkdownEditMode, setUpdateCheckModalOpen, openWizard, wizardGoToStep, setDebugWizardModalOpen, startTour, setFuzzyFileSearchOpen, onEditAgent,
+    onDebugReleaseQueuedItem, markdownEditMode, onToggleMarkdownEditMode, setUpdateCheckModalOpen, openWizard, wizardGoToStep, setDebugWizardModalOpen, setDebugPackageModalOpen, startTour, setFuzzyFileSearchOpen, onEditAgent,
     groupChats, onNewGroupChat, onOpenGroupChat, onCloseGroupChat, onDeleteGroupChat, activeGroupChatId,
     hasActiveSessionCapability
   } = props;
@@ -305,20 +306,22 @@ export function QuickActionsModal(props: QuickActionsModalProps) {
     { id: 'website', label: 'Maestro Website', subtext: 'Open the Maestro website', action: () => { window.maestro.shell.openExternal('https://runmaestro.ai/'); setQuickActionOpen(false); } },
     { id: 'discord', label: 'Join Discord', subtext: 'Join the Maestro community', action: () => { window.maestro.shell.openExternal('https://discord.gg/86crXbGb'); setQuickActionOpen(false); } },
     ...(setUpdateCheckModalOpen ? [{ id: 'updateCheck', label: 'Check for Updates', action: () => { setUpdateCheckModalOpen(true); setQuickActionOpen(false); } }] : []),
-    { id: 'createDebugPackage', label: 'Create Debug Package', shortcut: shortcuts.createDebugPackage, subtext: 'Generate a support bundle for bug reporting', action: async () => {
+    { id: 'createDebugPackage', label: 'Create Debug Package', shortcut: shortcuts.createDebugPackage, subtext: 'Generate a support bundle for bug reporting', action: () => {
       setQuickActionOpen(false);
-      addToast({ type: 'info', title: 'Debug Package', message: 'Creating debug package...' });
-      try {
-        const result = await window.maestro.debug.createPackage();
-        if (result.success && result.path) {
-          addToast({ type: 'success', title: 'Debug Package Created', message: `Saved to ${result.path}` });
-        } else if (result.error === 'Cancelled by user') {
-          // User cancelled, no need to show error
-        } else {
-          addToast({ type: 'error', title: 'Debug Package Failed', message: result.error || 'Unknown error' });
-        }
-      } catch (error) {
-        addToast({ type: 'error', title: 'Debug Package Failed', message: error instanceof Error ? error.message : 'Unknown error' });
+      if (setDebugPackageModalOpen) {
+        setDebugPackageModalOpen(true);
+      } else {
+        // Fallback to direct API call if modal not available
+        addToast({ type: 'info', title: 'Debug Package', message: 'Creating debug package...' });
+        window.maestro.debug.createPackage().then(result => {
+          if (result.success && result.path) {
+            addToast({ type: 'success', title: 'Debug Package Created', message: `Saved to ${result.path}` });
+          } else if (result.error !== 'Cancelled by user') {
+            addToast({ type: 'error', title: 'Debug Package Failed', message: result.error || 'Unknown error' });
+          }
+        }).catch(error => {
+          addToast({ type: 'error', title: 'Debug Package Failed', message: error instanceof Error ? error.message : 'Unknown error' });
+        });
       }
     } },
     { id: 'goToFiles', label: 'Go to Files Tab', shortcut: shortcuts.goToFiles, action: () => { setRightPanelOpen(true); setActiveRightTab('files'); setQuickActionOpen(false); } },

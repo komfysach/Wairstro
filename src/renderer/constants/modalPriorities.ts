@@ -113,6 +113,9 @@ export const MODAL_PRIORITIES = {
   /** Leaderboard registration modal */
   LEADERBOARD_REGISTRATION: 620,
 
+  /** Debug package generation modal */
+  DEBUG_PACKAGE: 605,
+
   /** About/info modal */
   ABOUT: 600,
 
