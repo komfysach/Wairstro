@@ -99,10 +99,8 @@ export interface UseSettingsReturn {
   // Font settings
   fontFamily: string;
   fontSize: number;
-  customFonts: string[];
   setFontFamily: (value: string) => void;
   setFontSize: (value: number) => void;
-  setCustomFonts: (value: string[]) => void;
 
   // UI settings
   activeThemeId: ThemeId;
@@ -188,8 +186,6 @@ export interface UseSettingsReturn {
   setUngroupedCollapsed: (value: boolean) => void;
 
   // Onboarding settings
-  wizardCompleted: boolean;
-  setWizardCompleted: (value: boolean) => void;
   tourCompleted: boolean;
   setTourCompleted: (value: boolean) => void;
   firstAutoRunCompleted: boolean;
@@ -245,7 +241,6 @@ export function useSettings(): UseSettingsReturn {
   // Font Config
   const [fontFamily, setFontFamilyState] = useState('Roboto Mono, Menlo, "Courier New", monospace');
   const [fontSize, setFontSizeState] = useState(14);
-  const [customFonts, setCustomFontsState] = useState<string[]>([]);
 
   // UI Config
   const [activeThemeId, setActiveThemeIdState] = useState<ThemeId>('dracula');
@@ -300,7 +295,6 @@ export function useSettings(): UseSettingsReturn {
   const [ungroupedCollapsed, setUngroupedCollapsedState] = useState(false);
 
   // Onboarding settings (persistent)
-  const [wizardCompleted, setWizardCompletedState] = useState(false);
   const [tourCompleted, setTourCompletedState] = useState(false);
   const [firstAutoRunCompleted, setFirstAutoRunCompletedState] = useState(false);
 
@@ -364,11 +358,6 @@ export function useSettings(): UseSettingsReturn {
   const setFontSize = useCallback((value: number) => {
     setFontSizeState(value);
     window.maestro.settings.set('fontSize', value);
-  }, []);
-
-  const setCustomFonts = useCallback((value: string[]) => {
-    setCustomFontsState(value);
-    window.maestro.settings.set('customFonts', value);
   }, []);
 
   const setActiveThemeId = useCallback((value: ThemeId) => {
@@ -668,19 +657,11 @@ export function useSettings(): UseSettingsReturn {
 
   // UI collapse state setters
   const setUngroupedCollapsed = useCallback((value: boolean) => {
-    console.log('[useSettings] setUngroupedCollapsed called with:', value);
     setUngroupedCollapsedState(value);
-    window.maestro.settings.set('ungroupedCollapsed', value)
-      .then(() => console.log('[useSettings] ungroupedCollapsed persisted successfully'))
-      .catch((err: unknown) => console.error('[useSettings] Failed to persist ungroupedCollapsed:', err));
+    window.maestro.settings.set('ungroupedCollapsed', value);
   }, []);
 
   // Onboarding setters
-  const setWizardCompleted = useCallback((value: boolean) => {
-    setWizardCompletedState(value);
-    window.maestro.settings.set('wizardCompleted', value);
-  }, []);
-
   const setTourCompleted = useCallback((value: boolean) => {
     setTourCompletedState(value);
     window.maestro.settings.set('tourCompleted', value);
@@ -895,7 +876,6 @@ export function useSettings(): UseSettingsReturn {
       const savedGhPath = await window.maestro.settings.get('ghPath');
       const savedFontSize = await window.maestro.settings.get('fontSize');
       const savedFontFamily = await window.maestro.settings.get('fontFamily');
-      const savedCustomFonts = await window.maestro.settings.get('customFonts');
       const savedLeftSidebarWidth = await window.maestro.settings.get('leftSidebarWidth');
       const savedRightPanelWidth = await window.maestro.settings.get('rightPanelWidth');
       const savedMarkdownEditMode = await window.maestro.settings.get('markdownEditMode');
@@ -919,7 +899,6 @@ export function useSettings(): UseSettingsReturn {
       const savedGlobalStats = await window.maestro.settings.get('globalStats');
       const savedAutoRunStats = await window.maestro.settings.get('autoRunStats');
       const savedUngroupedCollapsed = await window.maestro.settings.get('ungroupedCollapsed');
-      const savedWizardCompleted = await window.maestro.settings.get('wizardCompleted');
       const savedTourCompleted = await window.maestro.settings.get('tourCompleted');
       const savedFirstAutoRunCompleted = await window.maestro.settings.get('firstAutoRunCompleted');
       const savedOnboardingStats = await window.maestro.settings.get('onboardingStats');
@@ -941,7 +920,6 @@ export function useSettings(): UseSettingsReturn {
       if (savedGhPath !== undefined) setGhPathState(savedGhPath);
       if (savedFontSize !== undefined) setFontSizeState(savedFontSize);
       if (savedFontFamily !== undefined) setFontFamilyState(savedFontFamily);
-      if (savedCustomFonts !== undefined) setCustomFontsState(savedCustomFonts);
       if (savedLeftSidebarWidth !== undefined) setLeftSidebarWidthState(Math.max(256, Math.min(600, savedLeftSidebarWidth)));
       if (savedRightPanelWidth !== undefined) setRightPanelWidthState(savedRightPanelWidth);
       if (savedMarkdownEditMode !== undefined) setMarkdownEditModeState(savedMarkdownEditMode);
@@ -1057,7 +1035,6 @@ export function useSettings(): UseSettingsReturn {
       // UI collapse states
       if (savedUngroupedCollapsed !== undefined) setUngroupedCollapsedState(savedUngroupedCollapsed);
 
-      if (savedWizardCompleted !== undefined) setWizardCompletedState(savedWizardCompleted);
       if (savedTourCompleted !== undefined) setTourCompletedState(savedTourCompleted);
       if (savedFirstAutoRunCompleted !== undefined) setFirstAutoRunCompletedState(savedFirstAutoRunCompleted);
 
@@ -1110,10 +1087,8 @@ export function useSettings(): UseSettingsReturn {
     setGhPath,
     fontFamily,
     fontSize,
-    customFonts,
     setFontFamily,
     setFontSize,
-    setCustomFonts,
     activeThemeId,
     setActiveThemeId,
     customThemeColors,
@@ -1171,8 +1146,6 @@ export function useSettings(): UseSettingsReturn {
     getUnacknowledgedBadgeLevel,
     ungroupedCollapsed,
     setUngroupedCollapsed,
-    wizardCompleted,
-    setWizardCompleted,
     tourCompleted,
     setTourCompleted,
     firstAutoRunCompleted,
@@ -1207,7 +1180,6 @@ export function useSettings(): UseSettingsReturn {
     ghPath,
     fontFamily,
     fontSize,
-    customFonts,
     activeThemeId,
     customThemeColors,
     customThemeBaseId,
@@ -1234,7 +1206,6 @@ export function useSettings(): UseSettingsReturn {
     globalStats,
     autoRunStats,
     ungroupedCollapsed,
-    wizardCompleted,
     tourCompleted,
     firstAutoRunCompleted,
     onboardingStats,
@@ -1249,7 +1220,6 @@ export function useSettings(): UseSettingsReturn {
     setGhPath,
     setFontFamily,
     setFontSize,
-    setCustomFonts,
     setActiveThemeId,
     setCustomThemeColors,
     setCustomThemeBaseId,
@@ -1281,7 +1251,6 @@ export function useSettings(): UseSettingsReturn {
     acknowledgeBadge,
     getUnacknowledgedBadgeLevel,
     setUngroupedCollapsed,
-    setWizardCompleted,
     setTourCompleted,
     setFirstAutoRunCompleted,
     setOnboardingStats,

@@ -63,7 +63,6 @@ describe('useSettings', () => {
 
       expect(result.current.fontFamily).toBe('Roboto Mono, Menlo, "Courier New", monospace');
       expect(result.current.fontSize).toBe(14);
-      expect(result.current.customFonts).toEqual([]);
     });
 
     it('should have correct default values for UI settings', async () => {
@@ -450,19 +449,6 @@ describe('useSettings', () => {
 
       expect(result.current.fontSize).toBe(16);
       expect(window.maestro.settings.set).toHaveBeenCalledWith('fontSize', 16);
-    });
-
-    it('should update customFonts and persist to settings', async () => {
-      const { result } = renderHook(() => useSettings());
-      await waitForSettingsLoaded(result);
-
-      const newFonts = ['Fira Code', 'Source Code Pro'];
-      act(() => {
-        result.current.setCustomFonts(newFonts);
-      });
-
-      expect(result.current.customFonts).toEqual(newFonts);
-      expect(window.maestro.settings.set).toHaveBeenCalledWith('customFonts', newFonts);
     });
   });
 
