@@ -41,16 +41,12 @@ jobs:
           cache: 'npm'
 
       # Linux: Install build dependencies for native modules and electron-builder
-      # Includes ARM64 cross-compilation support for multi-arch builds
+      # Cross-compilers for ARM64 don't require adding arm64 architecture
       - name: Install Linux build dependencies
         if: matrix.platform == 'linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libarchive-tools rpm
-          # Add ARM64 architecture for cross-compilation
-          sudo dpkg --add-architecture arm64
-          sudo apt-get update
-          sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+          sudo apt-get install -y libarchive-tools rpm gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
 
       # Windows: Setup for native module compilation
       - name: Setup Windows build tools
