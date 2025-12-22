@@ -1036,15 +1036,15 @@ export function SessionList(props: SessionListProps) {
         {/* Worktree children drawer (when expanded) */}
         {hasWorktrees && worktreesExpanded && onToggleWorktreeExpanded && (
           <div
-            className="mx-1 rounded-b overflow-hidden"
+            className="ml-1 rounded-bl overflow-hidden"
             style={{
               backgroundColor: theme.colors.accent + '10',
-              border: `1px solid ${theme.colors.accent}30`,
-              borderTop: 'none',
+              borderLeft: `1px solid ${theme.colors.accent}30`,
+              borderBottom: `1px solid ${theme.colors.accent}30`,
             }}
           >
-            {/* Worktree children list - minimal left indent */}
-            <div className="pl-1">
+            {/* Worktree children list */}
+            <div>
               {worktreeChildren.sort((a, b) => compareSessionNames(a.worktreeBranch || a.name, b.worktreeBranch || b.name)).map(child => {
                 const childGlobalIdx = sortedSessions.findIndex(s => s.id === child.id);
                 const isChildKeyboardSelected = activeFocus === 'sidebar' && childGlobalIdx === selectedSidebarIndex;
