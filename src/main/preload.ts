@@ -270,6 +270,33 @@ contextBridge.exposeInMainWorld('maestro', {
       ipcRenderer.invoke('agent:retryAfterError', sessionId, options),
   },
 
+  // Context Merge API (for session context transfer and grooming)
+  context: {
+    // Get context from a stored agent session
+    getStoredSession: (agentId: string, projectRoot: string, sessionId: string) =>
+      ipcRenderer.invoke('context:getStoredSession', agentId, projectRoot, sessionId) as Promise<{
+        messages: Array<{
+          type: string;
+          role?: string;
+          content: string;
+          timestamp: string;
+          uuid: string;
+          toolUse?: unknown;
+        }>;
+        total: number;
+        hasMore: boolean;
+      } | null>,
+    // Create a temporary session for context grooming
+    createGroomingSession: (projectRoot: string, agentType: string) =>
+      ipcRenderer.invoke('context:createGroomingSession', projectRoot, agentType) as Promise<string>,
+    // Send grooming prompt to a session and get response
+    sendGroomingPrompt: (sessionId: string, prompt: string) =>
+      ipcRenderer.invoke('context:sendGroomingPrompt', sessionId, prompt) as Promise<string>,
+    // Clean up a temporary grooming session
+    cleanupGroomingSession: (sessionId: string) =>
+      ipcRenderer.invoke('context:cleanupGroomingSession', sessionId) as Promise<void>,
+  },
+
   // Web interface API
   web: {
     // Broadcast user input to web clients (for keeping web interface in sync)

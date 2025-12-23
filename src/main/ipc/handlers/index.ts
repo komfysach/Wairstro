@@ -22,6 +22,7 @@ import { registerAgentSessionsHandlers, AgentSessionsHandlerDependencies } from 
 import { registerGroupChatHandlers, GroupChatHandlerDependencies } from './groupChat';
 import { registerDebugHandlers, DebugHandlerDependencies } from './debug';
 import { registerSpeckitHandlers } from './speckit';
+import { registerContextHandlers, ContextHandlerDependencies } from './context';
 import { AgentDetector } from '../../agent-detector';
 import { ProcessManager } from '../../process-manager';
 import { WebServer } from '../../web-server';
@@ -44,6 +45,7 @@ export { registerAgentSessionsHandlers };
 export { registerGroupChatHandlers };
 export { registerDebugHandlers };
 export { registerSpeckitHandlers };
+export { registerContextHandlers };
 export type { AgentsHandlerDependencies };
 export type { ProcessHandlerDependencies };
 export type { PersistenceHandlerDependencies };
@@ -52,6 +54,7 @@ export type { ClaudeHandlerDependencies };
 export type { AgentSessionsHandlerDependencies };
 export type { GroupChatHandlerDependencies };
 export type { DebugHandlerDependencies };
+export type { ContextHandlerDependencies };
 export type { MaestroSettings, SessionsData, GroupsData };
 
 /**
@@ -151,6 +154,11 @@ export function registerAllHandlers(deps: HandlerDependencies): void {
   });
   // Register spec-kit handlers (no dependencies needed)
   registerSpeckitHandlers();
+  registerContextHandlers({
+    getMainWindow: deps.getMainWindow,
+    getProcessManager: deps.getProcessManager,
+    getAgentDetector: deps.getAgentDetector,
+  });
   // Setup logger event forwarding to renderer
   setupLoggerEventForwarding(deps.getMainWindow);
 }
