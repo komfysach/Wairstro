@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Plus, Star, Copy, Edit2, Mail, Pencil, Search } from 'lucide-react';
+import { X, Plus, Star, Copy, Edit2, Mail, Pencil, Search, GitMerge } from 'lucide-react';
 import type { AITab, Theme } from '../types';
 import { hasDraft } from '../utils/tabHelpers';
 
@@ -15,6 +15,8 @@ interface TabBarProps {
   onTabReorder?: (fromIndex: number, toIndex: number) => void;
   onTabStar?: (tabId: string, starred: boolean) => void;
   onTabMarkUnread?: (tabId: string) => void;
+  /** Handler to open merge session modal with this tab as source */
+  onMergeWith?: (tabId: string) => void;
   showUnreadOnly?: boolean;
   onToggleUnreadFilter?: () => void;
   onOpenTabSearch?: () => void;
@@ -37,6 +39,8 @@ interface TabProps {
   onRename: () => void;
   onStar?: (starred: boolean) => void;
   onMarkUnread?: () => void;
+  /** Handler to open merge session modal with this tab as source */
+  onMergeWith?: () => void;
   shortcutHint?: number | null;
   registerRef?: (el: HTMLDivElement | null) => void;
   hasDraft?: boolean;
@@ -103,6 +107,7 @@ function Tab({
   onRename,
   onStar,
   onMarkUnread,
+  onMergeWith,
   shortcutHint,
   registerRef,
   hasDraft
@@ -192,6 +197,12 @@ function Tab({
   const handleMarkUnreadClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     onMarkUnread?.();
+    setOverlayOpen(false);
+  };
+
+  const handleMergeWithClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onMergeWith?.();
     setOverlayOpen(false);
   };
 
@@ -401,6 +412,18 @@ function Tab({
               Rename Tab
             </button>
 
+            {/* Merge With button - only show for tabs with established session */}
+            {tab.agentSessionId && onMergeWith && (
+              <button
+                onClick={handleMergeWithClick}
+                className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs hover:bg-white/10 transition-colors"
+                style={{ color: theme.colors.textMain }}
+              >
+                <GitMerge className="w-3.5 h-3.5" style={{ color: theme.colors.textDim }} />
+                Merge With...
+              </button>
+            )}
+
             <button
               onClick={handleMarkUnreadClick}
               className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs hover:bg-white/10 transition-colors"
@@ -433,6 +456,7 @@ export function TabBar({
   onTabReorder,
   onTabStar,
   onTabMarkUnread,
+  onMergeWith,
   showUnreadOnly: showUnreadOnlyProp,
   onToggleUnreadFilter,
   onOpenTabSearch
@@ -627,6 +651,7 @@ export function TabBar({
               onRename={() => handleRenameRequest(tab.id)}
               onStar={onTabStar && tab.agentSessionId ? (starred) => onTabStar(tab.id, starred) : undefined}
               onMarkUnread={onTabMarkUnread ? () => onTabMarkUnread(tab.id) : undefined}
+              onMergeWith={onMergeWith && tab.agentSessionId ? () => onMergeWith(tab.id) : undefined}
               shortcutHint={!showUnreadOnly && originalIndex < 9 ? originalIndex + 1 : null}
               hasDraft={hasDraft(tab)}
               registerRef={(el) => {
