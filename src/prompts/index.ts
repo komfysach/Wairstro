@@ -31,6 +31,7 @@ import groupChatParticipantRequestPrompt from './group-chat-participant-request.
 
 // Context management prompts
 import contextGroomingPrompt from './context-grooming.md?raw';
+import contextTransferPrompt from './context-transfer.md?raw';
 
 export {
   // Wizard
@@ -59,4 +60,5 @@ export {
 
   // Context management
   contextGroomingPrompt,
+  contextTransferPrompt,
 };

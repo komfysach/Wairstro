@@ -2,9 +2,14 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   ContextGroomingService,
   contextGroomingService,
+  AGENT_ARTIFACTS,
+  AGENT_TARGET_NOTES,
+  getAgentDisplayName,
+  buildContextTransferPrompt,
 } from '../../../renderer/services/contextGroomer';
 import type { MergeRequest, GroomingProgress, ContextSource } from '../../../renderer/types/contextMerge';
 import type { LogEntry } from '../../../renderer/types';
+import type { ToolType } from '../../../shared/types';
 
 // Mock window.maestro for IPC calls
 const mockCreateGroomingSession = vi.fn();
@@ -467,5 +472,177 @@ describe('ContextGroomingService edge cases', () => {
       // Should handle all formats without throwing
       expect(result.success).toBe(true);
     }
+  });
+});
+
+describe('AGENT_ARTIFACTS', () => {
+  it('should define artifacts for all agent types', () => {
+    const expectedAgents: ToolType[] = ['claude-code', 'aider', 'opencode', 'codex', 'claude', 'terminal'];
+
+    for (const agent of expectedAgents) {
+      expect(AGENT_ARTIFACTS).toHaveProperty(agent);
+      expect(Array.isArray(AGENT_ARTIFACTS[agent])).toBe(true);
+    }
+  });
+
+  it('should include slash commands for claude-code', () => {
+    const artifacts = AGENT_ARTIFACTS['claude-code'];
+    expect(artifacts).toContain('/clear');
+    expect(artifacts).toContain('/compact');
+    expect(artifacts).toContain('/cost');
+    expect(artifacts).toContain('/doctor');
+  });
+
+  it('should include brand references for claude-code', () => {
+    const artifacts = AGENT_ARTIFACTS['claude-code'];
+    expect(artifacts).toContain('Claude');
+    expect(artifacts).toContain('Anthropic');
+    expect(artifacts).toContain('sonnet');
+    expect(artifacts).toContain('opus');
+  });
+
+  it('should include aider-specific commands', () => {
+    const artifacts = AGENT_ARTIFACTS['aider'];
+    expect(artifacts).toContain('/add');
+    expect(artifacts).toContain('/drop');
+    expect(artifacts).toContain('/commit');
+    expect(artifacts).toContain('Aider');
+  });
+
+  it('should include codex-specific references', () => {
+    const artifacts = AGENT_ARTIFACTS['codex'];
+    expect(artifacts).toContain('Codex');
+    expect(artifacts).toContain('OpenAI');
+    expect(artifacts).toContain('o1');
+    expect(artifacts).toContain('o3');
+  });
+
+  it('should have empty artifacts for terminal', () => {
+    expect(AGENT_ARTIFACTS['terminal']).toHaveLength(0);
+  });
+});
+
+describe('AGENT_TARGET_NOTES', () => {
+  it('should define notes for all agent types', () => {
+    const expectedAgents: ToolType[] = ['claude-code', 'aider', 'opencode', 'codex', 'claude', 'terminal'];
+
+    for (const agent of expectedAgents) {
+      expect(AGENT_TARGET_NOTES).toHaveProperty(agent);
+      expect(typeof AGENT_TARGET_NOTES[agent]).toBe('string');
+      expect(AGENT_TARGET_NOTES[agent].length).toBeGreaterThan(0);
+    }
+  });
+
+  it('should mention key capabilities in claude-code notes', () => {
+    const notes = AGENT_TARGET_NOTES['claude-code'];
+    expect(notes).toContain('Anthropic');
+    expect(notes).toContain('slash commands');
+    expect(notes).toContain('edit files');
+  });
+
+  it('should mention git workflow in aider notes', () => {
+    const notes = AGENT_TARGET_NOTES['aider'];
+    expect(notes).toContain('git');
+    expect(notes).toContain('/add');
+    expect(notes).toContain('/drop');
+  });
+
+  it('should mention reasoning models in codex notes', () => {
+    const notes = AGENT_TARGET_NOTES['codex'];
+    expect(notes).toContain('OpenAI');
+    expect(notes).toContain('reasoning');
+  });
+
+  it('should note lack of file access for base claude', () => {
+    const notes = AGENT_TARGET_NOTES['claude'];
+    expect(notes).toContain('does not have direct file system');
+  });
+});
+
+describe('getAgentDisplayName', () => {
+  it('should return correct display names for all agents', () => {
+    expect(getAgentDisplayName('claude-code')).toBe('Claude Code');
+    expect(getAgentDisplayName('aider')).toBe('Aider');
+    expect(getAgentDisplayName('opencode')).toBe('OpenCode');
+    expect(getAgentDisplayName('codex')).toBe('OpenAI Codex');
+    expect(getAgentDisplayName('claude')).toBe('Claude');
+    expect(getAgentDisplayName('terminal')).toBe('Terminal');
+  });
+
+  it('should return the agent type as fallback for unknown types', () => {
+    // Cast to ToolType to simulate an unknown type
+    const unknownType = 'unknown-agent' as ToolType;
+    expect(getAgentDisplayName(unknownType)).toBe('unknown-agent');
+  });
+});
+
+describe('buildContextTransferPrompt', () => {
+  it('should include source and target agent names', () => {
+    const prompt = buildContextTransferPrompt('claude-code', 'aider');
+
+    expect(prompt).toContain('Claude Code');
+    expect(prompt).toContain('Aider');
+  });
+
+  it('should include source agent artifacts', () => {
+    const prompt = buildContextTransferPrompt('claude-code', 'aider');
+
+    // Should include Claude Code artifacts as bullet points
+    expect(prompt).toContain('"/clear"');
+    expect(prompt).toContain('"/compact"');
+    expect(prompt).toContain('"Claude"');
+    expect(prompt).toContain('"Anthropic"');
+  });
+
+  it('should include target agent notes', () => {
+    const prompt = buildContextTransferPrompt('claude-code', 'aider');
+
+    // Should include Aider target notes
+    expect(prompt).toContain('git repositories');
+    expect(prompt).toContain('/add');
+    expect(prompt).toContain('/drop');
+  });
+
+  it('should handle agents with no artifacts', () => {
+    const prompt = buildContextTransferPrompt('terminal', 'claude-code');
+
+    // Should indicate no specific artifacts
+    expect(prompt).toContain('No specific artifacts to remove');
+  });
+
+  it('should include section headers from the template', () => {
+    const prompt = buildContextTransferPrompt('claude-code', 'codex');
+
+    expect(prompt).toContain('## Your Goals');
+    expect(prompt).toContain('## Source Agent Artifacts to Remove');
+    expect(prompt).toContain('## Target Agent Considerations');
+    expect(prompt).toContain('## Guidelines');
+    expect(prompt).toContain('## Output Format');
+  });
+
+  it('should work for all agent type combinations', () => {
+    const agents: ToolType[] = ['claude-code', 'aider', 'opencode', 'codex', 'claude', 'terminal'];
+
+    for (const source of agents) {
+      for (const target of agents) {
+        const prompt = buildContextTransferPrompt(source, target);
+
+        // Should not throw and should produce non-empty output
+        expect(prompt).toBeTruthy();
+        expect(prompt.length).toBeGreaterThan(100);
+
+        // Should include the display names
+        expect(prompt).toContain(getAgentDisplayName(source));
+        expect(prompt).toContain(getAgentDisplayName(target));
+      }
+    }
+  });
+
+  it('should handle transfer between same agent types', () => {
+    const prompt = buildContextTransferPrompt('claude-code', 'claude-code');
+
+    // Should still work even though source and target are the same
+    expect(prompt).toContain('Claude Code');
+    expect(prompt).toContain('"/clear"');
   });
 });

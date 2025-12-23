@@ -25,7 +25,138 @@ import {
   estimateTokenCount,
   calculateTotalTokens,
 } from '../utils/contextExtractor';
-import { contextGroomingPrompt } from '../../prompts';
+import { contextGroomingPrompt, contextTransferPrompt } from '../../prompts';
+
+/**
+ * Agent-specific artifacts that should be removed when transferring context.
+ * Each array contains patterns (commands, terms, references) that are specific
+ * to that agent and should be removed or converted when sending to a different agent.
+ */
+export const AGENT_ARTIFACTS: Record<ToolType, string[]> = {
+  'claude-code': [
+    // Slash commands
+    '/clear', '/compact', '/cost', '/doctor', '/help', '/memory',
+    '/model', '/review', '/vim', '/logout', '/login', '/config',
+    // Brand and model references
+    'Claude', 'Anthropic', 'sonnet', 'opus', 'haiku',
+    'claude-3', 'claude-4', 'claude-3.5', 'claude-opus', 'claude-sonnet',
+    // Tool-specific
+    'claude code', 'Claude Code', 'CLAUDE.md',
+  ],
+  'aider': [
+    // Slash commands
+    '/add', '/drop', '/commit', '/diff', '/undo', '/clear',
+    '/run', '/voice', '/help', '/quit', '/ls', '/map',
+    // Brand references
+    'Aider', 'aider',
+    // Model references
+    'gpt-4', 'gpt-3.5', 'GPT',
+  ],
+  'opencode': [
+    // Slash commands
+    '/help', '/clear', '/cost', '/model',
+    // Brand references
+    'OpenCode', 'opencode',
+    // Model references
+    'Claude', 'GPT', 'Gemini',
+  ],
+  'codex': [
+    // Slash commands
+    '/help', '/clear',
+    // Brand references
+    'Codex', 'OpenAI', 'GPT', 'o1', 'o3', 'o4-mini',
+    // Tool-specific
+    'openai codex', 'OpenAI Codex',
+  ],
+  'claude': [
+    // This is the base Claude (not Claude Code)
+    'Claude', 'Anthropic', 'sonnet', 'opus', 'haiku',
+  ],
+  'terminal': [
+    // Terminal has no agent-specific artifacts
+  ],
+};
+
+/**
+ * Notes about target agent capabilities that should be included in the transfer prompt.
+ * Helps the grooming agent understand what the target can and cannot do.
+ */
+export const AGENT_TARGET_NOTES: Record<ToolType, string> = {
+  'claude-code': `
+    Claude Code is an AI coding assistant by Anthropic.
+    It can read and edit files, run terminal commands, search code, and interact with git.
+    It uses slash commands like /compact, /clear, /cost for session management.
+    It can handle large codebases and multi-file changes.
+  `,
+  'aider': `
+    Aider is an AI pair programming tool.
+    It works with git repositories and can make commits.
+    It uses /add to include files in context and /drop to remove them.
+    It focuses on code changes and git workflow.
+  `,
+  'opencode': `
+    OpenCode is a multi-model AI coding assistant.
+    It supports multiple AI providers and models.
+    It can read and edit files, run commands, and search code.
+  `,
+  'codex': `
+    OpenAI Codex is an AI coding assistant by OpenAI.
+    It uses reasoning models like o1, o3, and o4-mini.
+    It can read files, edit code, and run terminal commands.
+    It excels at complex reasoning and problem-solving.
+  `,
+  'claude': `
+    Claude is a general-purpose AI assistant by Anthropic.
+    It does not have direct file system or terminal access.
+    Code examples should be presented as text for the user to apply.
+  `,
+  'terminal': `
+    Terminal is a raw shell interface.
+    It executes shell commands directly without AI interpretation.
+  `,
+};
+
+/**
+ * Get the human-readable name for an agent type.
+ */
+export function getAgentDisplayName(agentType: ToolType): string {
+  const names: Record<ToolType, string> = {
+    'claude-code': 'Claude Code',
+    'aider': 'Aider',
+    'opencode': 'OpenCode',
+    'codex': 'OpenAI Codex',
+    'claude': 'Claude',
+    'terminal': 'Terminal',
+  };
+  return names[agentType] || agentType;
+}
+
+/**
+ * Build a context transfer prompt with agent-specific artifact information.
+ *
+ * @param sourceAgent - The agent type the context is coming from
+ * @param targetAgent - The agent type the context is going to
+ * @returns A customized transfer prompt with agent-specific details
+ */
+export function buildContextTransferPrompt(
+  sourceAgent: ToolType,
+  targetAgent: ToolType
+): string {
+  const sourceArtifacts = AGENT_ARTIFACTS[sourceAgent] || [];
+  const targetNotes = AGENT_TARGET_NOTES[targetAgent] || 'No specific notes for this agent.';
+
+  // Format artifacts as a bullet list
+  const artifactList = sourceArtifacts.length > 0
+    ? sourceArtifacts.map(a => `- "${a}"`).join('\n')
+    : '- No specific artifacts to remove';
+
+  // Replace template variables in the transfer prompt
+  return contextTransferPrompt
+    .replace('{{sourceAgent}}', getAgentDisplayName(sourceAgent))
+    .replace('{{targetAgent}}', getAgentDisplayName(targetAgent))
+    .replace('{{sourceAgentArtifacts}}', artifactList)
+    .replace('{{targetAgentNotes}}', targetNotes.trim());
+}
 
 /**
  * Result of the grooming process.
