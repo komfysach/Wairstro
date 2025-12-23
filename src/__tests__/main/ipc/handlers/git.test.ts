@@ -2623,4 +2623,189 @@ export function Component() {
       });
     });
   });
+
+  describe('git:checkGhCli', () => {
+    beforeEach(async () => {
+      // Reset the cached gh status before each test
+      const cliDetection = await import('../../../../main/utils/cliDetection');
+      vi.mocked(cliDetection.getCachedGhStatus).mockReturnValue(null);
+      // Reset resolveGhPath to return 'gh' by default
+      vi.mocked(cliDetection.resolveGhPath).mockResolvedValue('gh');
+    });
+
+    it('should return installed: true and authenticated: true when gh is installed and authed', async () => {
+      vi.mocked(execFile.execFileNoThrow)
+        .mockResolvedValueOnce({
+          // gh --version
+          stdout: 'gh version 2.40.1 (2024-01-15)\nhttps://github.com/cli/cli/releases/tag/v2.40.1\n',
+          stderr: '',
+          exitCode: 0,
+        })
+        .mockResolvedValueOnce({
+          // gh auth status
+          stdout: 'github.com\n  ✓ Logged in to github.com account username (keyring)\n',
+          stderr: '',
+          exitCode: 0,
+        });
+
+      const handler = handlers.get('git:checkGhCli');
+      const result = await handler!({} as any);
+
+      expect(execFile.execFileNoThrow).toHaveBeenCalledWith('gh', ['--version']);
+      expect(execFile.execFileNoThrow).toHaveBeenCalledWith('gh', ['auth', 'status']);
+      expect(result).toEqual({
+        installed: true,
+        authenticated: true,
+      });
+    });
+
+    it('should return installed: false when gh is not installed', async () => {
+      vi.mocked(execFile.execFileNoThrow).mockResolvedValueOnce({
+        // gh --version fails
+        stdout: '',
+        stderr: 'command not found: gh',
+        exitCode: 127,
+      });
+
+      const handler = handlers.get('git:checkGhCli');
+      const result = await handler!({} as any);
+
+      expect(execFile.execFileNoThrow).toHaveBeenCalledTimes(1);
+      expect(execFile.execFileNoThrow).toHaveBeenCalledWith('gh', ['--version']);
+      expect(result).toEqual({
+        installed: false,
+        authenticated: false,
+      });
+    });
+
+    it('should return installed: true and authenticated: false when gh is installed but not authed', async () => {
+      vi.mocked(execFile.execFileNoThrow)
+        .mockResolvedValueOnce({
+          // gh --version
+          stdout: 'gh version 2.40.1 (2024-01-15)\n',
+          stderr: '',
+          exitCode: 0,
+        })
+        .mockResolvedValueOnce({
+          // gh auth status - not authenticated
+          stdout: '',
+          stderr: 'You are not logged into any GitHub hosts. Run gh auth login to authenticate.',
+          exitCode: 1,
+        });
+
+      const handler = handlers.get('git:checkGhCli');
+      const result = await handler!({} as any);
+
+      expect(execFile.execFileNoThrow).toHaveBeenCalledWith('gh', ['--version']);
+      expect(execFile.execFileNoThrow).toHaveBeenCalledWith('gh', ['auth', 'status']);
+      expect(result).toEqual({
+        installed: true,
+        authenticated: false,
+      });
+    });
+
+    it('should use cached result when available and no custom ghPath', async () => {
+      const cliDetection = await import('../../../../main/utils/cliDetection');
+      vi.mocked(cliDetection.getCachedGhStatus).mockReturnValue({
+        installed: true,
+        authenticated: true,
+      });
+
+      const handler = handlers.get('git:checkGhCli');
+      const result = await handler!({} as any);
+
+      // Should not call execFileNoThrow because cached result is used
+      expect(execFile.execFileNoThrow).not.toHaveBeenCalled();
+      expect(result).toEqual({
+        installed: true,
+        authenticated: true,
+      });
+    });
+
+    it('should bypass cache when custom ghPath is provided', async () => {
+      const cliDetection = await import('../../../../main/utils/cliDetection');
+      // Cache has a result
+      vi.mocked(cliDetection.getCachedGhStatus).mockReturnValue({
+        installed: true,
+        authenticated: true,
+      });
+      // Custom path resolved
+      vi.mocked(cliDetection.resolveGhPath).mockResolvedValue('/opt/homebrew/bin/gh');
+
+      vi.mocked(execFile.execFileNoThrow)
+        .mockResolvedValueOnce({
+          // gh --version
+          stdout: 'gh version 2.40.1\n',
+          stderr: '',
+          exitCode: 0,
+        })
+        .mockResolvedValueOnce({
+          // gh auth status - not authenticated
+          stdout: '',
+          stderr: 'Not logged in',
+          exitCode: 1,
+        });
+
+      const handler = handlers.get('git:checkGhCli');
+      const result = await handler!({} as any, '/opt/homebrew/bin/gh');
+
+      // Should bypass cache and check with custom path
+      expect(cliDetection.resolveGhPath).toHaveBeenCalledWith('/opt/homebrew/bin/gh');
+      expect(execFile.execFileNoThrow).toHaveBeenCalledWith('/opt/homebrew/bin/gh', ['--version']);
+      expect(execFile.execFileNoThrow).toHaveBeenCalledWith('/opt/homebrew/bin/gh', ['auth', 'status']);
+      expect(result).toEqual({
+        installed: true,
+        authenticated: false,
+      });
+    });
+
+    it('should cache result when checking without custom ghPath', async () => {
+      const cliDetection = await import('../../../../main/utils/cliDetection');
+
+      vi.mocked(execFile.execFileNoThrow)
+        .mockResolvedValueOnce({
+          // gh --version
+          stdout: 'gh version 2.40.1\n',
+          stderr: '',
+          exitCode: 0,
+        })
+        .mockResolvedValueOnce({
+          // gh auth status
+          stdout: 'Logged in\n',
+          stderr: '',
+          exitCode: 0,
+        });
+
+      const handler = handlers.get('git:checkGhCli');
+      await handler!({} as any);
+
+      // Should cache the result
+      expect(cliDetection.setCachedGhStatus).toHaveBeenCalledWith(true, true);
+    });
+
+    it('should not cache result when using custom ghPath', async () => {
+      const cliDetection = await import('../../../../main/utils/cliDetection');
+      vi.mocked(cliDetection.resolveGhPath).mockResolvedValue('/custom/path/gh');
+
+      vi.mocked(execFile.execFileNoThrow)
+        .mockResolvedValueOnce({
+          // gh --version
+          stdout: 'gh version 2.40.1\n',
+          stderr: '',
+          exitCode: 0,
+        })
+        .mockResolvedValueOnce({
+          // gh auth status
+          stdout: 'Logged in\n',
+          stderr: '',
+          exitCode: 0,
+        });
+
+      const handler = handlers.get('git:checkGhCli');
+      await handler!({} as any, '/custom/path/gh');
+
+      // Should NOT cache when custom path is used
+      expect(cliDetection.setCachedGhStatus).not.toHaveBeenCalled();
+    });
+  });
 });
