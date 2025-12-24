@@ -48,6 +48,8 @@ export interface SendToAgentOptions {
   groomContext: boolean;
   /** Target session ID to send context to */
   targetSessionId: string;
+  /** Whether to create a new session (default: true) */
+  createNewSession?: boolean;
 }
 
 export interface SendToAgentModalProps {

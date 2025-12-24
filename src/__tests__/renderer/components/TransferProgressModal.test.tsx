@@ -27,6 +27,7 @@ vi.mock('lucide-react', () => ({
   Loader2: () => <svg data-testid="loader-icon" />,
   AlertTriangle: () => <svg data-testid="alert-icon" />,
   ArrowRight: () => <svg data-testid="arrow-right-icon" />,
+  Wand2: () => <svg data-testid="wand-icon" />,
 }));
 
 // Mock contextGroomer for getAgentDisplayName

@@ -1821,7 +1821,7 @@ describe('TabBar', () => {
       });
 
       // Send to Agent button should be visible
-      expect(screen.getByText('Send to Agent...')).toBeInTheDocument();
+      expect(screen.getByText('Context: Send to Agent')).toBeInTheDocument();
     });
 
     it('does not show Send to Agent button when onSendToAgent is not provided', async () => {
@@ -1850,7 +1850,7 @@ describe('TabBar', () => {
       });
 
       // Send to Agent button should NOT be visible
-      expect(screen.queryByText('Send to Agent...')).not.toBeInTheDocument();
+      expect(screen.queryByText('Context: Send to Agent')).not.toBeInTheDocument();
     });
 
     it('does not show Send to Agent button for tabs without agentSessionId', async () => {
@@ -1880,7 +1880,7 @@ describe('TabBar', () => {
       });
 
       // Overlay shouldn't be shown for tabs without agentSessionId
-      expect(screen.queryByText('Send to Agent...')).not.toBeInTheDocument();
+      expect(screen.queryByText('Context: Send to Agent')).not.toBeInTheDocument();
     });
 
     it('calls onSendToAgent with tab id when Send to Agent button is clicked', async () => {
@@ -1909,7 +1909,7 @@ describe('TabBar', () => {
         vi.advanceTimersByTime(450);
       });
 
-      const sendToAgentButton = screen.getByText('Send to Agent...');
+      const sendToAgentButton = screen.getByText('Context: Send to Agent');
       fireEvent.click(sendToAgentButton);
 
       expect(mockOnSendToAgent).toHaveBeenCalledWith('tab-1');
@@ -1943,11 +1943,11 @@ describe('TabBar', () => {
       });
 
       // Click Send to Agent
-      const sendToAgentButton = screen.getByText('Send to Agent...');
+      const sendToAgentButton = screen.getByText('Context: Send to Agent');
       fireEvent.click(sendToAgentButton);
 
       // Overlay should be closed
-      expect(screen.queryByText('Send to Agent...')).not.toBeInTheDocument();
+      expect(screen.queryByText('Context: Send to Agent')).not.toBeInTheDocument();
     });
 
     it('renders ArrowRightCircle icon for Send to Agent button', async () => {
