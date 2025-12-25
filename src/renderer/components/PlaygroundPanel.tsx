@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { X, Trophy, FlaskConical, Play, RotateCcw, Sparkles, Copy, Check } from 'lucide-react';
+import { X, Trophy, FlaskConical, Play, RotateCcw, Sparkles, Copy, Check, Music } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import type { Theme, AutoRunStats, ThemeMode } from '../types';
 import { useLayerStack } from '../contexts/LayerStackContext';
 import { MODAL_PRIORITIES } from '../constants/modalPriorities';
 import { AchievementCard } from './AchievementCard';
 import { StandingOvationOverlay } from './StandingOvationOverlay';
+import { KeyboardMasteryCelebration } from './KeyboardMasteryCelebration';
 import { CONDUCTOR_BADGES, getBadgeForTime } from '../constants/conductorBadges';
+import { KEYBOARD_MASTERY_LEVELS } from '../constants/keyboardMastery';
 
 interface PlaygroundPanelProps {
   theme: Theme;
@@ -76,6 +78,10 @@ export function PlaygroundPanel({ theme, themeMode, onClose }: PlaygroundPanelPr
   const [showStandingOvation, setShowStandingOvation] = useState(false);
   const [ovationBadgeLevel, setOvationBadgeLevel] = useState(1);
   const [ovationIsNewRecord, setOvationIsNewRecord] = useState(false);
+
+  // Keyboard mastery playground state
+  const [showKeyboardMasteryCelebration, setShowKeyboardMasteryCelebration] = useState(false);
+  const [keyboardMasteryLevel, setKeyboardMasteryLevel] = useState(1);
 
   // Confetti playground state
   const [confettiParticleCount, setConfettiParticleCount] = useState(100);
@@ -575,6 +581,49 @@ confetti({
                     </div>
                   </div>
 
+                  <div
+                    className="p-4 rounded-lg border"
+                    style={{ borderColor: theme.colors.border, backgroundColor: theme.colors.bgActivity }}
+                  >
+                    <h3 className="text-sm font-bold mb-4" style={{ color: theme.colors.textMain }}>
+                      Keyboard Mastery Test
+                    </h3>
+                    <div className="space-y-3">
+                      <div>
+                        <label className="text-xs block mb-2" style={{ color: theme.colors.textDim }}>
+                          Mastery Level to Show
+                        </label>
+                        <select
+                          value={keyboardMasteryLevel}
+                          onChange={e => setKeyboardMasteryLevel(Number(e.target.value))}
+                          className="w-full px-3 py-2 rounded text-sm"
+                          style={{
+                            backgroundColor: theme.colors.bgMain,
+                            color: theme.colors.textMain,
+                            border: `1px solid ${theme.colors.border}`,
+                          }}
+                        >
+                          {KEYBOARD_MASTERY_LEVELS.map((level, idx) => (
+                            <option key={level.id} value={idx}>
+                              Level {idx}: {level.name} ({level.threshold}%)
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <button
+                        onClick={() => setShowKeyboardMasteryCelebration(true)}
+                        className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded font-medium transition-colors"
+                        style={{
+                          backgroundColor: '#9B59B6',
+                          color: '#fff',
+                        }}
+                      >
+                        <Music className="w-4 h-4" />
+                        Trigger Keyboard Mastery Celebration
+                      </button>
+                    </div>
+                  </div>
+
                   <button
                     onClick={resetMockData}
                     className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded font-medium transition-colors border"
@@ -945,6 +994,15 @@ confetti({
           recordTimeMs={mockLongestRun}
           isNewRecord={ovationIsNewRecord}
           onClose={() => setShowStandingOvation(false)}
+        />
+      )}
+
+      {/* Keyboard Mastery Celebration */}
+      {showKeyboardMasteryCelebration && (
+        <KeyboardMasteryCelebration
+          theme={theme}
+          level={keyboardMasteryLevel}
+          onClose={() => setShowKeyboardMasteryCelebration(false)}
         />
       )}
     </>
