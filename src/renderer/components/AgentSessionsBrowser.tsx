@@ -336,7 +336,7 @@ export function AgentSessionsBrowser({
     }
 
     cancelRename();
-  }, [activeSession?.projectRoot, agentId, renameValue, viewingSession?.sessionId, cancelRename, onUpdateTab, updateSession]);
+  }, [activeSession?.projectRoot, agentId, renameValue, viewingSession?.sessionId, cancelRename, onUpdateTab, updateSession, setViewingSession]);
 
   // Auto-view session when activeAgentSessionId is provided (e.g., from history panel click)
   useEffect(() => {

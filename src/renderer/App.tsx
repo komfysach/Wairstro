@@ -604,10 +604,12 @@ export default function MaestroConsole() {
   }, []);
 
   // Close file preview when switching sessions (history is now per-session)
+  // previewFile intentionally omitted: we only want to clear preview on session change, not when preview itself changes
   useEffect(() => {
     if (previewFile !== null) {
       setPreviewFile(null);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSessionId]);
 
   // Restore a persisted session by respawning its process
@@ -5645,7 +5647,7 @@ export default function MaestroConsole() {
     };
     window.addEventListener('maestro:remoteCommand', handleRemoteCommand);
     return () => window.removeEventListener('maestro:remoteCommand', handleRemoteCommand);
-  }, []);
+  }, [addLogToActiveTab]);
 
   // Listen for tour UI actions to control right panel state
   useEffect(() => {
