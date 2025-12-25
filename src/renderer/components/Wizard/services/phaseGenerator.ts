@@ -63,7 +63,7 @@ function extractDescription(content: string): string | undefined {
   // Split into lines and find content after the first heading
   const lines = content.split('\n');
   let foundHeading = false;
-  let descriptionLines: string[] = [];
+  const descriptionLines: string[] = [];
 
   for (const line of lines) {
     const trimmed = line.trim();

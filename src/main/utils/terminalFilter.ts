@@ -17,7 +17,7 @@ function filterTerminalPrompts(text: string, lastCommand?: string): string {
   const lines = text.split('\n');
   const filteredLines: string[] = [];
 
-  for (let line of lines) {
+  for (const line of lines) {
     const trimmedLine = line.trim();
 
     // Skip empty lines

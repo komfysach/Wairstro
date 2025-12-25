@@ -197,7 +197,7 @@ export function FileSearchModal({
   // Filter files based on view mode and search query
   const filteredFiles = useMemo(() => {
     // First filter by view mode (hidden files)
-    let files = viewMode === 'visible'
+    const files = viewMode === 'visible'
       ? allFiles.filter(f => !isHiddenFile(f.fullPath))
       : allFiles;
 

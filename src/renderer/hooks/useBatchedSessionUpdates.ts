@@ -234,7 +234,7 @@ export function useBatchedSessionUpdates(
 
           // Apply shell logs
           if (shellStdout || shellStderr) {
-            let shellLogs = [...updatedSession.shellLogs];
+            const shellLogs = [...updatedSession.shellLogs];
 
             if (shellStdout) {
               const lastLog = shellLogs[shellLogs.length - 1];

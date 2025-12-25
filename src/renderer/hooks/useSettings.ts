@@ -658,7 +658,7 @@ export function useSettings(): UseSettingsReturn {
   // Returns badge/record info so caller can show standing ovation during run
   const updateAutoRunProgress = useCallback((deltaMs: number): { newBadgeLevel: number | null; isNewRecord: boolean } => {
     let newBadgeLevel: number | null = null;
-    let isNewRecord = false;
+    const isNewRecord = false;
 
     setAutoRunStatsState(prev => {
       // Add the delta to cumulative time

@@ -19,7 +19,7 @@ const LOG_CONTEXT = '[Git]';
 
 // Worktree directory watchers keyed by session ID
 const worktreeWatchers = new Map<string, FSWatcher>();
-let worktreeWatchDebounceTimers = new Map<string, NodeJS.Timeout>();
+const worktreeWatchDebounceTimers = new Map<string, NodeJS.Timeout>();
 
 /** Helper to create handler options with Git context */
 const handlerOpts = (operation: string, logSuccess = false): CreateHandlerOptions => ({

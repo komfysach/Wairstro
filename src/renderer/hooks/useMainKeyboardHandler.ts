@@ -21,7 +21,7 @@ import { getInitialRenameValue } from '../utils/tabHelpers';
  * - recordShortcutUsage: Track shortcut usage for keyboard mastery gamification
  * - onKeyboardMasteryLevelUp: Callback when user levels up in keyboard mastery
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 export type KeyboardHandlerContext = any;
 
 /**

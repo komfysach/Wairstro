@@ -30,6 +30,6 @@ export function stripAnsiCodes(text: string): string {
   // Matches ANSI escape sequences: ESC[ followed by params and command letter
   // ESC is \x1b (decimal 27), followed by [ and then zero or more params
   // (digits or semicolons) ending with a letter command
-  // eslint-disable-next-line no-control-regex
+   
   return text.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '');
 }

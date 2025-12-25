@@ -360,7 +360,7 @@ export function useMobileSessionManagement(
           const session = updatedSessions.find(s => s.id === sessionId);
           if (session) {
             // Get the response from additionalData or the updated session
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+             
             const response = (additionalData as any)?.lastResponse || (session as any).lastResponse;
             onResponseComplete(session, response);
           }

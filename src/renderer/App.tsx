@@ -821,6 +821,7 @@ export default function MaestroConsole() {
       }
     };
     loadSessionsAndGroups();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- Load once on mount; activeSessionId/setActiveSessionId are intentionally omitted to prevent reload loops
   }, []);
 
   // Hide splash screen only when both settings and sessions have fully loaded
@@ -2215,6 +2216,7 @@ export default function MaestroConsole() {
       }
       thinkingChunkBuffer.clear();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- IPC subscription runs once on mount; refs/callbacks intentionally omitted to prevent re-subscription
   }, []);
 
   // --- GROUP CHAT EVENT LISTENERS ---
@@ -2538,6 +2540,7 @@ export default function MaestroConsole() {
           ? (activeSession.shellCwd || activeSession.cwd)
           : activeSession.cwd)
       : '',
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- Using specific properties instead of full activeSession object to avoid unnecessary re-renders
     [activeSession?.inputMode, activeSession?.shellCwd, activeSession?.cwd]
   );
 
@@ -3069,6 +3072,7 @@ export default function MaestroConsole() {
     if (!activeSession || activeSession.inputMode !== 'ai') return [];
     const activeTab = getActiveTab(activeSession);
     return activeTab?.stagedImages || [];
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- Using specific properties instead of full activeSession object to avoid unnecessary re-renders
   }, [activeSession?.aiTabs, activeSession?.activeTabId, activeSession?.inputMode]);
 
   // Set staged images on the active tab
@@ -6824,6 +6828,7 @@ export default function MaestroConsole() {
     // Then apply hidden files filter to match what FileExplorerPanel displays
     const displayTree = filterHiddenFiles(filteredFileTree);
     setFlatFileList(flattenTree(displayTree, expandedSet));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- Using specific properties instead of full activeSession object to avoid unnecessary re-renders
   }, [activeSession?.fileExplorerExpanded, filteredFileTree, showHiddenFiles]);
 
   // Handle pending jump path from /jump command
@@ -6856,6 +6861,7 @@ export default function MaestroConsole() {
     setSessions(prev => prev.map(s =>
       s.id === activeSession.id ? { ...s, pendingJumpPath: undefined } : s
     ));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- Using specific properties instead of full activeSession object to avoid unnecessary re-renders
   }, [activeSession?.pendingJumpPath, flatFileList, activeSession?.id]);
 
   // Scroll to selected file item when selection changes via keyboard

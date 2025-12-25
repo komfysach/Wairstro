@@ -534,7 +534,7 @@ export function ProcessMonitor(props: ProcessMonitorProps) {
   };
 
   // Expand all nodes by default on initial load
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   useEffect(() => {
     if (!isLoading && !hasExpandedInitially) {
       // Build tree and get all expandable node IDs
