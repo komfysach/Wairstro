@@ -46,6 +46,8 @@ export interface MarkdownComponentsOptions {
   imageRenderer?: React.ComponentType<{ src?: string; alt?: string }>;
   /** Custom code block renderer for specific languages (e.g., mermaid) */
   customLanguageRenderers?: Record<string, React.ComponentType<{ code: string; theme: Theme }>>;
+  /** Callback when internal file link is clicked (maestro-file:// protocol) */
+  onFileClick?: (filePath: string) => void;
   /** Callback when external link is clicked - if not provided, uses default browser behavior */
   onExternalLinkClick?: (href: string) => void;
   /** Search highlighting options */
@@ -284,7 +286,7 @@ function highlightSearchMatches(
 }
 
 export function createMarkdownComponents(options: MarkdownComponentsOptions): Partial<Components> {
-  const { theme, imageRenderer, customLanguageRenderers = {}, onExternalLinkClick, searchHighlight } = options;
+  const { theme, imageRenderer, customLanguageRenderers = {}, onFileClick, onExternalLinkClick, searchHighlight } = options;
 
   // Reset match counter at start of each render
   globalMatchCounter = 0;
@@ -363,9 +365,15 @@ export function createMarkdownComponents(options: MarkdownComponentsOptions): Pa
     };
   }
 
-  // External link handler if provided
-  if (onExternalLinkClick) {
+  // Link handler - supports both internal file links and external links
+  if (onFileClick || onExternalLinkClick) {
     components.a = ({ node, href, children, ...props }: any) => {
+      // Check for maestro-file:// protocol OR data-maestro-file attribute
+      // (data attribute is fallback when rehype strips custom protocols)
+      const dataFilePath = props['data-maestro-file'];
+      const isMaestroFile = href?.startsWith('maestro-file://') || !!dataFilePath;
+      const filePath = dataFilePath || (href?.startsWith('maestro-file://') ? href.replace('maestro-file://', '') : null);
+
       return React.createElement(
         'a',
         {
@@ -373,7 +381,9 @@ export function createMarkdownComponents(options: MarkdownComponentsOptions): Pa
           ...props,
           onClick: (e: React.MouseEvent) => {
             e.preventDefault();
-            if (href) {
+            if (isMaestroFile && filePath && onFileClick) {
+              onFileClick(filePath);
+            } else if (href && onExternalLinkClick) {
               onExternalLinkClick(href);
             }
           },

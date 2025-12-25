@@ -4,6 +4,7 @@ import remarkGfm from 'remark-gfm';
 import { Eye, Edit, Play, Square, HelpCircle, Loader2, Image, X, Search, ChevronDown, ChevronRight, FolderOpen, FileText, RefreshCw, Maximize2, AlertTriangle, SkipForward, XCircle } from 'lucide-react';
 import { getEncoder, formatTokenCount } from '../utils/tokenCounter';
 import type { BatchRunState, SessionState, Theme, Shortcut } from '../types';
+import type { FileNode } from '../types/fileTree';
 import { AutoRunnerHelpModal } from './AutoRunnerHelpModal';
 import { MermaidRenderer } from './MermaidRenderer';
 import { AutoRunDocumentSelector, DocumentTaskCount } from './AutoRunDocumentSelector';
@@ -15,9 +16,7 @@ import { useAutoRunImageHandling, imageCache } from '../hooks/useAutoRunImageHan
 import { TemplateAutocompleteDropdown } from './TemplateAutocompleteDropdown';
 import { generateAutoRunProseStyles, createMarkdownComponents } from '../utils/markdownConfig';
 import { formatShortcutKeys } from '../utils/shortcutFormatter';
-
-// Memoize remarkPlugins array - it never changes
-const REMARK_PLUGINS = [remarkGfm];
+import { remarkFileLinks } from '../utils/remarkFileLinks';
 
 interface AutoRunProps {
   theme: Theme;
@@ -1095,6 +1094,39 @@ const AutoRunInner = forwardRef<AutoRunHandle, AutoRunProps>(function AutoRunInn
     }
   }, [currentMatchIndex]);
 
+  // Convert documentTree to FileNode format for remarkFileLinks
+  const fileTree = useMemo((): FileNode[] => {
+    if (!documentTree) return [];
+    const convert = (nodes: typeof documentTree): FileNode[] => {
+      return nodes.map(node => ({
+        name: node.name,
+        type: node.type,
+        fullPath: node.path,
+        children: node.children ? convert(node.children as typeof documentTree) : undefined,
+      }));
+    };
+    return convert(documentTree);
+  }, [documentTree]);
+
+  // Handle file link clicks - navigate to the document
+  const handleFileClick = useCallback((filePath: string) => {
+    // filePath from remarkFileLinks will be like "Note.md" or "Subfolder/Note.md"
+    // onSelectDocument expects the path without extension for simple files,
+    // or the full relative path for nested files
+    const pathWithoutExt = filePath.replace(/\.md$/, '');
+    onSelectDocument(pathWithoutExt);
+  }, [onSelectDocument]);
+
+  // Memoize remarkPlugins - include remarkFileLinks when we have file tree
+  const remarkPlugins = useMemo(() => {
+    const plugins: any[] = [remarkGfm];
+    if (fileTree.length > 0) {
+      // cwd is empty since we're at the root of the Auto Run folder
+      plugins.push([remarkFileLinks, { fileTree, cwd: '' }]);
+    }
+    return plugins;
+  }, [fileTree]);
+
   // Memoize ReactMarkdown components - only regenerate when dependencies change
   // Uses shared utility from markdownConfig.ts with custom image renderer
   const markdownComponents = useMemo(() => {
@@ -1104,6 +1136,8 @@ const AutoRunInner = forwardRef<AutoRunHandle, AutoRunProps>(function AutoRunInn
       customLanguageRenderers: {
         mermaid: ({ code, theme: t }) => <MermaidRenderer chart={code} theme={t} />,
       },
+      // Handle internal file links (wiki-style [[links]])
+      onFileClick: handleFileClick,
       // Open external links in system browser
       onExternalLinkClick: (href) => window.maestro.shell.openExternal(href),
       // Add search highlighting when search is active with matches
@@ -1130,7 +1164,7 @@ const AutoRunInner = forwardRef<AutoRunHandle, AutoRunProps>(function AutoRunInn
         />
       ),
     };
-  }, [theme, folderPath, openLightboxByFilename, searchOpen, searchQuery, totalMatches, currentMatchIndex, handleMatchRendered]);
+  }, [theme, folderPath, openLightboxByFilename, searchOpen, searchQuery, totalMatches, currentMatchIndex, handleMatchRendered, handleFileClick]);
 
   return (
     <div
@@ -1576,7 +1610,7 @@ const AutoRunInner = forwardRef<AutoRunHandle, AutoRunProps>(function AutoRunInn
           >
             <style>{proseStyles}</style>
             <ReactMarkdown
-              remarkPlugins={REMARK_PLUGINS}
+              remarkPlugins={remarkPlugins}
               components={markdownComponents}
             >
               {localContent || '*No content yet. Switch to Edit mode to start writing.*'}
