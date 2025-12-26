@@ -459,7 +459,7 @@ Auto Run supports running multiple documents in sequence:
 2. Click **+ Add Docs** to add more documents to the queue
 3. Drag to reorder documents as needed
 4. Configure options per document:
-   - **Reset on Completion** - Uncheck all boxes when document completes (for repeatable tasks)
+   - **Reset on Completion** - Creates a working copy in `runs/` subfolder instead of modifying the original. The original document is never touched, and working copies (e.g., `TASK-1735192800000-loop-1.md`) serve as audit logs.
    - **Duplicate** - Add the same document multiple times
 5. Enable **Loop Mode** to cycle back to the first document after completing the last
 6. Click **Go** to start the batch run
@@ -490,7 +490,7 @@ Each task executes in a completely fresh AI session with its own unique session 
 - **Predictable behavior** - Tasks in looping playbooks execute identically each iteration
 - **Independent execution** - The agent approaches each task without memory of previous work
 
-This isolation is critical for playbooks with `Reset on Completion` documents that loop indefinitely. Without it, the AI might "remember" completing a task and skip re-execution on subsequent loops.
+This isolation is critical for playbooks with `Reset on Completion` documents that loop indefinitely. Each loop creates a fresh working copy from the original document, and the AI approaches it without memory of previous iterations.
 
 ### Environment Variables {#environment-variables}
 

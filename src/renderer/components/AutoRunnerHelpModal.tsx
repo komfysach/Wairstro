@@ -282,13 +282,17 @@ export function AutoRunnerHelpModal({ theme, onClose }: AutoRunnerHelpModalProps
             >
               <p>
                 Enable the reset toggle (<RotateCcw className="w-3 h-3 inline" />) on any document to
-                restore it to its original form after all tasks complete. A backup is created when the
-                document starts, and restored before moving to the next document.
+                keep it available for repeated runs. When enabled, Auto Run creates a <strong style={{ color: theme.colors.textMain }}>working copy</strong> in
+                the <code>runs/</code> subfolder and processes that copy—<em>the original document is never modified</em>.
+              </p>
+              <p>
+                Working copies are named with timestamps (e.g., <code>TASK-1735192800000-loop-1.md</code>) and
+                serve as an audit log of each loop's work. You can delete them manually when no longer needed.
               </p>
               <p>
                 Reset-enabled documents can be duplicated in the queue, allowing the same document to
-                run multiple times in a single batch. If Auto Run is interrupted while processing a
-                reset document, the backup is automatically restored.
+                run multiple times in a single batch. Since originals are untouched, interruptions
+                leave your source documents pristine.
               </p>
             </div>
           </section>
