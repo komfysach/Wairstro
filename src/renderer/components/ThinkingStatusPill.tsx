@@ -187,7 +187,7 @@ const AutoRunPill = memo(({
           className="text-xs font-semibold shrink-0"
           style={{ color: theme.colors.accent }}
         >
-          {isStopping ? 'AutoRun Stopping...' : 'AutoRun'}
+          AutoRun
         </span>
 
         {/* Worktree indicator */}

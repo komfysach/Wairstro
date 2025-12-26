@@ -1,7 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import mermaid from 'mermaid';
 import DOMPurify from 'dompurify';
 import type { Theme } from '../types';
+
+// Track if mermaid has been initialized
+let mermaidInitialized = false;
 
 interface MermaidRendererProps {
   chart: string;
@@ -183,86 +186,68 @@ const initMermaid = (theme: Theme) => {
   });
 };
 
-// Sanitize and parse SVG into safe DOM nodes
-const createSanitizedSvgElement = (svgString: string): Node | null => {
-  // First sanitize with DOMPurify configured for SVG
-  const sanitized = DOMPurify.sanitize(svgString, {
-    USE_PROFILES: { svg: true, svgFilters: true },
-    ADD_TAGS: ['foreignObject'],
-    ADD_ATTR: ['xmlns', 'xmlns:xlink', 'xlink:href', 'dominant-baseline', 'text-anchor'],
-    RETURN_DOM: true
-  });
-
-  // Return the first child (the SVG element)
-  return sanitized.firstChild;
-};
-
 export function MermaidRenderer({ chart, theme }: MermaidRendererProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [svgContent, setSvgContent] = useState<string | null>(null);
 
-  useEffect(() => {
+  // Use useLayoutEffect to ensure DOM is ready before we try to render
+  useLayoutEffect(() => {
+    let cancelled = false;
+
     const renderChart = async () => {
-      if (!containerRef.current || !chart.trim()) return;
+      if (!chart.trim()) {
+        setIsLoading(false);
+        return;
+      }
 
       setIsLoading(true);
       setError(null);
+      setSvgContent(null);
 
-      // Initialize mermaid with the app's theme colors
+      // Initialize mermaid with the app's theme colors (only once, or when theme changes)
       initMermaid(theme);
+      mermaidInitialized = true;
 
       try {
         // Generate a unique ID for this diagram
         const id = `mermaid-${Math.random().toString(36).substring(2, 11)}`;
 
-        // Render the diagram
-        const { svg: renderedSvg } = await mermaid.render(id, chart.trim());
+        // Render the diagram - mermaid.render returns { svg: string }
+        const result = await mermaid.render(id, chart.trim());
 
-        // Create sanitized DOM element from SVG string
-        const svgElement = createSanitizedSvgElement(renderedSvg);
+        if (cancelled) return;
 
-        // Clear container and append sanitized SVG
-        while (containerRef.current.firstChild) {
-          containerRef.current.removeChild(containerRef.current.firstChild);
+        if (result && result.svg) {
+          // Sanitize the SVG before setting it
+          const sanitizedSvg = DOMPurify.sanitize(result.svg, {
+            USE_PROFILES: { svg: true, svgFilters: true },
+            ADD_TAGS: ['foreignObject'],
+            ADD_ATTR: ['xmlns', 'xmlns:xlink', 'xlink:href', 'dominant-baseline', 'text-anchor'],
+          });
+          setSvgContent(sanitizedSvg);
+          setError(null);
+        } else {
+          setError('Mermaid returned empty result');
         }
-
-        if (svgElement) {
-          containerRef.current.appendChild(svgElement);
-        }
-
-        setError(null);
       } catch (err) {
+        if (cancelled) return;
         console.error('Mermaid rendering error:', err);
         setError(err instanceof Error ? err.message : 'Failed to render diagram');
-
-        // Clear container on error
-        if (containerRef.current) {
-          while (containerRef.current.firstChild) {
-            containerRef.current.removeChild(containerRef.current.firstChild);
-          }
-        }
       } finally {
-        setIsLoading(false);
+        if (!cancelled) {
+          setIsLoading(false);
+        }
       }
     };
 
     renderChart();
-  }, [chart, theme]);
 
-  if (isLoading) {
-    return (
-      <div
-        className="p-4 rounded-lg text-center text-sm"
-        style={{
-          backgroundColor: theme.colors.bgActivity,
-          color: theme.colors.textDim
-        }}
-      >
-        Rendering diagram...
-      </div>
-    );
-  }
+    return () => {
+      cancelled = true;
+    };
+  }, [chart, theme]);
 
   if (error) {
     return (
@@ -297,12 +282,53 @@ export function MermaidRenderer({ chart, theme }: MermaidRendererProps) {
     );
   }
 
+  // Update container with SVG when content changes
+  useLayoutEffect(() => {
+    if (containerRef.current && svgContent) {
+      // Parse sanitized SVG and append to container
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(svgContent, 'image/svg+xml');
+      const svgElement = doc.documentElement;
+
+      // Clear existing content
+      while (containerRef.current.firstChild) {
+        containerRef.current.removeChild(containerRef.current.firstChild);
+      }
+
+      // Append new SVG
+      if (svgElement && svgElement.tagName === 'svg') {
+        containerRef.current.appendChild(document.importNode(svgElement, true));
+      }
+    }
+  }, [svgContent]);
+
+  // Show loading state
+  if (isLoading) {
+    return (
+      <div
+        className="mermaid-container p-4 rounded-lg overflow-x-auto"
+        style={{
+          backgroundColor: theme.colors.bgActivity,
+          minHeight: '60px',
+        }}
+      >
+        <div
+          className="text-center text-sm"
+          style={{ color: theme.colors.textDim }}
+        >
+          Rendering diagram...
+        </div>
+      </div>
+    );
+  }
+
+  // Render container - SVG will be inserted via the effect above
   return (
     <div
       ref={containerRef}
       className="mermaid-container p-4 rounded-lg overflow-x-auto"
       style={{
-        backgroundColor: theme.colors.bgActivity
+        backgroundColor: theme.colors.bgActivity,
       }}
     />
   );

@@ -336,14 +336,20 @@ export function CommandInputBar({
 
   /**
    * Handle key press events
-   * AI mode: Enter adds newline (button to send)
+   * AI mode: Enter adds newline, Cmd/Ctrl+Enter submits
    * Terminal mode: Enter submits (Shift+Enter adds newline)
    */
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
       if (inputMode === 'ai') {
-        // AI mode: Enter always adds newline, use button to send
-        // No special handling needed - default behavior adds newline
+        // AI mode: Cmd+Enter (Mac) or Ctrl+Enter (Windows/Linux) submits
+        if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+          e.preventDefault();
+          if (!isSendBlocked) {
+            handleSubmit(e);
+          }
+        }
+        // Plain Enter adds newline (default behavior)
         return;
       }
       // Terminal mode: Submit on Enter (Shift+Enter adds newline)
@@ -352,7 +358,7 @@ export function CommandInputBar({
         handleSubmit(e);
       }
     },
-    [handleSubmit, inputMode]
+    [handleSubmit, inputMode, isSendBlocked]
   );
 
   /**

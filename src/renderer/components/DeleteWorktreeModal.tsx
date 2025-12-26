@@ -51,7 +51,7 @@ export function DeleteWorktreeModal({
   return (
     <Modal
       theme={theme}
-      title="Delete Worktree"
+      title="Remove Worktree"
       priority={MODAL_PRIORITIES.CONFIRM}
       onClose={onClose}
       width={500}

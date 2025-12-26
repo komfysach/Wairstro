@@ -665,17 +665,10 @@ export function registerGitHandlers(): void {
 
   // Scan a directory for subdirectories that are git repositories or worktrees
   // This is used for auto-discovering worktrees in a parent directory
+  // PERFORMANCE: Parallelized git operations to avoid blocking UI (was sequential before)
   ipcMain.handle('git:scanWorktreeDirectory', createIpcHandler(
     handlerOpts('scanWorktreeDirectory'),
     async (parentPath: string) => {
-      const gitSubdirs: Array<{
-        path: string;
-        name: string;
-        isWorktree: boolean;
-        branch: string | null;
-        repoRoot: string | null;
-      }> = [];
-
       try {
         // Read directory contents
         const entries = await fs.readdir(parentPath, { withFileTypes: true });
@@ -683,26 +676,27 @@ export function registerGitHandlers(): void {
         // Filter to only directories (excluding hidden directories)
         const subdirs = entries.filter(e => e.isDirectory() && !e.name.startsWith('.'));
 
-        // Check each subdirectory for git status
-        for (const subdir of subdirs) {
+        // Process all subdirectories in parallel instead of sequentially
+        // This dramatically reduces the time for directories with many worktrees
+        const results = await Promise.all(subdirs.map(async (subdir) => {
           const subdirPath = path.join(parentPath, subdir.name);
 
           // Check if it's inside a git work tree
           const isInsideWorkTree = await execFileNoThrow('git', ['rev-parse', '--is-inside-work-tree'], subdirPath);
           if (isInsideWorkTree.exitCode !== 0) {
-            continue; // Not a git repo
+            return null; // Not a git repo
           }
 
-          // Check if it's a worktree (git-dir != git-common-dir)
-          const gitDirResult = await execFileNoThrow('git', ['rev-parse', '--git-dir'], subdirPath);
-          const gitCommonDirResult = await execFileNoThrow('git', ['rev-parse', '--git-common-dir'], subdirPath);
+          // Run remaining git commands in parallel for each subdirectory
+          const [gitDirResult, gitCommonDirResult, branchResult] = await Promise.all([
+            execFileNoThrow('git', ['rev-parse', '--git-dir'], subdirPath),
+            execFileNoThrow('git', ['rev-parse', '--git-common-dir'], subdirPath),
+            execFileNoThrow('git', ['rev-parse', '--abbrev-ref', 'HEAD'], subdirPath),
+          ]);
 
           const gitDir = gitDirResult.exitCode === 0 ? gitDirResult.stdout.trim() : '';
           const gitCommonDir = gitCommonDirResult.exitCode === 0 ? gitCommonDirResult.stdout.trim() : gitDir;
           const isWorktree = gitDir !== gitCommonDir;
-
-          // Get current branch
-          const branchResult = await execFileNoThrow('git', ['rev-parse', '--abbrev-ref', 'HEAD'], subdirPath);
           const branch = branchResult.exitCode === 0 ? branchResult.stdout.trim() : null;
 
           // Get repo root
@@ -719,19 +713,23 @@ export function registerGitHandlers(): void {
             }
           }
 
-          gitSubdirs.push({
+          return {
             path: subdirPath,
             name: subdir.name,
             isWorktree,
             branch,
             repoRoot,
-          });
-        }
+          };
+        }));
+
+        // Filter out null results (non-git directories)
+        const gitSubdirs = results.filter((r): r is NonNullable<typeof r> => r !== null);
+
+        return { gitSubdirs };
       } catch (err) {
         logger.error(`Failed to scan directory ${parentPath}: ${err}`, LOG_CONTEXT);
+        return { gitSubdirs: [] };
       }
-
-      return { gitSubdirs };
     }
   ));
 

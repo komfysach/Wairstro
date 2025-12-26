@@ -515,6 +515,26 @@ export function AllSessionsView({
     }
   }, [sortedGroupKeys, collapsedGroups]);
 
+  // Auto-expand groups that contain search results when searching
+  useEffect(() => {
+    if (localSearchQuery.trim() && collapsedGroups) {
+      // Find groups that have matching sessions and expand them
+      const groupsWithMatches = new Set(sortedGroupKeys.filter(key => sessionsByGroup[key]?.sessions.length > 0));
+
+      // If any groups have matches, expand them
+      if (groupsWithMatches.size > 0) {
+        setCollapsedGroups(prev => {
+          const next = new Set(prev || []);
+          // Remove groups with matches from collapsed set (expand them)
+          for (const groupKey of groupsWithMatches) {
+            next.delete(groupKey);
+          }
+          return next;
+        });
+      }
+    }
+  }, [localSearchQuery, sortedGroupKeys, sessionsByGroup]);
+
   // Toggle group collapse
   const handleToggleCollapse = useCallback((groupId: string) => {
     setCollapsedGroups((prev) => {

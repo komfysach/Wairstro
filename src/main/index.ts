@@ -339,11 +339,14 @@ function createWebServer(): WebServer {
 
     // Get the requested tab's logs (or active tab if no tabId provided)
     // Tabs are the source of truth for AI conversation history
+    // Filter out thinking and tool logs - these should never be shown on the web interface
     let aiLogs: any[] = [];
     const targetTabId = tabId || session.activeTabId;
     if (session.aiTabs && session.aiTabs.length > 0) {
       const targetTab = session.aiTabs.find((t: any) => t.id === targetTabId) || session.aiTabs[0];
-      aiLogs = targetTab?.logs || [];
+      const rawLogs = targetTab?.logs || [];
+      // Web interface should never show thinking/tool logs regardless of desktop settings
+      aiLogs = rawLogs.filter((log: any) => log.source !== 'thinking' && log.source !== 'tool');
     }
 
     return {

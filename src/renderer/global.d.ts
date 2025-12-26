@@ -776,10 +776,13 @@ interface MaestroAPI {
     watchFolder: (folderPath: string) => Promise<{ success: boolean; error?: string }>;
     unwatchFolder: (folderPath: string) => Promise<{ success: boolean; error?: string }>;
     onFileChanged: (handler: (data: { folderPath: string; filename: string; eventType: string }) => void) => () => void;
-    // Backup operations for reset-on-completion documents
+    // Backup operations for reset-on-completion documents (legacy)
     createBackup: (folderPath: string, filename: string) => Promise<{ success: boolean; backupFilename?: string; error?: string }>;
     restoreBackup: (folderPath: string, filename: string) => Promise<{ success: boolean; error?: string }>;
     deleteBackups: (folderPath: string) => Promise<{ success: boolean; deletedCount?: number; error?: string }>;
+    // Working copy operations for reset-on-completion documents (preferred)
+    // Creates a copy in /runs/ subdirectory: {name}-{timestamp}-loop-{N}.md
+    createWorkingCopy: (folderPath: string, filename: string, loopNumber: number) => Promise<{ workingCopyPath: string; originalPath: string }>;
   };
   // Playbooks API (saved batch run configurations)
   playbooks: {

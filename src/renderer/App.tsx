@@ -3315,7 +3315,6 @@ function MaestroConsoleInner() {
     batchRunStates: _batchRunStates,
     getBatchState,
     activeBatchSessionIds,
-    stoppingBatchSessionIds,
     startBatchRun,
     stopBatchRun,
     // Error handling (Phase 5.10)
@@ -3914,159 +3913,183 @@ function MaestroConsoleInner() {
     defaultSaveToHistory
   ]);
 
-  // Legacy: Periodic scanner for sessions using old worktreeParentPath
-  // TODO: Remove after migration to new parent/child model
+  // Legacy: Scanner for sessions using old worktreeParentPath
+  // TODO: Remove after migration to new parent/child model (use worktreeConfig with file watchers instead)
+  // PERFORMANCE: Only scan on app focus (visibility change) instead of continuous polling
+  // This avoids blocking the main thread every 30 seconds during active use
   useEffect(() => {
+    // Check if any sessions use the legacy worktreeParentPath model
+    const hasLegacyWorktreeSessions = sessions.some(s => s.worktreeParentPath);
+    if (!hasLegacyWorktreeSessions) return;
+
+    // Track if we're currently scanning to avoid overlapping scans
+    let isScanning = false;
+
     const scanWorktreeParents = async () => {
-      // Find sessions that have worktreeParentPath set (legacy model)
-      const worktreeParentSessions = sessions.filter(s => s.worktreeParentPath);
-      if (worktreeParentSessions.length === 0) return;
+      if (isScanning) return;
+      isScanning = true;
 
-      // Collect all new sessions to add in a single batch (avoids stale closure issues)
-      const newSessionsToAdd: Session[] = [];
-      // Track paths we're about to add to avoid duplicates within this scan
-      const pathsBeingAdded = new Set<string>();
+      try {
+        // Find sessions that have worktreeParentPath set (legacy model)
+        const worktreeParentSessions = sessionsRef.current.filter(s => s.worktreeParentPath);
+        if (worktreeParentSessions.length === 0) return;
 
-      for (const session of worktreeParentSessions) {
-        try {
-          const result = await window.maestro.git.scanWorktreeDirectory(session.worktreeParentPath!);
-          const { gitSubdirs } = result;
+        // Collect all new sessions to add in a single batch (avoids stale closure issues)
+        const newSessionsToAdd: Session[] = [];
+        // Track paths we're about to add to avoid duplicates within this scan
+        const pathsBeingAdded = new Set<string>();
 
-          for (const subdir of gitSubdirs) {
-            // Skip if this path was manually removed by the user (use ref for current value)
-            const currentRemovedPaths = removedWorktreePathsRef.current;
-            if (currentRemovedPaths.has(subdir.path)) {
-              continue;
+        for (const session of worktreeParentSessions) {
+          try {
+            const result = await window.maestro.git.scanWorktreeDirectory(session.worktreeParentPath!);
+            const { gitSubdirs } = result;
+
+            for (const subdir of gitSubdirs) {
+              // Skip if this path was manually removed by the user (use ref for current value)
+              const currentRemovedPaths = removedWorktreePathsRef.current;
+              if (currentRemovedPaths.has(subdir.path)) {
+                continue;
+              }
+
+              // Skip if session already exists (check current sessions via ref)
+              const currentSessions = sessionsRef.current;
+              const existingSession = currentSessions.find(s => s.cwd === subdir.path || s.projectRoot === subdir.path);
+              if (existingSession) {
+                continue;
+              }
+
+              // Skip if we're already adding this path in this scan batch
+              if (pathsBeingAdded.has(subdir.path)) {
+                continue;
+              }
+
+              // Found a new worktree - prepare session creation
+              pathsBeingAdded.add(subdir.path);
+
+              const sessionName = subdir.branch
+                ? `${subdir.name} (${subdir.branch})`
+                : subdir.name;
+
+              const newId = generateId();
+              const initialTabId = generateId();
+              const initialTab: AITab = {
+                id: initialTabId,
+                agentSessionId: null,
+                name: null,
+                starred: false,
+                logs: [],
+                inputValue: '',
+                stagedImages: [],
+                createdAt: Date.now(),
+                state: 'idle',
+                saveToHistory: defaultSaveToHistory
+              };
+
+              // Fetch git info
+              let gitBranches: string[] | undefined;
+              let gitTags: string[] | undefined;
+              let gitRefsCacheTime: number | undefined;
+
+              try {
+                [gitBranches, gitTags] = await Promise.all([
+                  gitService.getBranches(subdir.path),
+                  gitService.getTags(subdir.path)
+                ]);
+                gitRefsCacheTime = Date.now();
+              } catch {
+                // Ignore errors
+              }
+
+              const newSession: Session = {
+                id: newId,
+                name: sessionName,
+                groupId: session.groupId,
+                toolType: session.toolType,
+                state: 'idle',
+                cwd: subdir.path,
+                fullPath: subdir.path,
+                projectRoot: subdir.path,
+                isGitRepo: true,
+                gitBranches,
+                gitTags,
+                gitRefsCacheTime,
+                worktreeParentPath: session.worktreeParentPath,
+                aiLogs: [],
+                shellLogs: [{ id: generateId(), timestamp: Date.now(), source: 'system', text: 'Shell Session Ready.' }],
+                workLog: [],
+                contextUsage: 0,
+                inputMode: session.inputMode,
+                aiPid: 0,
+                terminalPid: 0,
+                port: 3000 + Math.floor(Math.random() * 100),
+                isLive: false,
+                changedFiles: [],
+                fileTree: [],
+                fileExplorerExpanded: [],
+                fileExplorerScrollPos: 0,
+                fileTreeAutoRefreshInterval: 180,
+                shellCwd: subdir.path,
+                aiCommandHistory: [],
+                shellCommandHistory: [],
+                executionQueue: [],
+                activeTimeMs: 0,
+                aiTabs: [initialTab],
+                activeTabId: initialTabId,
+                closedTabHistory: [],
+                customPath: session.customPath,
+                customArgs: session.customArgs,
+                customEnvVars: session.customEnvVars,
+                customModel: session.customModel
+              };
+
+              newSessionsToAdd.push(newSession);
             }
-
-            // Skip if session already exists (check current sessions)
-            const existingSession = sessions.find(s => s.cwd === subdir.path || s.projectRoot === subdir.path);
-            if (existingSession) {
-              continue;
-            }
-
-            // Skip if we're already adding this path in this scan batch
-            if (pathsBeingAdded.has(subdir.path)) {
-              continue;
-            }
-
-            // Found a new worktree - prepare session creation
-            pathsBeingAdded.add(subdir.path);
-
-            const sessionName = subdir.branch
-              ? `${subdir.name} (${subdir.branch})`
-              : subdir.name;
-
-            const newId = generateId();
-            const initialTabId = generateId();
-            const initialTab: AITab = {
-              id: initialTabId,
-              agentSessionId: null,
-              name: null,
-              starred: false,
-              logs: [],
-              inputValue: '',
-              stagedImages: [],
-              createdAt: Date.now(),
-              state: 'idle',
-              saveToHistory: defaultSaveToHistory
-            };
-
-            // Fetch git info
-            let gitBranches: string[] | undefined;
-            let gitTags: string[] | undefined;
-            let gitRefsCacheTime: number | undefined;
-
-            try {
-              [gitBranches, gitTags] = await Promise.all([
-                gitService.getBranches(subdir.path),
-                gitService.getTags(subdir.path)
-              ]);
-              gitRefsCacheTime = Date.now();
-            } catch {
-              // Ignore errors
-            }
-
-            const newSession: Session = {
-              id: newId,
-              name: sessionName,
-              groupId: session.groupId,
-              toolType: session.toolType,
-              state: 'idle',
-              cwd: subdir.path,
-              fullPath: subdir.path,
-              projectRoot: subdir.path,
-              isGitRepo: true,
-              gitBranches,
-              gitTags,
-              gitRefsCacheTime,
-              worktreeParentPath: session.worktreeParentPath,
-              aiLogs: [],
-              shellLogs: [{ id: generateId(), timestamp: Date.now(), source: 'system', text: 'Shell Session Ready.' }],
-              workLog: [],
-              contextUsage: 0,
-              inputMode: session.inputMode,
-              aiPid: 0,
-              terminalPid: 0,
-              port: 3000 + Math.floor(Math.random() * 100),
-              isLive: false,
-              changedFiles: [],
-              fileTree: [],
-              fileExplorerExpanded: [],
-              fileExplorerScrollPos: 0,
-              fileTreeAutoRefreshInterval: 180,
-              shellCwd: subdir.path,
-              aiCommandHistory: [],
-              shellCommandHistory: [],
-              executionQueue: [],
-              activeTimeMs: 0,
-              aiTabs: [initialTab],
-              activeTabId: initialTabId,
-              closedTabHistory: [],
-              customPath: session.customPath,
-              customArgs: session.customArgs,
-              customEnvVars: session.customEnvVars,
-              customModel: session.customModel
-            };
-
-            newSessionsToAdd.push(newSession);
+          } catch (error) {
+            console.error(`[WorktreeScanner] Error scanning ${session.worktreeParentPath}:`, error);
           }
-        } catch (error) {
-          console.error(`[WorktreeScanner] Error scanning ${session.worktreeParentPath}:`, error);
         }
-      }
 
-      // Add all new sessions in a single update (uses functional update to get fresh state)
-      if (newSessionsToAdd.length > 0) {
-        setSessions(prev => {
-          // Double-check against current state to avoid duplicates
-          const currentPaths = new Set(prev.map(s => s.cwd));
-          const trulyNew = newSessionsToAdd.filter(s => !currentPaths.has(s.cwd));
-          if (trulyNew.length === 0) return prev;
-          return [...prev, ...trulyNew];
-        });
-
-        for (const session of newSessionsToAdd) {
-          addToast({
-            type: 'success',
-            title: 'New Worktree Discovered',
-            message: session.name,
+        // Add all new sessions in a single update (uses functional update to get fresh state)
+        if (newSessionsToAdd.length > 0) {
+          setSessions(prev => {
+            // Double-check against current state to avoid duplicates
+            const currentPaths = new Set(prev.map(s => s.cwd));
+            const trulyNew = newSessionsToAdd.filter(s => !currentPaths.has(s.cwd));
+            if (trulyNew.length === 0) return prev;
+            return [...prev, ...trulyNew];
           });
+
+          for (const session of newSessionsToAdd) {
+            addToast({
+              type: 'success',
+              title: 'New Worktree Discovered',
+              message: session.name,
+            });
+          }
         }
+      } finally {
+        isScanning = false;
       }
     };
 
-    // Scan immediately on mount if there are worktree parents
+    // Scan once on mount
     scanWorktreeParents();
 
-    // Set up interval to scan every 30 seconds
-    const intervalId = setInterval(scanWorktreeParents, 30000);
+    // Scan when app regains focus (visibility change) instead of polling
+    // This is much more efficient - only scans when user returns to app
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        scanWorktreeParents();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
-      clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-   
-  }, [sessions.length, defaultSaveToHistory]); // Re-run when session count changes (removedWorktreePaths accessed via ref)
+
+  }, [sessions.some(s => s.worktreeParentPath), defaultSaveToHistory]); // Only re-run when legacy sessions exist/don't exist
 
   // Handler to open batch runner modal
   const handleOpenBatchRunner = useCallback(() => {
@@ -4128,10 +4151,12 @@ function MaestroConsoleInner() {
     const sessionId = targetSessionId
       ?? (activeBatchSessionIds.length > 0 ? activeBatchSessionIds[0] : activeSession?.id);
     if (!sessionId) return;
-    setConfirmModalMessage('Stop Auto Run after the current task completes?');
+    const session = sessions.find(s => s.id === sessionId);
+    const agentName = session?.name || 'this session';
+    setConfirmModalMessage(`Stop Auto Run for "${agentName}" after the current task completes?`);
     setConfirmModalOnConfirm(() => () => stopBatchRun(sessionId));
     setConfirmModalOpen(true);
-  }, [activeBatchSessionIds, activeSession, stopBatchRun]);
+  }, [activeBatchSessionIds, activeSession, sessions, stopBatchRun]);
 
   // Error handling callbacks for Auto Run (Phase 5.10)
   const handleSkipCurrentDocument = useCallback(() => {
@@ -8443,7 +8468,6 @@ function MaestroConsoleInner() {
               ));
             }}
             activeBatchSessionIds={activeBatchSessionIds}
-            stoppingBatchSessionIds={stoppingBatchSessionIds}
             showSessionJumpNumbers={showSessionJumpNumbers}
             visibleSessions={visibleSessions}
             autoRunStats={autoRunStats}

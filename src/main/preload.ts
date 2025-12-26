@@ -147,10 +147,16 @@ contextBridge.exposeInMainWorld('maestro', {
     // This allows web commands to go through the same code path as desktop commands
     // inputMode is optional - if provided, renderer should use it instead of session state
     onRemoteCommand: (callback: (sessionId: string, command: string, inputMode?: 'ai' | 'terminal') => void) => {
-      console.log('[Preload] Registering onRemoteCommand listener');
+      console.log('[Preload] Registering onRemoteCommand listener, callback type:', typeof callback);
       const handler = (_: any, sessionId: string, command: string, inputMode?: 'ai' | 'terminal') => {
         console.log('[Preload] Received remote:executeCommand IPC:', { sessionId, command: command?.substring(0, 50), inputMode });
-        callback(sessionId, command, inputMode);
+        console.log('[Preload] About to invoke callback, callback type:', typeof callback);
+        try {
+          callback(sessionId, command, inputMode);
+          console.log('[Preload] Callback invoked successfully');
+        } catch (error) {
+          console.error('[Preload] Error invoking remote command callback:', error);
+        }
       };
       ipcRenderer.on('remote:executeCommand', handler);
       return () => ipcRenderer.removeListener('remote:executeCommand', handler);
@@ -1027,13 +1033,17 @@ contextBridge.exposeInMainWorld('maestro', {
       ipcRenderer.on('autorun:fileChanged', wrappedHandler);
       return () => ipcRenderer.removeListener('autorun:fileChanged', wrappedHandler);
     },
-    // Backup operations for reset-on-completion documents
+    // Backup operations for reset-on-completion documents (legacy)
     createBackup: (folderPath: string, filename: string) =>
       ipcRenderer.invoke('autorun:createBackup', folderPath, filename),
     restoreBackup: (folderPath: string, filename: string) =>
       ipcRenderer.invoke('autorun:restoreBackup', folderPath, filename),
     deleteBackups: (folderPath: string) =>
       ipcRenderer.invoke('autorun:deleteBackups', folderPath),
+    // Working copy operations for reset-on-completion documents (preferred)
+    // Creates a copy in /runs/ subdirectory: {name}-{timestamp}-loop-{N}.md
+    createWorkingCopy: (folderPath: string, filename: string, loopNumber: number): Promise<{ workingCopyPath: string; originalPath: string }> =>
+      ipcRenderer.invoke('autorun:createWorkingCopy', folderPath, filename, loopNumber),
   },
 
   // Playbooks API (saved batch run configurations)
@@ -1927,6 +1937,7 @@ export interface MaestroAPI {
     createBackup: (folderPath: string, filename: string) => Promise<{ success: boolean; backupFilename?: string; error?: string }>;
     restoreBackup: (folderPath: string, filename: string) => Promise<{ success: boolean; error?: string }>;
     deleteBackups: (folderPath: string) => Promise<{ success: boolean; deletedCount?: number; error?: string }>;
+    createWorkingCopy: (folderPath: string, filename: string, loopNumber: number) => Promise<{ workingCopyPath: string; originalPath: string }>;
   };
   playbooks: {
     list: (sessionId: string) => Promise<{

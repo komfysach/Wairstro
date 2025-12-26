@@ -308,7 +308,7 @@ function SessionContextMenu({
               style={{ color: theme.colors.error }}
             >
               <Trash2 className="w-3.5 h-3.5" />
-              Delete Worktree
+              Remove Worktree
             </button>
           )}
         </>
@@ -496,7 +496,6 @@ interface SessionTooltipContentProps {
   gitFileCount?: number;
   groupName?: string; // Optional group name (for skinny mode)
   isInBatch?: boolean; // Whether session is running in auto mode
-  isBatchStopping?: boolean; // Whether batch is in stopping state
 }
 
 function SessionTooltipContent({
@@ -505,7 +504,6 @@ function SessionTooltipContent({
   gitFileCount,
   groupName,
   isInBatch = false,
-  isBatchStopping = false,
 }: SessionTooltipContentProps) {
   return (
     <>
@@ -530,14 +528,14 @@ function SessionTooltipContent({
         {/* AUTO Mode Indicator */}
         {isInBatch && (
           <span
-            className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${isBatchStopping ? '' : 'animate-pulse'}`}
+            className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase animate-pulse"
             style={{
-              backgroundColor: isBatchStopping ? theme.colors.error + '30' : theme.colors.warning + '30',
-              color: isBatchStopping ? theme.colors.error : theme.colors.warning
+              backgroundColor: theme.colors.warning + '30',
+              color: theme.colors.warning
             }}
           >
             <Bot className="w-2.5 h-2.5" />
-            {isBatchStopping ? 'STOPPING' : 'AUTO'}
+            AUTO
           </span>
         )}
       </div>
@@ -703,7 +701,6 @@ interface SessionListProps {
 
   // Auto mode props
   activeBatchSessionIds?: string[]; // Session IDs that are running in auto mode
-  stoppingBatchSessionIds?: string[]; // Session IDs that are in stopping state
 
   // Session jump shortcut props (Opt+Cmd+NUMBER)
   showSessionJumpNumbers?: boolean;
@@ -768,7 +765,6 @@ export function SessionList(props: SessionListProps) {
     onOpenWorktreeConfig,
     onDeleteWorktree,
     activeBatchSessionIds = [],
-    stoppingBatchSessionIds = [],
     showSessionJumpNumbers = false,
     visibleSessions = [],
     autoRunStats,
@@ -960,15 +956,16 @@ export function SessionList(props: SessionListProps) {
           const hasUnreadTabs = s.aiTabs?.some(tab => tab.hasUnread);
           const isFirst = idx === 0;
           const isLast = idx === allSessions.length - 1;
+          const isInBatch = activeBatchSessionIds.includes(s.id);
 
           return (
             <div
               key={`${keyPrefix}-part-${s.id}`}
-              className="group/segment relative flex-1 h-full"
+              className={`group/segment relative flex-1 h-full ${isInBatch ? 'animate-pulse' : ''}`}
               style={{
-                ...(s.toolType === 'claude' && !s.agentSessionId
+                ...(s.toolType === 'claude' && !s.agentSessionId && !isInBatch
                   ? { border: `1px solid ${theme.colors.textDim}`, backgroundColor: 'transparent' }
-                  : { backgroundColor: getStatusColor(s.state, theme) }),
+                  : { backgroundColor: isInBatch ? theme.colors.warning : getStatusColor(s.state, theme) }),
                 // Rounded ends only on first/last
                 borderRadius: hasWorktrees
                   ? `${isFirst ? '9999px' : '0'} ${isLast ? '9999px' : '0'} ${isLast ? '9999px' : '0'} ${isFirst ? '9999px' : '0'}`
@@ -1003,8 +1000,7 @@ export function SessionList(props: SessionListProps) {
                   session={s}
                   theme={theme}
                   gitFileCount={gitFileCounts.get(s.id)}
-                  isInBatch={activeBatchSessionIds.includes(s.id)}
-                  isBatchStopping={stoppingBatchSessionIds.includes(s.id)}
+                  isInBatch={isInBatch}
                 />
               </div>
             </div>
@@ -1047,7 +1043,6 @@ export function SessionList(props: SessionListProps) {
           groupId={options.groupId}
           gitFileCount={gitFileCounts.get(session.id)}
           isInBatch={activeBatchSessionIds.includes(session.id)}
-          isBatchStopping={stoppingBatchSessionIds.includes(session.id)}
           jumpNumber={getSessionJumpNumber(session.id)}
           onSelect={() => setActiveSessionId(session.id)}
           onDragStart={() => handleDragStart(session.id)}
@@ -1107,7 +1102,6 @@ export function SessionList(props: SessionListProps) {
                     leftSidebarOpen={leftSidebarOpen}
                     gitFileCount={gitFileCounts.get(child.id)}
                     isInBatch={activeBatchSessionIds.includes(child.id)}
-                    isBatchStopping={stoppingBatchSessionIds.includes(child.id)}
                     jumpNumber={getSessionJumpNumber(child.id)}
                     onSelect={() => setActiveSessionId(child.id)}
                     onDragStart={() => handleDragStart(child.id)}
@@ -2040,16 +2034,14 @@ export function SessionList(props: SessionListProps) {
         <div className="flex-1 flex flex-col items-center py-4 gap-2 overflow-y-auto overflow-x-visible no-scrollbar">
           {sortedSessions.map(session => {
             const isInBatch = activeBatchSessionIds.includes(session.id);
-            const isBatchStopping = stoppingBatchSessionIds.includes(session.id);
             const hasUnreadTabs = session.aiTabs?.some(tab => tab.hasUnread);
-            // Sessions in Auto Run mode should show yellow/warning color, red if stopping
+            // Sessions in Auto Run mode should show yellow/warning color
             const effectiveStatusColor = isInBatch
-              ? (isBatchStopping ? theme.colors.error : theme.colors.warning)
+              ? theme.colors.warning
               : (session.toolType === 'claude' && !session.agentSessionId
                   ? undefined // Will use border style instead
                   : getStatusColor(session.state, theme));
-            // Don't pulse when stopping
-            const shouldPulse = (session.state === 'busy' || isInBatch) && !isBatchStopping;
+            const shouldPulse = session.state === 'busy' || isInBatch;
 
             return (
             <div
@@ -2095,7 +2087,6 @@ export function SessionList(props: SessionListProps) {
                   gitFileCount={gitFileCounts.get(session.id)}
                   groupName={groups.find(g => g.id === session.groupId)?.name}
                   isInBatch={isInBatch}
-                  isBatchStopping={isBatchStopping}
                 />
               </div>
             </div>

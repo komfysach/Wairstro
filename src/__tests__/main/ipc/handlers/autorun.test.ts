@@ -135,6 +135,7 @@ describe('autorun IPC handlers', () => {
         'autorun:createBackup',
         'autorun:restoreBackup',
         'autorun:deleteBackups',
+        'autorun:createWorkingCopy',
       ];
 
       for (const channel of expectedChannels) {
