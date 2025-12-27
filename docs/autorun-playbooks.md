@@ -1,5 +1,7 @@
 ---
 title: Auto Run + Playbooks
+description: Batch-process markdown checklists with AI agents using Auto Run and reusable Playbooks.
+icon: play
 ---
 
 Auto Run is a file-system-based document runner that lets you batch-process tasks using AI agents. Select a folder containing markdown documents with task checkboxes, and Maestro will work through them one by one, spawning a fresh AI session for each task.

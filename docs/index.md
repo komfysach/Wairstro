@@ -1,5 +1,7 @@
 ---
 title: Maestro
+description: Cross-platform desktop app for orchestrating multiple AI coding agents with a keyboard-first interface.
+icon: home
 ---
 
 > Maestro hones fractured attention into focused intent.
@@ -10,10 +12,17 @@ Collaborate with AI to create detailed specification documents, then let Auto Ru
 
 Run multiple agents in parallel with a Linear/Superhuman-level responsive interface. Currently supporting **Claude Code**, **OpenAI Codex**, and **OpenCode** with plans for additional agentic coding tools (Aider, Gemini CLI, Qwen3 Coder) based on user demand.
 
+![Main screen](./screenshots/main-screen.png)
+
 ## Video Walkthroughs
 
-- [~27m Walkthrough and Demo](https://youtu.be/fmwwTOg7cyA?si=VOkjO6oYjCSQvM0A)
-- [~6m Onboarding Demo](https://youtu.be/3wX5Q1I0sgI?si=oJkJDxgAWUvBXX4D)
+### Full Walkthrough (~27 min)
+
+<iframe width="560" height="315" src="https://www.youtube.com/embed/fmwwTOg7cyA" title="Maestro Walkthrough and Demo" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+
+### Quick Onboarding (~6 min)
+
+<iframe width="560" height="315" src="https://www.youtube.com/embed/3wX5Q1I0sgI" title="Maestro Onboarding Demo" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
 
 ## Start Here
 

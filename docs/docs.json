@@ -41,7 +41,8 @@
               "about/overview",
               "features",
               "screenshots"
-            ]
+            ],
+            "icon": "house"
           },
           {
             "group": "Getting Started",

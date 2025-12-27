@@ -1,5 +1,7 @@
 ---
 title: Context Management
+description: Compact, merge, and transfer conversation context between sessions and agents.
+icon: layers
 ---
 
 Context management lets you combine or transfer conversation history between sessions and agents, enabling powerful workflows where you can:

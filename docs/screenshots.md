@@ -1,61 +1,38 @@
 ---
-title: Screenshots
+title: Themes Gallery
+description: Preview Maestro's 12 beautiful themes including Dracula, Monokai, Nord, and more.
+icon: palette
 ---
 
-All these screenshots were captured in the theme "Pedurple". For screenshots of other themes, see [THEMES.md](https://github.com/pedramamini/Maestro/blob/main/THEMES.md). Also note that these screenshots are probably dated as the project is evolving rapidly.
+Maestro ships with 12 carefully crafted themes. Screenshots below show each theme in action.
 
-## Main Screen
+For detailed theme specifications (colors, fonts, code block styles), see [THEMES.md](https://github.com/pedramamini/Maestro/blob/main/THEMES.md) on GitHub.
 
-![Main screen](./screenshots/main-screen.png)
-
-## Command Interpreter (with collapsed left panel)
-
-![Command interpreter](./screenshots/command-interpreter.png)
-
-## Git Logs and Diff Viewer
-
-![Git logs](./screenshots/git-logs.png)
-![Git diff](./screenshots/git-diff.png)
-
-## File Viewer
-
-![File viewer](./screenshots/file-viewer.png)
-
-## CMD+K and Shortcuts Galore
-
-![Command palette 1](./screenshots/cmd-k-1.png)
-![Command palette 2](./screenshots/cmd-k-2.png)
-![Command palette 3](./screenshots/cmd-k-3.png)
-![Command palette 4](./screenshots/cmd-k-4.png)
-
-## Themes and Achievements
+## Available Themes
 
 ![Themes](./screenshots/themes.png)
-![Achievements](./screenshots/achievements.png)
 
-## Session Tracking, Starring, Labeling, and Recall
+### Dark Themes
+- **Dracula** — Classic purple-accented dark theme
+- **Monokai** — Vibrant syntax highlighting on dark background
+- **Nord** — Cool, bluish Arctic-inspired palette
+- **Tokyo Night** — Soft neon on deep blue
+- **One Dark Pro** — Atom-inspired dark theme
+- **Pedurple** — Custom purple theme (shown in most screenshots)
+- **GitHub Dark** — GitHub's official dark mode
+- **Solarized Dark** — Ethan Schoonover's precision-designed dark variant
 
-![Session tracking](./screenshots/session-tracking.png)
+### Light Themes
+- **GitHub Light** — GitHub's clean light mode
+- **Solarized Light** — Precision-designed light variant
+- **Quiet Light** — Soft, muted light theme
+- **Atom One Light** — Light variant of Atom's One theme
 
-## AutoRuns with Change History Tracking
+## Changing Themes
 
-![Auto Run 1](./screenshots/autorun-1.png)
-![Auto Run 2](./screenshots/autorun-2.png)
+1. Press `Cmd+K` (Mac) or `Ctrl+K` (Windows/Linux)
+2. Type "theme" and select **Change Theme**
+3. Use arrow keys to preview themes live
+4. Press `Enter` to apply
 
-## Group Chat
-
-![Group chat](./screenshots/group-chat.png)
-
-## Web Interface / Remote Control
-
-### Chat
-
-![Mobile chat](./screenshots/mobile-chat.png)
-
-### Groups / Sessions
-
-![Mobile groups](./screenshots/mobile-groups.png)
-
-### History
-
-![Mobile history](./screenshots/mobile-history.png)
+Or go to **Settings** (`Cmd+,`) → **Appearance** → **Theme**.

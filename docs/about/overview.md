@@ -1,5 +1,7 @@
 ---
 title: Overview
+description: Learn about Maestro's spec-driven workflow for AI-assisted development with multiple agents.
+icon: compass
 ---
 
 Maestro hones fractured attention into focused intent. It is built for developers who need to coordinate multiple AI agents, repositories, and long-running tasks without leaving a keyboard-first workflow.
@@ -8,14 +10,10 @@ Maestro hones fractured attention into focused intent. It is built for developer
 
 Maestro enables a **specification-first approach** to AI-assisted development. Instead of ad-hoc prompting, you collaboratively build detailed specs with the AI, then execute them systematically:
 
-1. PLAN
-Discuss the feature with the AI agent.
-2. SPECIFY
-Create markdown docs with task checklists in the Auto Run folder.
-3. EXECUTE
-Auto Run executes tasks in a fresh session per task.
-4. REFINE
-Review results, update specs, and repeat.
+1. **PLAN** — Discuss the feature with the AI agent
+2. **SPECIFY** — Create markdown docs with task checklists in the Auto Run folder
+3. **EXECUTE** — Auto Run works through tasks, spawning a fresh session per task
+4. **REFINE** — Review results, update specs, and repeat
 
 **Why this works:**
 - **Deliberate planning** — Conversation forces you to think through requirements before coding
@@ -37,14 +35,16 @@ This approach mirrors methodologies like [Spec-Kit](https://github.com/github/sp
 
 | Concept | Description |
 |---------|-------------|
-| **Agent** | A workspace tied to a project directory and AI provider (Claude Code, Codex, or OpenCode). Contains one Command Terminal and one AI Terminal with full conversation history. |
+| **Agent** | A Maestro workspace tied to a project directory, backed by a provider (Claude Code, Codex, or OpenCode). Each agent has a Command Terminal and AI Terminal. |
+| **Provider** | The underlying AI coding assistant (Claude Code, OpenAI Codex, or OpenCode) that powers an agent. |
+| **Session / Tab** | A conversation with the AI provider. Sessions and tabs are 1:1 — each tab represents one session. Agents can have multiple tabs for parallel conversations. |
 | **Group** | Organizational container for agents. Group by project, client, or workflow. |
 | **Group Chat** | Multi-agent conversation coordinated by a moderator. Ask questions across multiple agents and get synthesized answers. |
-| **Git Worktree** | An isolated working directory linked to a separate branch. Worktree sub-agents appear nested under their parent in the session list and can create PRs. |
-| **AI Terminal** | The conversation interface with your AI agent. Supports `@` file mentions, slash commands, and image attachments. |
-| **Command Terminal** | A PTY shell session for running commands directly. Tab completion for files, git branches, and command history. |
-| **Session Explorer** | Browse all past conversations for an agent. Star, rename, search, and resume any previous session. |
-| **Auto Run** | Automated task runner that processes markdown checklists. Spawns fresh AI sessions per task. |
+| **Git Worktree** | An isolated working directory linked to a separate branch. Worktree sub-agents appear nested under their parent in the agent list and can create PRs. |
+| **AI Terminal** | The conversation interface with your AI provider. Supports `@` file mentions, slash commands, and image attachments. |
+| **Command Terminal** | A PTY shell for running commands directly. Tab completion for files, git branches, and command history. |
+| **Session Explorer** | Browse all past sessions for an agent. Star, rename, search, and resume any previous conversation. |
+| **Auto Run** | Automated task runner that processes markdown checklists. Spawns a fresh session per task. |
 | **Playbook** | A saved Auto Run configuration with document order, options, and settings for repeatable batch workflows. |
 | **History** | Timestamped log of all actions (user commands, AI responses, Auto Run completions) with session links. |
 | **Remote Control** | Web interface for mobile access. Local network or remote via Cloudflare tunnel. |

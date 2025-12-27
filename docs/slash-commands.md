@@ -1,5 +1,7 @@
 ---
 title: Slash Commands
+description: Create custom slash commands with template variables for your AI workflows.
+icon: terminal
 ---
 
 Maestro includes an extensible slash command system with autocomplete. Type `/` in the input area to open the autocomplete menu, use arrow keys to navigate, and press `Tab` or `Enter` to select.

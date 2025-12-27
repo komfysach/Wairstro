@@ -1,5 +1,7 @@
 ---
 title: Remote Access
+description: Control Maestro from your phone via the built-in web server and Cloudflare tunnels.
+icon: wifi
 ---
 
 Maestro includes a built-in web server for mobile remote control:

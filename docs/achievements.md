@@ -1,5 +1,7 @@
 ---
 title: Achievements
+description: Level up through 11 conductor-themed ranks based on your cumulative Auto Run time.
+icon: trophy
 ---
 
 Maestro features a conductor-themed achievement system that tracks your cumulative Auto Run time. The focus is simple: **longest run wins**. As you accumulate Auto Run hours, you level up through 11 ranks inspired by the hierarchy of orchestral conductors.

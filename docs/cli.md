@@ -1,5 +1,7 @@
 ---
 title: Command Line Interface
+description: Run playbooks from the command line, cron jobs, or CI/CD pipelines with maestro-cli.
+icon: square-terminal
 ---
 
 Maestro includes a CLI tool (`maestro-cli`) for managing agents and running playbooks from the command line, cron jobs, or CI/CD pipelines. The CLI requires Node.js (which you already have if you're using Claude Code).

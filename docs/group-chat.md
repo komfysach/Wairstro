@@ -1,5 +1,7 @@
 ---
 title: Group Chat
+description: Coordinate multiple AI agents in a single conversation with a moderator AI.
+icon: messages-square
 ---
 
 Group Chat lets you coordinate multiple AI agents in a single conversation. A moderator AI orchestrates the discussion, routing questions to the right agents and synthesizing their responses.

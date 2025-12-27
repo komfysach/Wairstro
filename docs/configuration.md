@@ -1,5 +1,7 @@
 ---
 title: Configuration
+description: Storage locations, cross-device sync, and Maestro configuration options.
+icon: settings
 ---
 
 Settings are stored in:

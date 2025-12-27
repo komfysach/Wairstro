@@ -1,6 +1,14 @@
 ---
 title: Keyboard Shortcuts
+description: Complete reference for Maestro keyboard shortcuts, tab completion, and mastery tracking.
+icon: keyboard
 ---
+
+## Quick Actions (Cmd+K)
+
+The command palette is your gateway to nearly every action in Maestro. Press `Cmd+K` (Mac) or `Ctrl+K` (Windows/Linux) to open it.
+
+![Command palette](./screenshots/cmd-k-1.png)
 
 ## Global Shortcuts
 

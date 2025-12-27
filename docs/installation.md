@@ -1,5 +1,7 @@
 ---
 title: Installation
+description: Download and install Maestro on macOS, Windows, or Linux.
+icon: download
 ---
 
 ## Download

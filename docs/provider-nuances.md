@@ -1,8 +1,10 @@
 ---
 title: Provider Nuances
+description: Feature differences between Claude Code, OpenAI Codex, and OpenCode providers.
+icon: puzzle
 ---
 
-Each AI agent has unique capabilities and limitations. Maestro adapts its UI based on what each provider supports.
+Each AI provider has unique capabilities and limitations. Maestro adapts its UI based on what each provider supports.
 
 ## Claude Code
 

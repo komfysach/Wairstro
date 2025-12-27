@@ -1,5 +1,7 @@
 ---
 title: Features
+description: Explore Maestro's power features including Git Worktrees, Auto Run, Group Chat, and Remote Access.
+icon: sparkles
 ---
 
 ## Power Features
@@ -9,7 +11,7 @@ title: Features
 - 💬 **[Group Chat](./group-chat)** - Coordinate multiple AI agents in a single conversation. A moderator AI orchestrates discussions, routing questions to the right agents and synthesizing their responses for cross-project questions and architecture discussions.
 - 🌐 **[Remote Access](./remote-access)** - Built-in web server with QR code access. Monitor and control all your agents from your phone. Supports local network access and remote tunneling via Cloudflare for access from anywhere.
 - 💻 **[Command Line Interface](./cli)** - Full CLI (`maestro-cli`) for headless operation. List agents/groups, run playbooks from cron jobs or CI/CD pipelines, with human-readable or JSONL output for scripting.
-- 🚀 **Multi-Instance Management** - Run unlimited agents and terminal sessions in parallel. Each agent has its own workspace, conversation history, and isolated context.
+- 🚀 **Multi-Instance Management** - Run unlimited agents in parallel. Each agent has its own workspace, conversation history, and isolated context.
 - 📬 **Message Queueing** - Queue messages while AI is busy; they're sent automatically when the agent becomes ready. Never lose a thought.
 
 ## Core Features
@@ -27,4 +29,4 @@ title: Features
 - 💰 **Cost Tracking** - Real-time token usage and cost tracking per session and globally.
 - 🏆 **[Achievements](./achievements)** - Level up from Apprentice to Titan of the Baton based on cumulative Auto Run time. 11 conductor-themed ranks to unlock.
 
-> **Note**: Maestro supports Claude Code, OpenAI Codex, and OpenCode. Support for additional agents (Aider, Gemini CLI, Qwen3 Coder) may be added in future releases based on community demand.
+> **Note**: Maestro supports Claude Code, OpenAI Codex, and OpenCode as providers. Support for additional providers (Aider, Gemini CLI, Qwen3 Coder) may be added in future releases based on community demand.

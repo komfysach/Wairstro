@@ -1,5 +1,7 @@
 ---
 title: Troubleshooting & Support
+description: Debug packages, common issues, and how to get help with Maestro.
+icon: life-buoy
 ---
 
 ## Debug Package
