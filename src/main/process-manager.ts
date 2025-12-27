@@ -547,7 +547,7 @@ export class ProcessManager extends EventEmitter {
         // 1. spawn() with shell:false cannot execute batch scripts directly
         // 2. Commands without extensions need PATHEXT resolution
         const spawnCommand = command;
-        const spawnArgs = finalArgs;
+        let spawnArgs = finalArgs;
         let useShell = false;
 
         if (isWindows) {
@@ -571,16 +571,59 @@ export class ProcessManager extends EventEmitter {
               });
             }
           }
+
+          // When using shell=true on Windows, arguments need proper escaping for cmd.exe
+          // cmd.exe interprets special characters like &, |, <, >, ^, %, !, " and others
+          // The safest approach is to wrap arguments containing spaces or special chars in double quotes
+          // and escape any embedded double quotes by doubling them
+          if (useShell) {
+            spawnArgs = finalArgs.map(arg => {
+              // For long arguments (like prompts with system context), always quote them
+              // This prevents issues with special characters and ensures the entire argument is passed as one piece
+              // Check if arg contains characters that need escaping for cmd.exe
+              // Special chars: space, &, |, <, >, ^, %, !, (, ), ", #, and shell metacharacters
+              // Also quote any argument longer than 100 chars as it likely contains prose that needs protection
+              const needsQuoting = /[ &|<>^%!()"\n\r#?*]/.test(arg) || arg.length > 100;
+              if (needsQuoting) {
+                // Escape embedded double quotes by doubling them, then wrap in double quotes
+                // Also escape carets (^) which is cmd.exe's escape character
+                // Note: % is used for environment variables in cmd.exe, but escaping it (%%)
+                // can cause issues with some commands, so we only wrap in quotes
+                const escaped = arg
+                  .replace(/"/g, '""')  // Escape double quotes
+                  .replace(/\^/g, '^^'); // Escape carets
+                return `"${escaped}"`;
+              }
+              return arg;
+            });
+            logger.debug('[ProcessManager] Escaped args for Windows shell', 'ProcessManager', {
+              originalArgsCount: finalArgs.length,
+              escapedArgsCount: spawnArgs.length,
+              // Log first 200 chars of each arg for debugging
+              argsPreview: spawnArgs.map(a => a.substring(0, 200)),
+            });
+          }
         }
+
+        logger.debug('[ProcessManager] About to spawn with shell option', 'ProcessManager', {
+          sessionId,
+          spawnCommand,
+          useShell,
+          isWindows,
+          argsCount: spawnArgs.length,
+          // Log prompt arg length if present (last arg after '--')
+          promptArgLength: prompt ? spawnArgs[spawnArgs.length - 1]?.length : undefined,
+        });
 
         const childProcess = spawn(spawnCommand, spawnArgs, {
           cwd,
           env,
-          shell: useShell, // Enable shell only for .cmd files on Windows
+          shell: useShell, // Enable shell only when needed (batch files, extensionless commands on Windows)
           stdio: ['pipe', 'pipe', 'pipe'], // Explicitly set stdio to pipe
         });
 
         logger.debug('[ProcessManager] Child process spawned', 'ProcessManager', {
+          sessionId,
           pid: childProcess.pid,
           hasStdout: !!childProcess.stdout,
           hasStderr: !!childProcess.stderr,
