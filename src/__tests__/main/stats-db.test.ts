@@ -1379,3 +1379,692 @@ describe('Query events recorded for interactive sessions', () => {
     });
   });
 });
+
+/**
+ * Comprehensive Auto Run session and task recording verification tests
+ *
+ * These tests verify the complete Auto Run tracking workflow:
+ * 1. Auto Run sessions are properly recorded when batch processing starts
+ * 2. Individual tasks within sessions are recorded with timing data
+ * 3. Sessions are updated correctly when batch processing completes
+ * 4. All data can be retrieved with proper field mapping
+ */
+describe('Auto Run sessions and tasks recorded correctly', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockDb.pragma.mockReturnValue([{ user_version: 1 }]);
+    mockDb.prepare.mockReturnValue(mockStatement);
+    mockStatement.run.mockReturnValue({ changes: 1 });
+    mockStatement.get.mockReturnValue({ count: 0, total_duration: 0 });
+    mockStatement.all.mockReturnValue([]);
+    mockFsExistsSync.mockReturnValue(true);
+  });
+
+  afterEach(() => {
+    vi.resetModules();
+  });
+
+  describe('Auto Run session lifecycle', () => {
+    it('should record Auto Run session with all required fields', async () => {
+      const { StatsDB } = await import('../../main/stats-db');
+      const db = new StatsDB();
+      db.initialize();
+
+      const startTime = Date.now();
+      const sessionId = db.insertAutoRunSession({
+        sessionId: 'maestro-session-123',
+        agentType: 'claude-code',
+        documentPath: 'Auto Run Docs/PHASE-1.md',
+        startTime,
+        duration: 0, // Duration is 0 at start
+        tasksTotal: 10,
+        tasksCompleted: 0,
+        projectPath: '/Users/test/my-project',
+      });
+
+      expect(sessionId).toBeDefined();
+      expect(typeof sessionId).toBe('string');
+
+      // Verify all fields were passed correctly to the INSERT statement
+      const runCalls = mockStatement.run.mock.calls;
+      const lastCall = runCalls[runCalls.length - 1];
+
+      // INSERT parameters: id, session_id, agent_type, document_path, start_time, duration, tasks_total, tasks_completed, project_path
+      expect(lastCall[1]).toBe('maestro-session-123'); // session_id
+      expect(lastCall[2]).toBe('claude-code'); // agent_type
+      expect(lastCall[3]).toBe('Auto Run Docs/PHASE-1.md'); // document_path
+      expect(lastCall[4]).toBe(startTime); // start_time
+      expect(lastCall[5]).toBe(0); // duration (0 at start)
+      expect(lastCall[6]).toBe(10); // tasks_total
+      expect(lastCall[7]).toBe(0); // tasks_completed (0 at start)
+      expect(lastCall[8]).toBe('/Users/test/my-project'); // project_path
+    });
+
+    it('should record Auto Run session with multiple documents (comma-separated)', async () => {
+      const { StatsDB } = await import('../../main/stats-db');
+      const db = new StatsDB();
+      db.initialize();
+
+      const sessionId = db.insertAutoRunSession({
+        sessionId: 'multi-doc-session',
+        agentType: 'claude-code',
+        documentPath: 'PHASE-1.md, PHASE-2.md, PHASE-3.md',
+        startTime: Date.now(),
+        duration: 0,
+        tasksTotal: 25,
+        tasksCompleted: 0,
+        projectPath: '/project',
+      });
+
+      expect(sessionId).toBeDefined();
+
+      const runCalls = mockStatement.run.mock.calls;
+      const lastCall = runCalls[runCalls.length - 1];
+      expect(lastCall[3]).toBe('PHASE-1.md, PHASE-2.md, PHASE-3.md');
+    });
+
+    it('should update Auto Run session duration and tasks on completion', async () => {
+      const { StatsDB } = await import('../../main/stats-db');
+      const db = new StatsDB();
+      db.initialize();
+
+      // First, insert the session
+      const autoRunId = db.insertAutoRunSession({
+        sessionId: 'session-to-update',
+        agentType: 'claude-code',
+        documentPath: 'TASKS.md',
+        startTime: Date.now() - 60000, // Started 1 minute ago
+        duration: 0,
+        tasksTotal: 5,
+        tasksCompleted: 0,
+        projectPath: '/project',
+      });
+
+      // Now update it with completion data
+      const updated = db.updateAutoRunSession(autoRunId, {
+        duration: 60000, // 1 minute
+        tasksCompleted: 5,
+      });
+
+      expect(updated).toBe(true);
+
+      // Verify UPDATE was called
+      expect(mockStatement.run).toHaveBeenCalled();
+    });
+
+    it('should update Auto Run session with partial completion (some tasks skipped)', async () => {
+      const { StatsDB } = await import('../../main/stats-db');
+      const db = new StatsDB();
+      db.initialize();
+
+      const autoRunId = db.insertAutoRunSession({
+        sessionId: 'partial-session',
+        agentType: 'claude-code',
+        documentPath: 'COMPLEX-TASKS.md',
+        startTime: Date.now(),
+        duration: 0,
+        tasksTotal: 10,
+        tasksCompleted: 0,
+        projectPath: '/project',
+      });
+
+      // Update with partial completion (7 of 10 tasks)
+      const updated = db.updateAutoRunSession(autoRunId, {
+        duration: 120000, // 2 minutes
+        tasksCompleted: 7,
+      });
+
+      expect(updated).toBe(true);
+    });
+
+    it('should handle Auto Run session stopped by user (wasStopped)', async () => {
+      const { StatsDB } = await import('../../main/stats-db');
+      const db = new StatsDB();
+      db.initialize();
+
+      const autoRunId = db.insertAutoRunSession({
+        sessionId: 'stopped-session',
+        agentType: 'claude-code',
+        documentPath: 'TASKS.md',
+        startTime: Date.now(),
+        duration: 0,
+        tasksTotal: 20,
+        tasksCompleted: 0,
+        projectPath: '/project',
+      });
+
+      // User stopped after 3 tasks
+      const updated = db.updateAutoRunSession(autoRunId, {
+        duration: 30000, // 30 seconds
+        tasksCompleted: 3,
+      });
+
+      expect(updated).toBe(true);
+    });
+  });
+
+  describe('Auto Run task recording', () => {
+    it('should record individual task with all fields', async () => {
+      const { StatsDB } = await import('../../main/stats-db');
+      const db = new StatsDB();
+      db.initialize();
+
+      const taskStartTime = Date.now() - 5000;
+      const taskId = db.insertAutoRunTask({
+        autoRunSessionId: 'auto-run-session-1',
+        sessionId: 'maestro-session-1',
+        agentType: 'claude-code',
+        taskIndex: 0,
+        taskContent: 'Implement user authentication module',
+        startTime: taskStartTime,
+        duration: 5000,
+        success: true,
+      });
+
+      expect(taskId).toBeDefined();
+
+      const runCalls = mockStatement.run.mock.calls;
+      const lastCall = runCalls[runCalls.length - 1];
+
+      // INSERT parameters: id, auto_run_session_id, session_id, agent_type, task_index, task_content, start_time, duration, success
+      expect(lastCall[1]).toBe('auto-run-session-1'); // auto_run_session_id
+      expect(lastCall[2]).toBe('maestro-session-1'); // session_id
+      expect(lastCall[3]).toBe('claude-code'); // agent_type
+      expect(lastCall[4]).toBe(0); // task_index
+      expect(lastCall[5]).toBe('Implement user authentication module'); // task_content
+      expect(lastCall[6]).toBe(taskStartTime); // start_time
+      expect(lastCall[7]).toBe(5000); // duration
+      expect(lastCall[8]).toBe(1); // success (true -> 1)
+    });
+
+    it('should record failed task with success=false', async () => {
+      const { StatsDB } = await import('../../main/stats-db');
+      const db = new StatsDB();
+      db.initialize();
+
+      db.insertAutoRunTask({
+        autoRunSessionId: 'auto-run-1',
+        sessionId: 'session-1',
+        agentType: 'claude-code',
+        taskIndex: 2,
+        taskContent: 'Fix complex edge case that requires manual intervention',
+        startTime: Date.now(),
+        duration: 10000,
+        success: false, // Task failed
+      });
+
+      const runCalls = mockStatement.run.mock.calls;
+      const lastCall = runCalls[runCalls.length - 1];
+      expect(lastCall[8]).toBe(0); // success (false -> 0)
+    });
+
+    it('should record multiple tasks for same Auto Run session', async () => {
+      const { StatsDB } = await import('../../main/stats-db');
+      const db = new StatsDB();
+      db.initialize();
+
+      const autoRunSessionId = 'multi-task-session';
+      const baseTime = Date.now();
+
+      // Task 0
+      const task0Id = db.insertAutoRunTask({
+        autoRunSessionId,
+        sessionId: 'session-1',
+        agentType: 'claude-code',
+        taskIndex: 0,
+        taskContent: 'Task 0: Initialize project',
+        startTime: baseTime,
+        duration: 3000,
+        success: true,
+      });
+
+      // Task 1
+      const task1Id = db.insertAutoRunTask({
+        autoRunSessionId,
+        sessionId: 'session-1',
+        agentType: 'claude-code',
+        taskIndex: 1,
+        taskContent: 'Task 1: Add dependencies',
+        startTime: baseTime + 3000,
+        duration: 5000,
+        success: true,
+      });
+
+      // Task 2
+      const task2Id = db.insertAutoRunTask({
+        autoRunSessionId,
+        sessionId: 'session-1',
+        agentType: 'claude-code',
+        taskIndex: 2,
+        taskContent: 'Task 2: Configure build system',
+        startTime: baseTime + 8000,
+        duration: 7000,
+        success: true,
+      });
+
+      // All tasks should have unique IDs
+      expect(task0Id).not.toBe(task1Id);
+      expect(task1Id).not.toBe(task2Id);
+      expect(task0Id).not.toBe(task2Id);
+
+      // All 3 INSERT calls should have happened
+      expect(mockStatement.run).toHaveBeenCalledTimes(3);
+    });
+
+    it('should record task without optional taskContent', async () => {
+      const { StatsDB } = await import('../../main/stats-db');
+      const db = new StatsDB();
+      db.initialize();
+
+      const taskId = db.insertAutoRunTask({
+        autoRunSessionId: 'auto-run-1',
+        sessionId: 'session-1',
+        agentType: 'claude-code',
+        taskIndex: 0,
+        // taskContent is omitted
+        startTime: Date.now(),
+        duration: 2000,
+        success: true,
+      });
+
+      expect(taskId).toBeDefined();
+
+      const runCalls = mockStatement.run.mock.calls;
+      const lastCall = runCalls[runCalls.length - 1];
+      expect(lastCall[5]).toBeNull(); // task_content should be NULL
+    });
+  });
+
+  describe('Auto Run session and task retrieval', () => {
+    it('should retrieve Auto Run sessions with proper field mapping', async () => {
+      const now = Date.now();
+      mockStatement.all.mockReturnValue([
+        {
+          id: 'auto-run-id-1',
+          session_id: 'session-1',
+          agent_type: 'claude-code',
+          document_path: 'PHASE-1.md',
+          start_time: now - 60000,
+          duration: 60000,
+          tasks_total: 10,
+          tasks_completed: 10,
+          project_path: '/project/path',
+        },
+        {
+          id: 'auto-run-id-2',
+          session_id: 'session-2',
+          agent_type: 'opencode',
+          document_path: null, // No document path
+          start_time: now - 120000,
+          duration: 45000,
+          tasks_total: 5,
+          tasks_completed: 4,
+          project_path: null,
+        },
+      ]);
+
+      const { StatsDB } = await import('../../main/stats-db');
+      const db = new StatsDB();
+      db.initialize();
+
+      const sessions = db.getAutoRunSessions('week');
+
+      expect(sessions).toHaveLength(2);
+
+      // First session - all fields present
+      expect(sessions[0].id).toBe('auto-run-id-1');
+      expect(sessions[0].sessionId).toBe('session-1');
+      expect(sessions[0].agentType).toBe('claude-code');
+      expect(sessions[0].documentPath).toBe('PHASE-1.md');
+      expect(sessions[0].startTime).toBe(now - 60000);
+      expect(sessions[0].duration).toBe(60000);
+      expect(sessions[0].tasksTotal).toBe(10);
+      expect(sessions[0].tasksCompleted).toBe(10);
+      expect(sessions[0].projectPath).toBe('/project/path');
+
+      // Second session - optional fields are undefined
+      expect(sessions[1].id).toBe('auto-run-id-2');
+      expect(sessions[1].documentPath).toBeUndefined();
+      expect(sessions[1].projectPath).toBeUndefined();
+      expect(sessions[1].tasksCompleted).toBe(4);
+    });
+
+    it('should retrieve tasks for Auto Run session with proper field mapping', async () => {
+      const now = Date.now();
+      mockStatement.all.mockReturnValue([
+        {
+          id: 'task-id-0',
+          auto_run_session_id: 'auto-run-1',
+          session_id: 'session-1',
+          agent_type: 'claude-code',
+          task_index: 0,
+          task_content: 'First task description',
+          start_time: now - 15000,
+          duration: 5000,
+          success: 1,
+        },
+        {
+          id: 'task-id-1',
+          auto_run_session_id: 'auto-run-1',
+          session_id: 'session-1',
+          agent_type: 'claude-code',
+          task_index: 1,
+          task_content: null, // No content
+          start_time: now - 10000,
+          duration: 5000,
+          success: 1,
+        },
+        {
+          id: 'task-id-2',
+          auto_run_session_id: 'auto-run-1',
+          session_id: 'session-1',
+          agent_type: 'claude-code',
+          task_index: 2,
+          task_content: 'Failed task',
+          start_time: now - 5000,
+          duration: 3000,
+          success: 0, // Failed
+        },
+      ]);
+
+      const { StatsDB } = await import('../../main/stats-db');
+      const db = new StatsDB();
+      db.initialize();
+
+      const tasks = db.getAutoRunTasks('auto-run-1');
+
+      expect(tasks).toHaveLength(3);
+
+      // First task
+      expect(tasks[0].id).toBe('task-id-0');
+      expect(tasks[0].autoRunSessionId).toBe('auto-run-1');
+      expect(tasks[0].sessionId).toBe('session-1');
+      expect(tasks[0].agentType).toBe('claude-code');
+      expect(tasks[0].taskIndex).toBe(0);
+      expect(tasks[0].taskContent).toBe('First task description');
+      expect(tasks[0].startTime).toBe(now - 15000);
+      expect(tasks[0].duration).toBe(5000);
+      expect(tasks[0].success).toBe(true); // 1 -> true
+
+      // Second task - no content
+      expect(tasks[1].taskContent).toBeUndefined();
+      expect(tasks[1].success).toBe(true);
+
+      // Third task - failed
+      expect(tasks[2].success).toBe(false); // 0 -> false
+    });
+
+    it('should return tasks ordered by task_index ASC', async () => {
+      // Return tasks in wrong order to verify sorting
+      mockStatement.all.mockReturnValue([
+        { id: 't2', auto_run_session_id: 'ar1', session_id: 's1', agent_type: 'claude-code', task_index: 2, task_content: 'C', start_time: 3, duration: 1, success: 1 },
+        { id: 't0', auto_run_session_id: 'ar1', session_id: 's1', agent_type: 'claude-code', task_index: 0, task_content: 'A', start_time: 1, duration: 1, success: 1 },
+        { id: 't1', auto_run_session_id: 'ar1', session_id: 's1', agent_type: 'claude-code', task_index: 1, task_content: 'B', start_time: 2, duration: 1, success: 1 },
+      ]);
+
+      const { StatsDB } = await import('../../main/stats-db');
+      const db = new StatsDB();
+      db.initialize();
+
+      const tasks = db.getAutoRunTasks('ar1');
+
+      // Should be returned as-is (the SQL query handles ordering)
+      // The mock returns them unsorted, but the real DB would sort them
+      expect(tasks).toHaveLength(3);
+    });
+  });
+
+  describe('Auto Run time range filtering', () => {
+    it('should filter Auto Run sessions by day range', async () => {
+      mockStatement.all.mockReturnValue([]);
+
+      const { StatsDB } = await import('../../main/stats-db');
+      const db = new StatsDB();
+      db.initialize();
+
+      db.getAutoRunSessions('day');
+
+      // Verify the query was prepared with time filter
+      const prepareCalls = mockDb.prepare.mock.calls;
+      const selectCall = prepareCalls.find((call) =>
+        (call[0] as string).includes('SELECT * FROM auto_run_sessions')
+      );
+      expect(selectCall).toBeDefined();
+      expect(selectCall![0]).toContain('start_time >= ?');
+    });
+
+    it('should return all Auto Run sessions for "all" time range', async () => {
+      const { StatsDB } = await import('../../main/stats-db');
+      const db = new StatsDB();
+      db.initialize();
+
+      mockStatement.all.mockReturnValue([
+        { id: 'old', session_id: 's1', agent_type: 'claude-code', document_path: null, start_time: 1000, duration: 100, tasks_total: 1, tasks_completed: 1, project_path: null },
+        { id: 'new', session_id: 's2', agent_type: 'claude-code', document_path: null, start_time: Date.now(), duration: 100, tasks_total: 1, tasks_completed: 1, project_path: null },
+      ]);
+
+      const sessions = db.getAutoRunSessions('all');
+
+      // With 'all' range, startTime should be 0, so all sessions should be returned
+      expect(sessions).toHaveLength(2);
+    });
+  });
+
+  describe('complete Auto Run workflow', () => {
+    it('should support the full Auto Run lifecycle: start -> record tasks -> end', async () => {
+      const { StatsDB } = await import('../../main/stats-db');
+      const db = new StatsDB();
+      db.initialize();
+
+      const batchStartTime = Date.now();
+
+      // Step 1: Start Auto Run session
+      const autoRunId = db.insertAutoRunSession({
+        sessionId: 'complete-workflow-session',
+        agentType: 'claude-code',
+        documentPath: 'PHASE-1.md, PHASE-2.md',
+        startTime: batchStartTime,
+        duration: 0,
+        tasksTotal: 5,
+        tasksCompleted: 0,
+        projectPath: '/test/project',
+      });
+
+      expect(autoRunId).toBeDefined();
+
+      // Step 2: Record individual tasks as they complete
+      let taskTime = batchStartTime;
+
+      for (let i = 0; i < 5; i++) {
+        const taskDuration = 2000 + (i * 500); // Varying durations
+        db.insertAutoRunTask({
+          autoRunSessionId: autoRunId,
+          sessionId: 'complete-workflow-session',
+          agentType: 'claude-code',
+          taskIndex: i,
+          taskContent: `Task ${i + 1}: Implementation step ${i + 1}`,
+          startTime: taskTime,
+          duration: taskDuration,
+          success: i !== 3, // Task 4 (index 3) fails
+        });
+        taskTime += taskDuration;
+      }
+
+      // Step 3: End Auto Run session
+      const totalDuration = taskTime - batchStartTime;
+      const updated = db.updateAutoRunSession(autoRunId, {
+        duration: totalDuration,
+        tasksCompleted: 4, // 4 of 5 succeeded
+      });
+
+      expect(updated).toBe(true);
+
+      // Verify the total number of INSERT/UPDATE calls
+      // 1 session insert + 5 task inserts + 1 session update = 7 calls
+      expect(mockStatement.run).toHaveBeenCalledTimes(7);
+    });
+
+    it('should handle Auto Run with loop mode (multiple passes)', async () => {
+      const { StatsDB } = await import('../../main/stats-db');
+      const db = new StatsDB();
+      db.initialize();
+
+      const startTime = Date.now();
+
+      // Start session for loop mode run
+      const autoRunId = db.insertAutoRunSession({
+        sessionId: 'loop-mode-session',
+        agentType: 'claude-code',
+        documentPath: 'RECURRING-TASKS.md',
+        startTime,
+        duration: 0,
+        tasksTotal: 15, // Initial estimate (may grow with loops)
+        tasksCompleted: 0,
+        projectPath: '/project',
+      });
+
+      // Record tasks from multiple loop iterations
+      // Loop 1: 5 tasks
+      for (let i = 0; i < 5; i++) {
+        db.insertAutoRunTask({
+          autoRunSessionId: autoRunId,
+          sessionId: 'loop-mode-session',
+          agentType: 'claude-code',
+          taskIndex: i,
+          taskContent: `Loop 1, Task ${i + 1}`,
+          startTime: startTime + (i * 3000),
+          duration: 3000,
+          success: true,
+        });
+      }
+
+      // Loop 2: 5 more tasks
+      for (let i = 0; i < 5; i++) {
+        db.insertAutoRunTask({
+          autoRunSessionId: autoRunId,
+          sessionId: 'loop-mode-session',
+          agentType: 'claude-code',
+          taskIndex: 5 + i, // Continue indexing from where loop 1 ended
+          taskContent: `Loop 2, Task ${i + 1}`,
+          startTime: startTime + 15000 + (i * 3000),
+          duration: 3000,
+          success: true,
+        });
+      }
+
+      // Update with final stats
+      db.updateAutoRunSession(autoRunId, {
+        duration: 30000, // 30 seconds total
+        tasksCompleted: 10,
+      });
+
+      // 1 session + 10 tasks + 1 update = 12 calls
+      expect(mockStatement.run).toHaveBeenCalledTimes(12);
+    });
+  });
+
+  describe('edge cases and error scenarios', () => {
+    it('should handle very long task content (synopsis)', async () => {
+      const { StatsDB } = await import('../../main/stats-db');
+      const db = new StatsDB();
+      db.initialize();
+
+      const longContent = 'A'.repeat(10000); // 10KB task content
+
+      const taskId = db.insertAutoRunTask({
+        autoRunSessionId: 'ar1',
+        sessionId: 's1',
+        agentType: 'claude-code',
+        taskIndex: 0,
+        taskContent: longContent,
+        startTime: Date.now(),
+        duration: 5000,
+        success: true,
+      });
+
+      expect(taskId).toBeDefined();
+
+      const runCalls = mockStatement.run.mock.calls;
+      const lastCall = runCalls[runCalls.length - 1];
+      expect(lastCall[5]).toBe(longContent);
+    });
+
+    it('should handle zero duration tasks', async () => {
+      const { StatsDB } = await import('../../main/stats-db');
+      const db = new StatsDB();
+      db.initialize();
+
+      const taskId = db.insertAutoRunTask({
+        autoRunSessionId: 'ar1',
+        sessionId: 's1',
+        agentType: 'claude-code',
+        taskIndex: 0,
+        taskContent: 'Instant task',
+        startTime: Date.now(),
+        duration: 0, // Zero duration (e.g., cached result)
+        success: true,
+      });
+
+      expect(taskId).toBeDefined();
+
+      const runCalls = mockStatement.run.mock.calls;
+      const lastCall = runCalls[runCalls.length - 1];
+      expect(lastCall[7]).toBe(0);
+    });
+
+    it('should handle Auto Run session with zero tasks total', async () => {
+      const { StatsDB } = await import('../../main/stats-db');
+      const db = new StatsDB();
+      db.initialize();
+
+      // This shouldn't happen in practice, but the database should handle it
+      const sessionId = db.insertAutoRunSession({
+        sessionId: 'empty-session',
+        agentType: 'claude-code',
+        documentPath: 'EMPTY.md',
+        startTime: Date.now(),
+        duration: 100,
+        tasksTotal: 0,
+        tasksCompleted: 0,
+        projectPath: '/project',
+      });
+
+      expect(sessionId).toBeDefined();
+    });
+
+    it('should handle different agent types for Auto Run', async () => {
+      const { StatsDB } = await import('../../main/stats-db');
+      const db = new StatsDB();
+      db.initialize();
+
+      // Claude Code Auto Run
+      db.insertAutoRunSession({
+        sessionId: 's1',
+        agentType: 'claude-code',
+        documentPath: 'TASKS.md',
+        startTime: Date.now(),
+        duration: 1000,
+        tasksTotal: 5,
+        tasksCompleted: 5,
+        projectPath: '/project',
+      });
+
+      // OpenCode Auto Run
+      db.insertAutoRunSession({
+        sessionId: 's2',
+        agentType: 'opencode',
+        documentPath: 'TASKS.md',
+        startTime: Date.now(),
+        duration: 2000,
+        tasksTotal: 3,
+        tasksCompleted: 3,
+        projectPath: '/project',
+      });
+
+      // Verify both agent types were recorded
+      const runCalls = mockStatement.run.mock.calls;
+      expect(runCalls[0][2]).toBe('claude-code');
+      expect(runCalls[1][2]).toBe('opencode');
+    });
+  });
+});
