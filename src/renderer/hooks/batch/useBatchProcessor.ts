@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useReducer, useEffect, useMemo } from 'react';
-import type { BatchRunState, BatchRunConfig, Session, HistoryEntry, UsageStats, Group, AutoRunStats, AgentError, ToolType } from '../../types';
+import type { BatchRunState, BatchRunConfig, Session, HistoryEntry, UsageStats, Group, AutoRunStats, AgentError } from '../../types';
 import { getBadgeForTime, getNextBadge, formatTimeRemaining } from '../../constants/conductorBadges';
 import { formatElapsedTime } from '../../../shared/formatters';
 import { gitService } from '../../services/git';
@@ -40,7 +40,6 @@ interface UseBatchProcessorProps {
   groups: Group[];
   onUpdateSession: (sessionId: string, updates: Partial<Session>) => void;
   onSpawnAgent: (sessionId: string, prompt: string, cwdOverride?: string) => Promise<{ success: boolean; response?: string; agentSessionId?: string; usageStats?: UsageStats }>;
-  onSpawnSynopsis: (sessionId: string, cwd: string, agentSessionId: string, prompt: string, toolType?: ToolType) => Promise<{ success: boolean; response?: string }>;
   onAddHistoryEntry: (entry: Omit<HistoryEntry, 'id'>) => void | Promise<void>;
   onComplete?: (info: BatchCompleteInfo) => void;
   // Callback for PR creation results (success or failure)
@@ -173,7 +172,6 @@ export function useBatchProcessor({
   groups,
   onUpdateSession,
   onSpawnAgent,
-  onSpawnSynopsis,
   onAddHistoryEntry,
   onComplete,
   onPRResult,
@@ -739,7 +737,6 @@ export function useBatchProcessor({
               docContent,
               {
                 onSpawnAgent,
-                onSpawnSynopsis,
               }
             );
 
@@ -1282,7 +1279,7 @@ export function useBatchProcessor({
     delete errorResolutionRefs.current[sessionId];
     delete stopRequestedRefs.current[sessionId];
   // Note: updateBatchStateAndBroadcast is accessed via ref to avoid stale closure in long-running async
-  }, [onUpdateSession, onSpawnAgent, onSpawnSynopsis, onAddHistoryEntry, onComplete, onPRResult, audioFeedbackEnabled, audioFeedbackCommand, timeTracking, onProcessQueueAfterCompletion]);
+  }, [onUpdateSession, onSpawnAgent, onAddHistoryEntry, onComplete, onPRResult, audioFeedbackEnabled, audioFeedbackCommand, timeTracking, onProcessQueueAfterCompletion]);
 
   /**
    * Request to stop the batch run for a specific session after current task completes

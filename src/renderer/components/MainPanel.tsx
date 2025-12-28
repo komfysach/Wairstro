@@ -519,7 +519,8 @@ export const MainPanel = React.memo(forwardRef<MainPanelHandle, MainPanelProps>(
           <div ref={headerRef} className="h-16 border-b flex items-center justify-between px-6 shrink-0" style={{ borderColor: theme.colors.border, backgroundColor: theme.colors.bgSidebar }} data-tour="header-controls">
             <div className="flex items-center gap-4 min-w-0">
               <div className="flex items-center gap-2 text-sm font-medium min-w-0">
-                <span className="truncate max-w-[200px]">{activeSession.name}</span>
+                {/* Session name - protected from shrinking, other elements hide first */}
+                <span className="shrink-0">{activeSession.name}</span>
                 <div
                   className="relative"
                   onMouseEnter={activeSession.isGitRepo ? gitTooltip.triggerHandlers.onMouseEnter : undefined}

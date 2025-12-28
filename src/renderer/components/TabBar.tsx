@@ -577,57 +577,51 @@ function Tab({
             {/* Tab Close Actions Section - divider and close options */}
             <div className="my-1 border-t" style={{ borderColor: theme.colors.border }} />
 
-            {/* Close Tab - disabled if only one tab */}
+            {/* Close Tab - always available */}
             <button
               onClick={handleCloseClick}
-              className={`w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs transition-colors ${
-                hasOnlyOneTab ? 'opacity-40 cursor-default' : 'hover:bg-white/10'
-              }`}
+              className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs transition-colors hover:bg-white/10"
               style={{ color: theme.colors.textMain }}
-              disabled={hasOnlyOneTab}
             >
               <X className="w-3.5 h-3.5" style={{ color: theme.colors.textDim }} />
               Close
             </button>
 
-            {/* Close Others - disabled if only one tab */}
-            <button
-              onClick={handleCloseOthersClick}
-              className={`w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs transition-colors ${
-                hasOnlyOneTab ? 'opacity-40 cursor-default' : 'hover:bg-white/10'
-              }`}
-              style={{ color: theme.colors.textMain }}
-              disabled={hasOnlyOneTab}
-            >
-              <Minus className="w-3.5 h-3.5" style={{ color: theme.colors.textDim }} />
-              Close Others
-            </button>
+            {/* Close Others - suppressed if only one tab */}
+            {!hasOnlyOneTab && (
+              <button
+                onClick={handleCloseOthersClick}
+                className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs transition-colors hover:bg-white/10"
+                style={{ color: theme.colors.textMain }}
+              >
+                <Minus className="w-3.5 h-3.5" style={{ color: theme.colors.textDim }} />
+                Close Others
+              </button>
+            )}
 
-            {/* Close Tabs to the Left - disabled if first tab */}
-            <button
-              onClick={handleCloseLeftClick}
-              className={`w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs transition-colors ${
-                isFirstTab ? 'opacity-40 cursor-default' : 'hover:bg-white/10'
-              }`}
-              style={{ color: theme.colors.textMain }}
-              disabled={isFirstTab}
-            >
-              <ArrowLeftToLine className="w-3.5 h-3.5" style={{ color: theme.colors.textDim }} />
-              Close Tabs to the Left
-            </button>
+            {/* Close Tabs to the Left - suppressed if first tab */}
+            {!isFirstTab && (
+              <button
+                onClick={handleCloseLeftClick}
+                className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs transition-colors hover:bg-white/10"
+                style={{ color: theme.colors.textMain }}
+              >
+                <ArrowLeftToLine className="w-3.5 h-3.5" style={{ color: theme.colors.textDim }} />
+                Close Tabs to the Left
+              </button>
+            )}
 
-            {/* Close Tabs to the Right - disabled if last tab */}
-            <button
-              onClick={handleCloseRightClick}
-              className={`w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs transition-colors ${
-                isLastTab ? 'opacity-40 cursor-default' : 'hover:bg-white/10'
-              }`}
-              style={{ color: theme.colors.textMain }}
-              disabled={isLastTab}
-            >
-              <ArrowRightToLine className="w-3.5 h-3.5" style={{ color: theme.colors.textDim }} />
-              Close Tabs to the Right
-            </button>
+            {/* Close Tabs to the Right - suppressed if last tab */}
+            {!isLastTab && (
+              <button
+                onClick={handleCloseRightClick}
+                className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs transition-colors hover:bg-white/10"
+                style={{ color: theme.colors.textMain }}
+              >
+                <ArrowRightToLine className="w-3.5 h-3.5" style={{ color: theme.colors.textDim }} />
+                Close Tabs to the Right
+              </button>
+            )}
           </div>
         </div>,
         document.body

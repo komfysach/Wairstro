@@ -13,10 +13,8 @@
  */
 
 import { useCallback } from 'react';
-import type { Session, UsageStats, ToolType } from '../../types';
+import type { Session, UsageStats } from '../../types';
 import { substituteTemplateVariables, TemplateContext } from '../../utils/templateVariables';
-import { autorunSynopsisPrompt } from '../../../prompts';
-import { parseSynopsis } from '../../../shared/synopsis';
 import { countUnfinishedTasks, countCheckedTasks } from './batchUtils';
 
 /**
@@ -160,20 +158,6 @@ export interface DocumentProcessorCallbacks {
     response?: string;
     agentSessionId?: string;
     usageStats?: UsageStats;
-  }>;
-
-  /**
-   * Spawn a synopsis request for a completed task
-   */
-  onSpawnSynopsis: (
-    sessionId: string,
-    cwd: string,
-    agentSessionId: string,
-    prompt: string,
-    toolType?: ToolType
-  ) => Promise<{
-    success: boolean;
-    response?: string;
   }>;
 }
 
@@ -356,46 +340,41 @@ export function useDocumentProcessor(): UseDocumentProcessorReturn {
       // Detect if document content changed
       const documentChanged = contentBeforeTask !== contentAfterTask;
 
-      // Generate synopsis for successful tasks with an agent session
+      // Generate synopsis for successful tasks
+      // The autorun prompt instructs the agent to start with a specific synopsis,
+      // so we extract it from the task response rather than making a separate call
       let shortSummary = `[${filename}] Task completed`;
       let fullSynopsis = shortSummary;
 
-      if (result.success && result.agentSessionId) {
-        // Request a synopsis from the agent by resuming the session
-        // Use effectiveCwd (worktree path when active) to find the session
-        try {
-          const synopsisResult = await callbacks.onSpawnSynopsis(
-            session.id,
-            effectiveCwd,
-            result.agentSessionId,
-            autorunSynopsisPrompt,
-            session.toolType // Pass the agent type for multi-provider support
-          );
+      if (result.success && result.response) {
+        // Extract synopsis from the task response (first paragraph is the synopsis per prompt instructions)
+        const responseText = result.response.trim();
+        if (responseText) {
+          // Use the first paragraph as the short summary
+          const paragraphs = responseText.split(/\n\n+/);
+          const firstParagraph = paragraphs[0]?.trim() || '';
 
-          // Debug: Log synopsis result
-          window.maestro.logger.log('debug', '[DocumentProcessor] Synopsis result', 'DocumentProcessor', {
-            success: synopsisResult.success,
-            hasResponse: !!synopsisResult.response,
-            responseLength: synopsisResult.response?.length || 0,
-            responsePreview: synopsisResult.response?.substring(0, 200) || '(empty)',
-          });
+          // Clean up the first paragraph - remove markdown formatting for summary
+          const cleanFirstParagraph = firstParagraph
+            .replace(/^\*\*Summary:\*\*\s*/i, '') // Remove **Summary:** prefix if present
+            .replace(/^#+\s*/, '') // Remove heading markers
+            .replace(/\*\*/g, '') // Remove bold markers
+            .trim();
 
-          if (synopsisResult.success && synopsisResult.response) {
-            const parsed = parseSynopsis(synopsisResult.response);
-            // Debug: Log parsed synopsis
-            window.maestro.logger.log('debug', '[DocumentProcessor] Parsed synopsis', 'DocumentProcessor', {
-              shortSummary: parsed.shortSummary.substring(0, 100),
-              fullSynopsisLength: parsed.fullSynopsis.length,
-            });
-            shortSummary = parsed.shortSummary;
-            fullSynopsis = parsed.fullSynopsis;
+          if (cleanFirstParagraph && cleanFirstParagraph.length > 10) {
+            // Use first sentence or first 150 chars as short summary
+            const firstSentenceMatch = cleanFirstParagraph.match(/^[^.!?]+[.!?]/);
+            shortSummary = firstSentenceMatch
+              ? firstSentenceMatch[0].trim()
+              : cleanFirstParagraph.substring(0, 150) + (cleanFirstParagraph.length > 150 ? '...' : '');
+
+            // Full synopsis is the complete response
+            fullSynopsis = responseText;
           }
-        } catch (err) {
-          console.error('[DocumentProcessor] Synopsis generation failed:', err);
         }
       } else if (!result.success) {
         shortSummary = `[${filename}] Task failed`;
-        fullSynopsis = shortSummary;
+        fullSynopsis = result.response || shortSummary;
       }
 
       return {

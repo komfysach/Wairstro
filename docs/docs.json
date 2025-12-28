@@ -55,15 +55,14 @@
             "group": "Usage",
             "pages": [
               "general-usage",
-              "keyboard-shortcuts",
-              "slash-commands",
-              "speckit-commands",
+              "context-management",
+              "history",
+              "autorun-playbooks",
               "git-worktrees",
               "group-chat",
-              "autorun-playbooks",
-              "history",
-              "context-management",
-              "achievements"
+              "remote-access",
+              "slash-commands",
+              "speckit-commands"
             ]
           },
           {
@@ -76,8 +75,9 @@
           {
             "group": "Reference",
             "pages": [
+              "achievements",
+              "keyboard-shortcuts",
               "configuration",
-              "remote-access",
               "troubleshooting"
             ]
           }

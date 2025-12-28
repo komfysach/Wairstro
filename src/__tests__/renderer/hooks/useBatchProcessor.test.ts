@@ -590,7 +590,6 @@ describe('useBatchProcessor hook', () => {
   // Mock callbacks
   let mockOnUpdateSession: ReturnType<typeof vi.fn>;
   let mockOnSpawnAgent: ReturnType<typeof vi.fn>;
-  let mockOnSpawnSynopsis: ReturnType<typeof vi.fn>;
   let mockOnAddHistoryEntry: ReturnType<typeof vi.fn>;
   let mockOnComplete: ReturnType<typeof vi.fn>;
   let mockOnPRResult: ReturnType<typeof vi.fn>;
@@ -611,8 +610,7 @@ describe('useBatchProcessor hook', () => {
   beforeEach(() => {
     // Reset mocks
     mockOnUpdateSession = vi.fn();
-    mockOnSpawnAgent = vi.fn().mockResolvedValue({ success: true, agentSessionId: 'mock-claude-session', usageStats: { inputTokens: 100, outputTokens: 200, totalCostUsd: 0.01, cacheReadInputTokens: 0, cacheCreationInputTokens: 0, contextWindow: 0 } });
-    mockOnSpawnSynopsis = vi.fn().mockResolvedValue({ success: true, response: '**Summary:** Test task completed\n\n**Details:** Some details here.' });
+    mockOnSpawnAgent = vi.fn().mockResolvedValue({ success: true, agentSessionId: 'mock-claude-session', usageStats: { inputTokens: 100, outputTokens: 200, totalCostUsd: 0.01, cacheReadInputTokens: 0, cacheCreationInputTokens: 0, contextWindow: 0 }, response: '**Summary:** Test task completed\n\n**Details:** Some details here.' });
     mockOnAddHistoryEntry = vi.fn();
     mockOnComplete = vi.fn();
     mockOnPRResult = vi.fn();
@@ -676,7 +674,6 @@ describe('useBatchProcessor hook', () => {
           groups,
           onUpdateSession: mockOnUpdateSession,
           onSpawnAgent: mockOnSpawnAgent,
-          onSpawnSynopsis: mockOnSpawnSynopsis,
           onAddHistoryEntry: mockOnAddHistoryEntry,
           onComplete: mockOnComplete,
           onPRResult: mockOnPRResult
@@ -699,7 +696,6 @@ describe('useBatchProcessor hook', () => {
           groups,
           onUpdateSession: mockOnUpdateSession,
           onSpawnAgent: mockOnSpawnAgent,
-          onSpawnSynopsis: mockOnSpawnSynopsis,
           onAddHistoryEntry: mockOnAddHistoryEntry
         })
       );
@@ -723,7 +719,6 @@ describe('useBatchProcessor hook', () => {
           groups,
           onUpdateSession: mockOnUpdateSession,
           onSpawnAgent: mockOnSpawnAgent,
-          onSpawnSynopsis: mockOnSpawnSynopsis,
           onAddHistoryEntry: mockOnAddHistoryEntry
         })
       );
@@ -745,7 +740,6 @@ describe('useBatchProcessor hook', () => {
           groups,
           onUpdateSession: mockOnUpdateSession,
           onSpawnAgent: mockOnSpawnAgent,
-          onSpawnSynopsis: mockOnSpawnSynopsis,
           onAddHistoryEntry: mockOnAddHistoryEntry
         })
       );
@@ -773,7 +767,6 @@ describe('useBatchProcessor hook', () => {
           groups,
           onUpdateSession: mockOnUpdateSession,
           onSpawnAgent: mockOnSpawnAgent,
-          onSpawnSynopsis: mockOnSpawnSynopsis,
           onAddHistoryEntry: mockOnAddHistoryEntry
         })
       );
@@ -799,7 +792,6 @@ describe('useBatchProcessor hook', () => {
           groups,
           onUpdateSession: mockOnUpdateSession,
           onSpawnAgent: mockOnSpawnAgent,
-          onSpawnSynopsis: mockOnSpawnSynopsis,
           onAddHistoryEntry: mockOnAddHistoryEntry
         })
       );
@@ -825,7 +817,6 @@ describe('useBatchProcessor hook', () => {
           groups,
           onUpdateSession: mockOnUpdateSession,
           onSpawnAgent: mockOnSpawnAgent,
-          onSpawnSynopsis: mockOnSpawnSynopsis,
           onAddHistoryEntry: mockOnAddHistoryEntry
         })
       );
@@ -854,7 +845,6 @@ describe('useBatchProcessor hook', () => {
           groups,
           onUpdateSession: mockOnUpdateSession,
           onSpawnAgent: mockOnSpawnAgent,
-          onSpawnSynopsis: mockOnSpawnSynopsis,
           onAddHistoryEntry: mockOnAddHistoryEntry
         })
       );
@@ -893,7 +883,6 @@ describe('useBatchProcessor hook', () => {
           groups,
           onUpdateSession: mockOnUpdateSession,
           onSpawnAgent: mockOnSpawnAgent,
-          onSpawnSynopsis: mockOnSpawnSynopsis,
           onAddHistoryEntry: mockOnAddHistoryEntry,
           onComplete: mockOnComplete
         })
@@ -948,7 +937,6 @@ describe('useBatchProcessor hook', () => {
           groups,
           onUpdateSession: mockOnUpdateSession,
           onSpawnAgent: mockOnSpawnAgent,
-          onSpawnSynopsis: mockOnSpawnSynopsis,
           onAddHistoryEntry: mockOnAddHistoryEntry,
           onComplete: mockOnComplete
         })
@@ -988,7 +976,6 @@ describe('useBatchProcessor hook', () => {
           groups,
           onUpdateSession: mockOnUpdateSession,
           onSpawnAgent: mockOnSpawnAgent,
-          onSpawnSynopsis: mockOnSpawnSynopsis,
           onAddHistoryEntry: mockOnAddHistoryEntry
         })
       );
@@ -1049,7 +1036,6 @@ describe('useBatchProcessor hook', () => {
           groups,
           onUpdateSession: mockOnUpdateSession,
           onSpawnAgent: mockOnSpawnAgent,
-          onSpawnSynopsis: mockOnSpawnSynopsis,
           onAddHistoryEntry: mockOnAddHistoryEntry,
           onComplete: mockOnComplete
         })
@@ -1088,7 +1074,6 @@ describe('useBatchProcessor hook', () => {
           groups,
           onUpdateSession: mockOnUpdateSession,
           onSpawnAgent: mockOnSpawnAgent,
-          onSpawnSynopsis: mockOnSpawnSynopsis,
           onAddHistoryEntry: mockOnAddHistoryEntry,
           onComplete: mockOnComplete
         })
@@ -1132,7 +1117,6 @@ describe('useBatchProcessor hook', () => {
           groups,
           onUpdateSession: mockOnUpdateSession,
           onSpawnAgent: mockOnSpawnAgent,
-          onSpawnSynopsis: mockOnSpawnSynopsis,
           onAddHistoryEntry: mockOnAddHistoryEntry,
           onComplete: mockOnComplete
         })
@@ -1178,7 +1162,6 @@ describe('useBatchProcessor hook', () => {
           groups,
           onUpdateSession: mockOnUpdateSession,
           onSpawnAgent: mockOnSpawnAgent,
-          onSpawnSynopsis: mockOnSpawnSynopsis,
           onAddHistoryEntry: mockOnAddHistoryEntry,
           onComplete: mockOnComplete,
           onPRResult: mockOnPRResult
@@ -1229,7 +1212,6 @@ describe('useBatchProcessor hook', () => {
           groups,
           onUpdateSession: mockOnUpdateSession,
           onSpawnAgent: mockOnSpawnAgent,
-          onSpawnSynopsis: mockOnSpawnSynopsis,
           onAddHistoryEntry: mockOnAddHistoryEntry,
           onComplete: mockOnComplete,
           onPRResult: mockOnPRResult
@@ -1276,7 +1258,6 @@ describe('useBatchProcessor hook', () => {
           groups,
           onUpdateSession: mockOnUpdateSession,
           onSpawnAgent: mockOnSpawnAgent,
-          onSpawnSynopsis: mockOnSpawnSynopsis,
           onAddHistoryEntry: mockOnAddHistoryEntry,
           onComplete: mockOnComplete,
           onPRResult: mockOnPRResult
@@ -1342,7 +1323,6 @@ describe('useBatchProcessor hook', () => {
           groups,
           onUpdateSession: mockOnUpdateSession,
           onSpawnAgent: mockOnSpawnAgent,
-          onSpawnSynopsis: mockOnSpawnSynopsis,
           onAddHistoryEntry: mockOnAddHistoryEntry,
           onComplete: mockOnComplete
         })
@@ -1390,7 +1370,6 @@ describe('useBatchProcessor hook', () => {
           groups,
           onUpdateSession: mockOnUpdateSession,
           onSpawnAgent: mockOnSpawnAgent,
-          onSpawnSynopsis: mockOnSpawnSynopsis,
           onAddHistoryEntry: mockOnAddHistoryEntry,
           onComplete: mockOnComplete
         })
@@ -1434,7 +1413,6 @@ describe('useBatchProcessor hook', () => {
           groups,
           onUpdateSession: mockOnUpdateSession,
           onSpawnAgent: mockOnSpawnAgent,
-          onSpawnSynopsis: mockOnSpawnSynopsis,
           onAddHistoryEntry: mockOnAddHistoryEntry,
           onComplete: mockOnComplete,
           audioFeedbackEnabled: true,
@@ -1473,7 +1451,6 @@ describe('useBatchProcessor hook', () => {
           groups,
           onUpdateSession: mockOnUpdateSession,
           onSpawnAgent: mockOnSpawnAgent,
-          onSpawnSynopsis: mockOnSpawnSynopsis,
           onAddHistoryEntry: mockOnAddHistoryEntry,
           onComplete: mockOnComplete
         })
@@ -1511,7 +1488,6 @@ describe('useBatchProcessor hook', () => {
           groups,
           onUpdateSession: mockOnUpdateSession,
           onSpawnAgent: mockOnSpawnAgent,
-          onSpawnSynopsis: mockOnSpawnSynopsis,
           onAddHistoryEntry: mockOnAddHistoryEntry,
           onComplete: mockOnComplete
         })
@@ -1553,7 +1529,6 @@ describe('useBatchProcessor hook', () => {
           groups,
           onUpdateSession: mockOnUpdateSession,
           onSpawnAgent: mockOnSpawnAgent,
-          onSpawnSynopsis: mockOnSpawnSynopsis,
           onAddHistoryEntry: mockOnAddHistoryEntry,
           onComplete: mockOnComplete
         })
@@ -1581,9 +1556,11 @@ describe('useBatchProcessor hook', () => {
       const sessions = [createMockSession()];
       const groups = [createMockGroup()];
 
-      // Mock synopsis with proper format
-      mockOnSpawnSynopsis.mockResolvedValue({
+      // Mock agent response with synopsis format (synopsis is now extracted from agent response)
+      mockOnSpawnAgent.mockResolvedValue({
         success: true,
+        agentSessionId: 'mock-claude-session',
+        usageStats: { inputTokens: 100, outputTokens: 200, totalCostUsd: 0.01, cacheReadInputTokens: 0, cacheCreationInputTokens: 0, contextWindow: 0 },
         response: '**Summary:** Created new component\n\n**Details:** Added a React component with hooks and tests.'
       });
 
@@ -1601,7 +1578,6 @@ describe('useBatchProcessor hook', () => {
           groups,
           onUpdateSession: mockOnUpdateSession,
           onSpawnAgent: mockOnSpawnAgent,
-          onSpawnSynopsis: mockOnSpawnSynopsis,
           onAddHistoryEntry: mockOnAddHistoryEntry,
           onComplete: mockOnComplete
         })
@@ -1628,9 +1604,11 @@ describe('useBatchProcessor hook', () => {
       const sessions = [createMockSession()];
       const groups = [createMockGroup()];
 
-      // Mock synopsis with ANSI codes and box drawing chars
-      mockOnSpawnSynopsis.mockResolvedValue({
+      // Mock agent response with ANSI codes and box drawing chars (synopsis is now extracted from agent response)
+      mockOnSpawnAgent.mockResolvedValue({
         success: true,
+        agentSessionId: 'mock-claude-session',
+        usageStats: { inputTokens: 100, outputTokens: 200, totalCostUsd: 0.01, cacheReadInputTokens: 0, cacheCreationInputTokens: 0, contextWindow: 0 },
         response: '\x1b[32m**Summary:**\x1b[0m ─── Task done │\n\n**Details:** Info here.'
       });
 
@@ -1647,7 +1625,6 @@ describe('useBatchProcessor hook', () => {
           groups,
           onUpdateSession: mockOnUpdateSession,
           onSpawnAgent: mockOnSpawnAgent,
-          onSpawnSynopsis: mockOnSpawnSynopsis,
           onAddHistoryEntry: mockOnAddHistoryEntry,
           onComplete: mockOnComplete
         })
@@ -1669,9 +1646,11 @@ describe('useBatchProcessor hook', () => {
       const sessions = [createMockSession()];
       const groups = [createMockGroup()];
 
-      // Mock synopsis with only Summary
-      mockOnSpawnSynopsis.mockResolvedValue({
+      // Mock agent response with only Summary (synopsis is now extracted from agent response)
+      mockOnSpawnAgent.mockResolvedValue({
         success: true,
+        agentSessionId: 'mock-claude-session',
+        usageStats: { inputTokens: 100, outputTokens: 200, totalCostUsd: 0.01, cacheReadInputTokens: 0, cacheCreationInputTokens: 0, contextWindow: 0 },
         response: '**Summary:** No changes made.'
       });
 
@@ -1688,7 +1667,6 @@ describe('useBatchProcessor hook', () => {
           groups,
           onUpdateSession: mockOnUpdateSession,
           onSpawnAgent: mockOnSpawnAgent,
-          onSpawnSynopsis: mockOnSpawnSynopsis,
           onAddHistoryEntry: mockOnAddHistoryEntry,
           onComplete: mockOnComplete
         })
@@ -1713,9 +1691,11 @@ describe('useBatchProcessor hook', () => {
       const sessions = [createMockSession()];
       const groups = [createMockGroup()];
 
-      // Mock synopsis without proper markdown format
-      mockOnSpawnSynopsis.mockResolvedValue({
+      // Mock agent response without proper markdown format (synopsis is now extracted from agent response)
+      mockOnSpawnAgent.mockResolvedValue({
         success: true,
+        agentSessionId: 'mock-claude-session',
+        usageStats: { inputTokens: 100, outputTokens: 200, totalCostUsd: 0.01, cacheReadInputTokens: 0, cacheCreationInputTokens: 0, contextWindow: 0 },
         response: 'Just a plain text response\nWith multiple lines.'
       });
 
@@ -1732,7 +1712,6 @@ describe('useBatchProcessor hook', () => {
           groups,
           onUpdateSession: mockOnUpdateSession,
           onSpawnAgent: mockOnSpawnAgent,
-          onSpawnSynopsis: mockOnSpawnSynopsis,
           onAddHistoryEntry: mockOnAddHistoryEntry,
           onComplete: mockOnComplete
         })
@@ -1746,10 +1725,10 @@ describe('useBatchProcessor hook', () => {
         }, '/test/folder');
       });
 
-      // Should use first line as fallback
+      // Should use first sentence as summary (full paragraph if no sentence break found within 150 chars)
       expect(mockOnAddHistoryEntry).toHaveBeenCalledWith(
         expect.objectContaining({
-          summary: 'Just a plain text response'
+          summary: 'Just a plain text response\nWith multiple lines.'
         })
       );
     });
@@ -1758,9 +1737,11 @@ describe('useBatchProcessor hook', () => {
       const sessions = [createMockSession()];
       const groups = [createMockGroup()];
 
-      // Mock empty synopsis
-      mockOnSpawnSynopsis.mockResolvedValue({
+      // Mock agent response with empty text (synopsis is now extracted from agent response)
+      mockOnSpawnAgent.mockResolvedValue({
         success: true,
+        agentSessionId: 'mock-claude-session',
+        usageStats: { inputTokens: 100, outputTokens: 200, totalCostUsd: 0.01, cacheReadInputTokens: 0, cacheCreationInputTokens: 0, contextWindow: 0 },
         response: ''
       });
 
@@ -1777,7 +1758,6 @@ describe('useBatchProcessor hook', () => {
           groups,
           onUpdateSession: mockOnUpdateSession,
           onSpawnAgent: mockOnSpawnAgent,
-          onSpawnSynopsis: mockOnSpawnSynopsis,
           onAddHistoryEntry: mockOnAddHistoryEntry,
           onComplete: mockOnComplete
         })
@@ -1803,8 +1783,13 @@ describe('useBatchProcessor hook', () => {
       const sessions = [createMockSession()];
       const groups = [createMockGroup()];
 
-      // Mock synopsis failure
-      mockOnSpawnSynopsis.mockResolvedValue({ success: false });
+      // Mock agent failure (synopsis is now extracted from agent response)
+      mockOnSpawnAgent.mockResolvedValue({
+        success: false,
+        agentSessionId: 'mock-claude-session',
+        usageStats: { inputTokens: 100, outputTokens: 200, totalCostUsd: 0.01, cacheReadInputTokens: 0, cacheCreationInputTokens: 0, contextWindow: 0 },
+        response: ''
+      });
 
       let callCount = 0;
       mockReadDoc.mockImplementation(async () => {
@@ -1819,7 +1804,6 @@ describe('useBatchProcessor hook', () => {
           groups,
           onUpdateSession: mockOnUpdateSession,
           onSpawnAgent: mockOnSpawnAgent,
-          onSpawnSynopsis: mockOnSpawnSynopsis,
           onAddHistoryEntry: mockOnAddHistoryEntry,
           onComplete: mockOnComplete
         })
@@ -1841,8 +1825,8 @@ describe('useBatchProcessor hook', () => {
       const sessions = [createMockSession()];
       const groups = [createMockGroup()];
 
-      // Mock synopsis throwing error
-      mockOnSpawnSynopsis.mockRejectedValue(new Error('Synopsis generation failed'));
+      // Mock agent throwing error (synopsis is now extracted from agent response)
+      mockOnSpawnAgent.mockRejectedValue(new Error('Agent execution failed'));
 
       let callCount = 0;
       mockReadDoc.mockImplementation(async () => {
@@ -1857,7 +1841,6 @@ describe('useBatchProcessor hook', () => {
           groups,
           onUpdateSession: mockOnUpdateSession,
           onSpawnAgent: mockOnSpawnAgent,
-          onSpawnSynopsis: mockOnSpawnSynopsis,
           onAddHistoryEntry: mockOnAddHistoryEntry,
           onComplete: mockOnComplete
         })
@@ -1896,7 +1879,6 @@ describe('useBatchProcessor hook', () => {
           groups,
           onUpdateSession: mockOnUpdateSession,
           onSpawnAgent: mockOnSpawnAgent,
-          onSpawnSynopsis: mockOnSpawnSynopsis,
           onAddHistoryEntry: mockOnAddHistoryEntry,
           onComplete: mockOnComplete
         })
@@ -1936,7 +1918,6 @@ describe('useBatchProcessor hook', () => {
           groups,
           onUpdateSession: mockOnUpdateSession,
           onSpawnAgent: mockOnSpawnAgent,
-          onSpawnSynopsis: mockOnSpawnSynopsis,
           onAddHistoryEntry: mockOnAddHistoryEntry,
           onComplete: mockOnComplete
         })
@@ -1976,7 +1957,6 @@ describe('useBatchProcessor hook', () => {
           groups,
           onUpdateSession: mockOnUpdateSession,
           onSpawnAgent: mockOnSpawnAgent,
-          onSpawnSynopsis: mockOnSpawnSynopsis,
           onAddHistoryEntry: mockOnAddHistoryEntry,
           onComplete: mockOnComplete
         })
@@ -2013,7 +1993,6 @@ describe('useBatchProcessor hook', () => {
           groups,
           onUpdateSession: mockOnUpdateSession,
           onSpawnAgent: mockOnSpawnAgent,
-          onSpawnSynopsis: mockOnSpawnSynopsis,
           onAddHistoryEntry: mockOnAddHistoryEntry,
           onComplete: mockOnComplete
         })
@@ -2048,7 +2027,6 @@ describe('useBatchProcessor hook', () => {
           groups,
           onUpdateSession: mockOnUpdateSession,
           onSpawnAgent: mockOnSpawnAgent,
-          onSpawnSynopsis: mockOnSpawnSynopsis,
           onAddHistoryEntry: mockOnAddHistoryEntry,
           onComplete: mockOnComplete
         })
@@ -2085,7 +2063,6 @@ describe('useBatchProcessor hook', () => {
           groups,
           onUpdateSession: mockOnUpdateSession,
           onSpawnAgent: mockOnSpawnAgent,
-          onSpawnSynopsis: mockOnSpawnSynopsis,
           onAddHistoryEntry: mockOnAddHistoryEntry,
           onComplete: mockOnComplete
         })
@@ -2135,7 +2112,6 @@ describe('useBatchProcessor hook', () => {
           groups,
           onUpdateSession: mockOnUpdateSession,
           onSpawnAgent: mockOnSpawnAgent,
-          onSpawnSynopsis: mockOnSpawnSynopsis,
           onAddHistoryEntry: mockOnAddHistoryEntry,
           onComplete: mockOnComplete
         })
@@ -2176,7 +2152,6 @@ describe('useBatchProcessor hook', () => {
           groups,
           onUpdateSession: mockOnUpdateSession,
           onSpawnAgent: mockOnSpawnAgent,
-          onSpawnSynopsis: mockOnSpawnSynopsis,
           onAddHistoryEntry: mockOnAddHistoryEntry,
           onComplete: mockOnComplete
         })
@@ -2226,7 +2201,6 @@ describe('useBatchProcessor hook', () => {
           groups,
           onUpdateSession: mockOnUpdateSession,
           onSpawnAgent: mockOnSpawnAgent,
-          onSpawnSynopsis: mockOnSpawnSynopsis,
           onAddHistoryEntry: mockOnAddHistoryEntry,
           onComplete: mockOnComplete
         })
@@ -2289,7 +2263,6 @@ describe('useBatchProcessor hook', () => {
           groups,
           onUpdateSession: mockOnUpdateSession,
           onSpawnAgent: mockOnSpawnAgent,
-          onSpawnSynopsis: mockOnSpawnSynopsis,
           onAddHistoryEntry: mockOnAddHistoryEntry,
           onComplete: mockOnComplete
         })
@@ -2345,7 +2318,6 @@ describe('useBatchProcessor hook', () => {
           groups,
           onUpdateSession: mockOnUpdateSession,
           onSpawnAgent: mockOnSpawnAgent,
-          onSpawnSynopsis: mockOnSpawnSynopsis,
           onAddHistoryEntry: mockOnAddHistoryEntry,
           onComplete: mockOnComplete
         })
@@ -2384,7 +2356,6 @@ describe('useBatchProcessor hook', () => {
           groups,
           onUpdateSession: mockOnUpdateSession,
           onSpawnAgent: mockOnSpawnAgent,
-          onSpawnSynopsis: mockOnSpawnSynopsis,
           onAddHistoryEntry: mockOnAddHistoryEntry,
           onComplete: mockOnComplete
         })
@@ -2435,7 +2406,6 @@ describe('useBatchProcessor hook', () => {
           groups,
           onUpdateSession: mockOnUpdateSession,
           onSpawnAgent: mockOnSpawnAgent,
-          onSpawnSynopsis: mockOnSpawnSynopsis,
           onAddHistoryEntry: mockOnAddHistoryEntry,
           onComplete: mockOnComplete
         })
@@ -2486,7 +2456,6 @@ describe('useBatchProcessor hook', () => {
           groups,
           onUpdateSession: mockOnUpdateSession,
           onSpawnAgent: mockOnSpawnAgent,
-          onSpawnSynopsis: mockOnSpawnSynopsis,
           onAddHistoryEntry: mockOnAddHistoryEntry,
           onComplete: mockOnComplete
         })
@@ -2525,7 +2494,6 @@ describe('useBatchProcessor hook', () => {
           groups,
           onUpdateSession: mockOnUpdateSession,
           onSpawnAgent: mockOnSpawnAgent,
-          onSpawnSynopsis: mockOnSpawnSynopsis,
           onAddHistoryEntry: mockOnAddHistoryEntry,
           onComplete: mockOnComplete
         })
@@ -2570,7 +2538,6 @@ describe('useBatchProcessor hook', () => {
           groups,
           onUpdateSession: mockOnUpdateSession,
           onSpawnAgent: mockOnSpawnAgent,
-          onSpawnSynopsis: mockOnSpawnSynopsis,
           onAddHistoryEntry: mockOnAddHistoryEntry,
           onComplete: mockOnComplete
         })
@@ -2606,7 +2573,6 @@ describe('useBatchProcessor hook', () => {
           groups,
           onUpdateSession: mockOnUpdateSession,
           onSpawnAgent: mockOnSpawnAgent,
-          onSpawnSynopsis: mockOnSpawnSynopsis,
           onAddHistoryEntry: mockOnAddHistoryEntry,
           onComplete: mockOnComplete
         })
@@ -2652,7 +2618,6 @@ describe('useBatchProcessor hook', () => {
           groups,
           onUpdateSession: mockOnUpdateSession,
           onSpawnAgent: mockOnSpawnAgent,
-          onSpawnSynopsis: mockOnSpawnSynopsis,
           onAddHistoryEntry: mockOnAddHistoryEntry,
           onComplete: mockOnComplete
         })
@@ -2690,7 +2655,6 @@ describe('useBatchProcessor hook', () => {
           groups,
           onUpdateSession: mockOnUpdateSession,
           onSpawnAgent: mockOnSpawnAgent,
-          onSpawnSynopsis: mockOnSpawnSynopsis,
           onAddHistoryEntry: mockOnAddHistoryEntry,
           onComplete: mockOnComplete
         })
@@ -2733,7 +2697,6 @@ describe('useBatchProcessor hook', () => {
           groups,
           onUpdateSession: mockOnUpdateSession,
           onSpawnAgent: mockOnSpawnAgent,
-          onSpawnSynopsis: mockOnSpawnSynopsis,
           onAddHistoryEntry: mockOnAddHistoryEntry,
           onComplete: mockOnComplete
         })
@@ -2777,7 +2740,6 @@ describe('useBatchProcessor hook', () => {
           groups,
           onUpdateSession: mockOnUpdateSession,
           onSpawnAgent: mockOnSpawnAgent,
-          onSpawnSynopsis: mockOnSpawnSynopsis,
           onAddHistoryEntry: mockOnAddHistoryEntry,
           onComplete: mockOnComplete
         })
@@ -2816,7 +2778,6 @@ describe('useBatchProcessor hook', () => {
           groups,
           onUpdateSession: mockOnUpdateSession,
           onSpawnAgent: mockOnSpawnAgent,
-          onSpawnSynopsis: mockOnSpawnSynopsis,
           onAddHistoryEntry: mockOnAddHistoryEntry,
           onComplete: mockOnComplete
         })
@@ -2869,7 +2830,6 @@ describe('useBatchProcessor hook', () => {
           groups,
           onUpdateSession: mockOnUpdateSession,
           onSpawnAgent: mockOnSpawnAgent,
-          onSpawnSynopsis: mockOnSpawnSynopsis,
           onAddHistoryEntry: mockOnAddHistoryEntry,
           onComplete: mockOnComplete
         })
@@ -2930,7 +2890,6 @@ describe('useBatchProcessor hook', () => {
           groups,
           onUpdateSession: mockOnUpdateSession,
           onSpawnAgent: mockOnSpawnAgent,
-          onSpawnSynopsis: mockOnSpawnSynopsis,
           onAddHistoryEntry: mockOnAddHistoryEntry,
           onComplete: mockOnComplete
         })
@@ -2993,7 +2952,6 @@ describe('useBatchProcessor hook', () => {
           groups,
           onUpdateSession: mockOnUpdateSession,
           onSpawnAgent: mockOnSpawnAgent,
-          onSpawnSynopsis: mockOnSpawnSynopsis,
           onAddHistoryEntry: mockOnAddHistoryEntry,
           onComplete: mockOnComplete,
           onPRResult: mockOnPRResult
@@ -3060,7 +3018,6 @@ describe('useBatchProcessor hook', () => {
           groups,
           onUpdateSession: mockOnUpdateSession,
           onSpawnAgent: mockOnSpawnAgent,
-          onSpawnSynopsis: mockOnSpawnSynopsis,
           onAddHistoryEntry: mockOnAddHistoryEntry,
           onComplete: mockOnComplete,
           onPRResult: mockOnPRResult
@@ -3119,7 +3076,6 @@ describe('useBatchProcessor hook', () => {
           groups,
           onUpdateSession: mockOnUpdateSession,
           onSpawnAgent: mockOnSpawnAgent,
-          onSpawnSynopsis: mockOnSpawnSynopsis,
           onAddHistoryEntry: mockOnAddHistoryEntry,
           onComplete: mockOnComplete
         })
@@ -3165,11 +3121,8 @@ describe('useBatchProcessor hook', () => {
 
       mockOnSpawnAgent.mockResolvedValue({
         success: true,
-        agentSessionId: 'test-session'
-      });
-
-      mockOnSpawnSynopsis.mockResolvedValue({
-        success: true,
+        agentSessionId: 'test-session',
+        usageStats: { inputTokens: 100, outputTokens: 200, totalCostUsd: 0.01, cacheReadInputTokens: 0, cacheCreationInputTokens: 0, contextWindow: 0 },
         response: '**Summary:** Fixed the bug\n\n**Details:** Updated the function.'
       });
 
@@ -3182,7 +3135,6 @@ describe('useBatchProcessor hook', () => {
           groups,
           onUpdateSession: mockOnUpdateSession,
           onSpawnAgent: mockOnSpawnAgent,
-          onSpawnSynopsis: mockOnSpawnSynopsis,
           onAddHistoryEntry: mockOnAddHistoryEntry,
           onComplete: mockOnComplete,
           audioFeedbackEnabled: true,
@@ -3227,7 +3179,6 @@ describe('useBatchProcessor hook', () => {
           groups,
           onUpdateSession: mockOnUpdateSession,
           onSpawnAgent: mockOnSpawnAgent,
-          onSpawnSynopsis: mockOnSpawnSynopsis,
           onAddHistoryEntry: mockOnAddHistoryEntry,
           onComplete: mockOnComplete
         })
@@ -3276,7 +3227,6 @@ describe('useBatchProcessor hook', () => {
           groups,
           onUpdateSession: mockOnUpdateSession,
           onSpawnAgent: mockOnSpawnAgent,
-          onSpawnSynopsis: mockOnSpawnSynopsis,
           onAddHistoryEntry: mockOnAddHistoryEntry,
           onComplete: mockOnComplete,
           onPRResult: mockOnPRResult
@@ -3331,7 +3281,6 @@ describe('useBatchProcessor hook', () => {
           groups,
           onUpdateSession: mockOnUpdateSession,
           onSpawnAgent: mockOnSpawnAgent,
-          onSpawnSynopsis: mockOnSpawnSynopsis,
           onAddHistoryEntry: mockOnAddHistoryEntry,
           onComplete: mockOnComplete,
           onPRResult: mockOnPRResult
@@ -3386,7 +3335,6 @@ describe('useBatchProcessor hook', () => {
           groups,
           onUpdateSession: mockOnUpdateSession,
           onSpawnAgent: mockOnSpawnAgent,
-          onSpawnSynopsis: mockOnSpawnSynopsis,
           onAddHistoryEntry: mockOnAddHistoryEntry,
           onComplete: mockOnComplete
           // No onPRResult callback - tests the if (onPRResult) branch
@@ -3438,11 +3386,7 @@ describe('useBatchProcessor hook', () => {
           cacheReadInputTokens: 0,
           cacheCreationInputTokens: 0,
           contextWindow: 0
-        }
-      });
-
-      mockOnSpawnSynopsis.mockResolvedValue({
-        success: true,
+        },
         response: '**Summary:** Fixed it\n\n**Details:** Done.'
       });
 
@@ -3452,7 +3396,6 @@ describe('useBatchProcessor hook', () => {
           groups,
           onUpdateSession: mockOnUpdateSession,
           onSpawnAgent: mockOnSpawnAgent,
-          onSpawnSynopsis: mockOnSpawnSynopsis,
           onAddHistoryEntry: mockOnAddHistoryEntry,
           onComplete: mockOnComplete
         })
@@ -3494,7 +3437,6 @@ describe('useBatchProcessor hook', () => {
           groups,
           onUpdateSession: mockOnUpdateSession,
           onSpawnAgent: mockOnSpawnAgent,
-          onSpawnSynopsis: mockOnSpawnSynopsis,
           onAddHistoryEntry: mockOnAddHistoryEntry,
           onComplete: mockOnComplete
         })
@@ -3536,7 +3478,6 @@ describe('useBatchProcessor hook', () => {
           groups,
           onUpdateSession: mockOnUpdateSession,
           onSpawnAgent: mockOnSpawnAgent,
-          onSpawnSynopsis: mockOnSpawnSynopsis,
           onAddHistoryEntry: mockOnAddHistoryEntry,
           onComplete: mockOnComplete
         })
@@ -3578,7 +3519,6 @@ describe('useBatchProcessor hook', () => {
           groups,
           onUpdateSession: mockOnUpdateSession,
           onSpawnAgent: mockOnSpawnAgent,
-          onSpawnSynopsis: mockOnSpawnSynopsis,
           onAddHistoryEntry: mockOnAddHistoryEntry,
           onComplete: mockOnComplete
         })
@@ -3619,7 +3559,6 @@ describe('useBatchProcessor hook', () => {
           groups,
           onUpdateSession: mockOnUpdateSession,
           onSpawnAgent: mockOnSpawnAgent,
-          onSpawnSynopsis: mockOnSpawnSynopsis,
           onAddHistoryEntry: mockOnAddHistoryEntry,
           onComplete: mockOnComplete
         })
@@ -3662,7 +3601,6 @@ describe('useBatchProcessor hook', () => {
           groups,
           onUpdateSession: mockOnUpdateSession,
           onSpawnAgent: mockOnSpawnAgent,
-          onSpawnSynopsis: mockOnSpawnSynopsis,
           onAddHistoryEntry: mockOnAddHistoryEntry,
           onComplete: mockOnComplete
         })
@@ -3700,7 +3638,6 @@ describe('useBatchProcessor hook', () => {
           groups,
           onUpdateSession: mockOnUpdateSession,
           onSpawnAgent: mockOnSpawnAgent,
-          onSpawnSynopsis: mockOnSpawnSynopsis,
           onAddHistoryEntry: mockOnAddHistoryEntry,
           onComplete: mockOnComplete
         })
@@ -3751,7 +3688,6 @@ describe('useBatchProcessor hook', () => {
           groups,
           onUpdateSession: mockOnUpdateSession,
           onSpawnAgent: mockOnSpawnAgent,
-          onSpawnSynopsis: mockOnSpawnSynopsis,
           onAddHistoryEntry: mockOnAddHistoryEntry,
           onComplete: mockOnComplete,
           onPRResult: mockOnPRResult
@@ -3812,7 +3748,6 @@ describe('useBatchProcessor hook', () => {
           groups,
           onUpdateSession: mockOnUpdateSession,
           onSpawnAgent: mockOnSpawnAgent,
-          onSpawnSynopsis: mockOnSpawnSynopsis,
           onAddHistoryEntry: mockOnAddHistoryEntry,
           onComplete: mockOnComplete,
           onPRResult: mockOnPRResult
@@ -3868,7 +3803,6 @@ describe('useBatchProcessor hook', () => {
           groups,
           onUpdateSession: mockOnUpdateSession,
           onSpawnAgent: mockOnSpawnAgent,
-          onSpawnSynopsis: mockOnSpawnSynopsis,
           onAddHistoryEntry: mockOnAddHistoryEntry,
           onComplete: mockOnComplete
         })
@@ -3912,7 +3846,6 @@ describe('useBatchProcessor hook', () => {
           groups,
           onUpdateSession: mockOnUpdateSession,
           onSpawnAgent: mockOnSpawnAgent,
-          onSpawnSynopsis: mockOnSpawnSynopsis,
           onAddHistoryEntry: mockOnAddHistoryEntry,
           onComplete: mockOnComplete
         })
@@ -3957,7 +3890,6 @@ describe('useBatchProcessor hook', () => {
           groups,
           onUpdateSession: mockOnUpdateSession,
           onSpawnAgent: mockOnSpawnAgent,
-          onSpawnSynopsis: mockOnSpawnSynopsis,
           onAddHistoryEntry: mockOnAddHistoryEntry,
           onComplete: mockOnComplete
         })
@@ -4003,7 +3935,6 @@ describe('useBatchProcessor hook', () => {
           groups,
           onUpdateSession: mockOnUpdateSession,
           onSpawnAgent: mockOnSpawnAgent,
-          onSpawnSynopsis: mockOnSpawnSynopsis,
           onAddHistoryEntry: mockOnAddHistoryEntry,
           onComplete: mockOnComplete
         })
@@ -4036,7 +3967,6 @@ describe('useBatchProcessor hook', () => {
           groups,
           onUpdateSession: mockOnUpdateSession,
           onSpawnAgent: mockOnSpawnAgent,
-          onSpawnSynopsis: mockOnSpawnSynopsis,
           onAddHistoryEntry: mockOnAddHistoryEntry,
           onComplete: mockOnComplete
         })
@@ -4066,7 +3996,6 @@ describe('useBatchProcessor hook', () => {
           groups,
           onUpdateSession: mockOnUpdateSession,
           onSpawnAgent: mockOnSpawnAgent,
-          onSpawnSynopsis: mockOnSpawnSynopsis,
           onAddHistoryEntry: mockOnAddHistoryEntry,
           onComplete: mockOnComplete
         })
@@ -4111,7 +4040,6 @@ describe('useBatchProcessor hook', () => {
           groups,
           onUpdateSession: mockOnUpdateSession,
           onSpawnAgent: mockOnSpawnAgent,
-          onSpawnSynopsis: mockOnSpawnSynopsis,
           onAddHistoryEntry: mockOnAddHistoryEntry,
           onComplete: mockOnComplete,
           audioFeedbackEnabled: false // Disabled
@@ -4145,11 +4073,8 @@ describe('useBatchProcessor hook', () => {
 
       mockOnSpawnAgent.mockResolvedValue({
         success: true,
-        agentSessionId: 'test-session'
-      });
-
-      mockOnSpawnSynopsis.mockResolvedValue({
-        success: true,
+        agentSessionId: 'test-session',
+        usageStats: { inputTokens: 100, outputTokens: 200, totalCostUsd: 0.01, cacheReadInputTokens: 0, cacheCreationInputTokens: 0, contextWindow: 0 },
         response: '**Summary:** Done'
       });
 
@@ -4159,7 +4084,6 @@ describe('useBatchProcessor hook', () => {
           groups,
           onUpdateSession: mockOnUpdateSession,
           onSpawnAgent: mockOnSpawnAgent,
-          onSpawnSynopsis: mockOnSpawnSynopsis,
           onAddHistoryEntry: mockOnAddHistoryEntry,
           onComplete: mockOnComplete,
           audioFeedbackEnabled: true,
@@ -4206,7 +4130,6 @@ describe('useBatchProcessor hook', () => {
           groups,
           onUpdateSession: mockOnUpdateSession,
           onSpawnAgent: mockOnSpawnAgent,
-          onSpawnSynopsis: mockOnSpawnSynopsis,
           onAddHistoryEntry: mockOnAddHistoryEntry,
           onComplete: mockOnComplete,
           onPRResult: mockOnPRResult

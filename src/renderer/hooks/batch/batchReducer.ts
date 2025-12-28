@@ -341,11 +341,17 @@ export function batchReducer(state: BatchState, action: BatchAction): BatchState
       const { sessionId } = action;
       const currentState = state[sessionId] || DEFAULT_BATCH_STATE;
 
-      // State machine: RUNNING -> STOPPING (STOP_REQUESTED)
+      // State machine transition depends on current state:
+      // - RUNNING -> STOPPING (STOP_REQUESTED)
+      // - PAUSED_ERROR -> STOPPING (ABORT_REQUESTED)
+      const eventType = currentState.processingState === 'PAUSED_ERROR'
+        ? 'ABORT_REQUESTED'
+        : 'STOP_REQUESTED';
+
       const { newState: processingState } = validateAndTransition(
         sessionId,
         currentState.processingState,
-        'STOP_REQUESTED'
+        eventType
       );
 
       return {
@@ -354,6 +360,13 @@ export function batchReducer(state: BatchState, action: BatchAction): BatchState
           ...currentState,
           isStopping: true,
           processingState,
+          // Clear error state when aborting from PAUSED_ERROR
+          ...(currentState.processingState === 'PAUSED_ERROR' && {
+            error: undefined,
+            errorPaused: false,
+            errorDocumentIndex: undefined,
+            errorTaskDescription: undefined,
+          }),
         },
       };
     }

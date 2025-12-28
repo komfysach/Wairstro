@@ -1291,7 +1291,7 @@ function MaestroConsoleInner() {
       } | null = null;
       let queuedItemToProcess: { sessionId: string; item: QueuedItem } | null = null;
       // Track if we need to run synopsis after completion (for /commit and other AI commands)
-      let synopsisData: { sessionId: string; cwd: string; agentSessionId: string; command: string; groupName: string; projectName: string; tabName?: string; tabId?: string; toolType?: ToolType } | null = null;
+      let synopsisData: { sessionId: string; cwd: string; agentSessionId: string; command: string; groupName: string; projectName: string; tabName?: string; tabId?: string; toolType?: ToolType; sessionConfig?: { customPath?: string; customArgs?: string; customEnvVars?: Record<string, string>; customModel?: string; customContextWindow?: number; } } | null = null;
 
       if (isFromAi) {
         const currentSession = sessionsRef.current.find(s => s.id === actualSessionId);
@@ -1393,7 +1393,14 @@ function MaestroConsoleInner() {
               projectName,
               tabName,
               tabId: completedTab?.id,
-              toolType: currentSession.toolType // Pass tool type for multi-provider support
+              toolType: currentSession.toolType, // Pass tool type for multi-provider support
+              sessionConfig: {
+                customPath: currentSession.customPath,
+                customArgs: currentSession.customArgs,
+                customEnvVars: currentSession.customEnvVars,
+                customModel: currentSession.customModel,
+                customContextWindow: currentSession.customContextWindow,
+              }
             };
           }
         }
@@ -1646,7 +1653,8 @@ function MaestroConsoleInner() {
           synopsisData.cwd,
           synopsisData.agentSessionId,
           SYNOPSIS_PROMPT,
-          synopsisData.toolType // Pass tool type for multi-provider support
+          synopsisData.toolType, // Pass tool type for multi-provider support
+          synopsisData.sessionConfig // Pass session config for custom env vars, args, etc.
         ).then(result => {
           const duration = Date.now() - startTime;
           if (result.success && result.response && addHistoryEntryRef.current) {
@@ -1679,6 +1687,12 @@ function MaestroConsoleInner() {
             if (rightPanelRef.current) {
               rightPanelRef.current.refreshHistoryPanel();
             }
+          } else if (!result.success) {
+            console.warn('[onProcessExit] Synopsis generation failed - no history entry created', {
+              sessionId: synopsisData!.sessionId,
+              agentSessionId: synopsisData!.agentSessionId,
+              hasResponse: !!result.response,
+            });
           }
         }).catch(err => {
           console.error('[onProcessExit] Synopsis failed:', err);
@@ -3479,7 +3493,6 @@ function MaestroConsoleInner() {
       ));
     },
     onSpawnAgent: spawnAgentForSession,
-    onSpawnSynopsis: spawnBackgroundSynopsis,
     onAddHistoryEntry: async (entry) => {
       await window.maestro.history.add({
         ...entry,
@@ -3792,7 +3805,14 @@ function MaestroConsoleInner() {
         activeSession.cwd,
         agentSessionId,
         autorunSynopsisPrompt,
-        activeSession.toolType
+        activeSession.toolType,
+        {
+          customPath: activeSession.customPath,
+          customArgs: activeSession.customArgs,
+          customEnvVars: activeSession.customEnvVars,
+          customModel: activeSession.customModel,
+          customContextWindow: activeSession.customContextWindow,
+        }
       );
 
       if (result.success && result.response) {

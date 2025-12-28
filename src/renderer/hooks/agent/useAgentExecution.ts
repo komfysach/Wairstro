@@ -45,10 +45,17 @@ export interface UseAgentExecutionReturn {
     cwd: string,
     resumeAgentSessionId: string,
     prompt: string,
-    toolType?: ToolType
+    toolType?: ToolType,
+    sessionConfig?: {
+      customPath?: string;
+      customArgs?: string;
+      customEnvVars?: Record<string, string>;
+      customModel?: string;
+      customContextWindow?: number;
+    }
   ) => Promise<AgentSpawnResult>;
   /** Ref to spawnBackgroundSynopsis for use in callbacks that need latest version */
-  spawnBackgroundSynopsisRef: React.MutableRefObject<((sessionId: string, cwd: string, resumeAgentSessionId: string, prompt: string, toolType?: ToolType) => Promise<AgentSpawnResult>) | null>;
+  spawnBackgroundSynopsisRef: React.MutableRefObject<((sessionId: string, cwd: string, resumeAgentSessionId: string, prompt: string, toolType?: ToolType, sessionConfig?: { customPath?: string; customArgs?: string; customEnvVars?: Record<string, string>; customModel?: string; customContextWindow?: number; }) => Promise<AgentSpawnResult>) | null>;
   /** Ref to spawnAgentWithPrompt for use in callbacks that need latest version */
   spawnAgentWithPromptRef: React.MutableRefObject<((prompt: string) => Promise<AgentSpawnResult>) | null>;
   /** Show flash notification (auto-dismisses after 2 seconds) */
@@ -345,7 +352,14 @@ export function useAgentExecution(
     cwd: string,
     resumeAgentSessionId: string,
     prompt: string,
-    toolType: ToolType = 'claude-code'
+    toolType: ToolType = 'claude-code',
+    sessionConfig?: {
+      customPath?: string;
+      customArgs?: string;
+      customEnvVars?: Record<string, string>;
+      customModel?: string;
+      customContextWindow?: number;
+    }
   ): Promise<AgentSpawnResult> => {
     try {
       const agent = await window.maestro.agents.get(toolType);
@@ -356,7 +370,6 @@ export function useAgentExecution(
 
       // Use a unique target ID for background synopsis
       const targetSessionId = `${sessionId}-synopsis-${Date.now()}`;
-      console.log(`[spawnBackgroundSynopsis] Starting synopsis request, targetSessionId: ${targetSessionId}, resumeAgentSessionId: ${resumeAgentSessionId}`);
 
       return new Promise((resolve) => {
         let agentSessionId: string | undefined;
@@ -372,7 +385,6 @@ export function useAgentExecution(
 
         cleanupFns.push(window.maestro.process.onData((sid: string, data: string) => {
           if (sid === targetSessionId) {
-            console.log(`[spawnBackgroundSynopsis] onData received, length: ${data.length}, preview: "${data.substring(0, 200)}"`);
             responseText += data;
           }
         }));
@@ -393,14 +405,13 @@ export function useAgentExecution(
 
         cleanupFns.push(window.maestro.process.onExit((sid: string) => {
           if (sid === targetSessionId) {
-            console.log(`[spawnBackgroundSynopsis] onExit received, responseText length: ${responseText.length}, responseText preview: "${responseText.substring(0, 200)}"`);
             cleanup();
             resolve({ success: true, response: responseText, agentSessionId, usageStats: synopsisUsageStats });
           }
         }));
 
         // Spawn with session resume - the IPC handler will use the agent's resumeArgs builder
-        const commandToUse = agent.path || agent.command;
+        const commandToUse = sessionConfig?.customPath || agent.path || agent.command;
         window.maestro.process.spawn({
           sessionId: targetSessionId,
           toolType,
@@ -409,6 +420,12 @@ export function useAgentExecution(
           args: agent.args || [],
           prompt,
           agentSessionId: resumeAgentSessionId, // This triggers the agent's resume mechanism
+          // Per-session config overrides (if set)
+          sessionCustomPath: sessionConfig?.customPath,
+          sessionCustomArgs: sessionConfig?.customArgs,
+          sessionCustomEnvVars: sessionConfig?.customEnvVars,
+          sessionCustomModel: sessionConfig?.customModel,
+          sessionCustomContextWindow: sessionConfig?.customContextWindow,
         }).catch(() => {
           cleanup();
           resolve({ success: false });

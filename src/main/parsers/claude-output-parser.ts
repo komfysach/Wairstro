@@ -118,19 +118,6 @@ export class ClaudeOutputParser implements AgentOutputParser {
         resultText = this.extractTextFromMessage(msg);
       }
 
-      // Debug: Log result message details for synopsis debugging
-      // This helps diagnose issues where result.text is empty
-      if (!resultText) {
-        console.warn('[ClaudeOutputParser] Result message has no text', {
-          hasResult: !!msg.result,
-          hasMessage: !!msg.message,
-          hasContent: !!msg.message?.content,
-          contentType: typeof msg.message?.content,
-          sessionId: msg.session_id,
-          rawKeys: Object.keys(msg),
-        });
-      }
-
       const event: ParsedEvent = {
         type: 'result',
         text: resultText,
