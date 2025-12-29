@@ -548,4 +548,44 @@ describe('SourceDistributionChart', () => {
       expect(screen.getByText(/99\.9%/)).toBeInTheDocument();
     });
   });
+
+  describe('Smooth Animations', () => {
+    it('applies CSS transitions to arc paths for smooth updates', () => {
+      const { container } = render(
+        <SourceDistributionChart data={mockData} theme={theme} />
+      );
+
+      const paths = container.querySelectorAll('svg path');
+      expect(paths.length).toBeGreaterThan(0);
+
+      // All arc paths should have transition styles
+      const firstPath = paths[0] as HTMLElement;
+      expect(firstPath.style.transition).toContain('d');
+      expect(firstPath.style.transition).toContain('0.5s');
+    });
+
+    it('uses cubic-bezier easing for smooth animation curves', () => {
+      const { container } = render(
+        <SourceDistributionChart data={mockData} theme={theme} />
+      );
+
+      const paths = container.querySelectorAll('svg path');
+      expect(paths.length).toBeGreaterThan(0);
+
+      const firstPath = paths[0] as HTMLElement;
+      expect(firstPath.style.transition).toContain('cubic-bezier');
+    });
+
+    it('applies opacity transition for hover effects', () => {
+      const { container } = render(
+        <SourceDistributionChart data={mockData} theme={theme} />
+      );
+
+      const paths = container.querySelectorAll('svg path');
+      expect(paths.length).toBeGreaterThan(0);
+
+      const firstPath = paths[0] as HTMLElement;
+      expect(firstPath.style.transition).toContain('opacity');
+    });
+  });
 });

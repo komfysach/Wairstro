@@ -435,7 +435,7 @@ export function ActivityHeatmap({ data, timeRange, theme }: ActivityHeatmapProps
                     {week.days.map((day) => (
                       <div
                         key={day.dateString}
-                        className="rounded-sm cursor-default transition-all"
+                        className="rounded-sm cursor-default"
                         style={{
                           width: cellSize,
                           height: cellSize,
@@ -448,6 +448,7 @@ export function ActivityHeatmap({ data, timeRange, theme }: ActivityHeatmapProps
                               ? `2px solid ${theme.colors.accent}`
                               : 'none',
                           outlineOffset: -1,
+                          transition: 'background-color 0.5s cubic-bezier(0.4, 0, 0.2, 1), outline 0.15s ease',
                         }}
                         onMouseEnter={(e) => handleMouseEnter(day, e)}
                         onMouseLeave={handleMouseLeave}

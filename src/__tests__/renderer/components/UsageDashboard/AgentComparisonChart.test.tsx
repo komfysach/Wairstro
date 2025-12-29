@@ -194,8 +194,9 @@ describe('AgentComparisonChart', () => {
         <AgentComparisonChart data={mockData} theme={theme} />
       );
 
-      // Find the bar fill divs (with h-full and rounded classes - the actual colored bars)
-      const bars = container.querySelectorAll('.h-full.rounded.transition-all.duration-300');
+      // Find the bar fill divs (with h-full, rounded, and flex classes - the actual colored bars)
+      // These bars now use inline styles for transitions instead of Tailwind classes
+      const bars = container.querySelectorAll('.h-full.rounded.flex.items-center');
       const colors = Array.from(bars)
         .map((bar) => (bar as HTMLElement).style.backgroundColor)
         .filter((c) => c !== '');
@@ -376,7 +377,8 @@ describe('AgentComparisonChart', () => {
       );
 
       // Find the first bar (should be claude-code with highest duration)
-      const bars = container.querySelectorAll('.h-full.rounded.transition-all');
+      // Bars have h-full, rounded, and flex classes with inline transition styles
+      const bars = container.querySelectorAll('.h-full.rounded.flex.items-center');
 
       if (bars.length > 0) {
         const firstBar = bars[0] as HTMLElement;
@@ -409,6 +411,46 @@ describe('AgentComparisonChart', () => {
           color: theme.colors.textMain,
         });
       }
+    });
+  });
+
+  describe('Smooth Animations', () => {
+    it('applies CSS transitions to bars for smooth width changes', () => {
+      const { container } = render(
+        <AgentComparisonChart data={mockData} theme={theme} />
+      );
+
+      // Find bar elements - they have h-full, rounded, and flex classes
+      const bars = container.querySelectorAll('.h-full.rounded.flex.items-center');
+      expect(bars.length).toBeGreaterThan(0);
+
+      const firstBar = bars[0] as HTMLElement;
+      expect(firstBar.style.transition).toContain('width');
+      expect(firstBar.style.transition).toContain('0.5s');
+    });
+
+    it('uses cubic-bezier easing for smooth animation curves', () => {
+      const { container } = render(
+        <AgentComparisonChart data={mockData} theme={theme} />
+      );
+
+      const bars = container.querySelectorAll('.h-full.rounded.flex.items-center');
+      expect(bars.length).toBeGreaterThan(0);
+
+      const firstBar = bars[0] as HTMLElement;
+      expect(firstBar.style.transition).toContain('cubic-bezier');
+    });
+
+    it('applies opacity transition for hover effects', () => {
+      const { container } = render(
+        <AgentComparisonChart data={mockData} theme={theme} />
+      );
+
+      const bars = container.querySelectorAll('.h-full.rounded.flex.items-center');
+      expect(bars.length).toBeGreaterThan(0);
+
+      const firstBar = bars[0] as HTMLElement;
+      expect(firstBar.style.transition).toContain('opacity');
     });
   });
 });

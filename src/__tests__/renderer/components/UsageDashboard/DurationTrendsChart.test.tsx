@@ -644,4 +644,84 @@ describe('DurationTrendsChart', () => {
       }
     });
   });
+
+  describe('Smooth Animations', () => {
+    it('applies CSS transitions to line path for smooth updates', () => {
+      const { container } = render(
+        <DurationTrendsChart
+          data={mockData}
+          timeRange="week"
+          theme={theme}
+        />
+      );
+
+      const paths = container.querySelectorAll('path');
+      // Find the main line path (has stroke but no fill)
+      const linePath = Array.from(paths).find(
+        (p) => p.getAttribute('stroke') && p.getAttribute('fill') === 'none'
+      );
+
+      expect(linePath).toBeInTheDocument();
+      const style = (linePath as HTMLElement).style;
+      expect(style.transition).toContain('d');
+      expect(style.transition).toContain('0.5s');
+    });
+
+    it('applies CSS transitions to area path for smooth updates', () => {
+      const { container } = render(
+        <DurationTrendsChart
+          data={mockData}
+          timeRange="week"
+          theme={theme}
+        />
+      );
+
+      const paths = container.querySelectorAll('path');
+      // Find the area path (has gradient fill)
+      const areaPath = Array.from(paths).find((p) =>
+        p.getAttribute('fill')?.includes('url(#duration-gradient')
+      );
+
+      expect(areaPath).toBeInTheDocument();
+      const style = (areaPath as HTMLElement).style;
+      expect(style.transition).toContain('d');
+      expect(style.transition).toContain('0.5s');
+    });
+
+    it('applies CSS transitions to data points for smooth position updates', () => {
+      const { container } = render(
+        <DurationTrendsChart
+          data={mockData}
+          timeRange="week"
+          theme={theme}
+        />
+      );
+
+      const circles = container.querySelectorAll('circle');
+      expect(circles.length).toBeGreaterThan(0);
+
+      const style = (circles[0] as unknown as HTMLElement).style;
+      expect(style.transition).toContain('cx');
+      expect(style.transition).toContain('cy');
+      expect(style.transition).toContain('0.5s');
+    });
+
+    it('uses cubic-bezier easing for smooth animation curves', () => {
+      const { container } = render(
+        <DurationTrendsChart
+          data={mockData}
+          timeRange="week"
+          theme={theme}
+        />
+      );
+
+      const paths = container.querySelectorAll('path');
+      const linePath = Array.from(paths).find(
+        (p) => p.getAttribute('stroke') && p.getAttribute('fill') === 'none'
+      );
+
+      const style = (linePath as HTMLElement).style;
+      expect(style.transition).toContain('cubic-bezier');
+    });
+  });
 });

@@ -261,11 +261,12 @@ export function AgentComparisonChart({ data, theme }: AgentComparisonChartProps)
                   >
                     {/* Bar fill */}
                     <div
-                      className="h-full rounded transition-all duration-300 flex items-center"
+                      className="h-full rounded flex items-center"
                       style={{
                         width: `${Math.max(barWidth, 2)}%`,
                         backgroundColor: agent.color,
                         opacity: isHovered ? 1 : 0.85,
+                        transition: 'width 0.5s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease',
                       }}
                     >
                       {/* Percentage label inside bar (if bar is wide enough) */}

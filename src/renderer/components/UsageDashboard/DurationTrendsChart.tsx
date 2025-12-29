@@ -409,6 +409,9 @@ export function DurationTrendsChart({ data, timeRange, theme }: DurationTrendsCh
             <path
               d={areaPath}
               fill={`url(#${gradientId})`}
+              style={{
+                transition: 'd 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
+              }}
             />
 
             {/* Main line */}
@@ -419,6 +422,9 @@ export function DurationTrendsChart({ data, timeRange, theme }: DurationTrendsCh
               strokeWidth={2}
               strokeLinecap="round"
               strokeLinejoin="round"
+              style={{
+                transition: 'd 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
+              }}
             />
 
             {/* Data points */}
@@ -436,7 +442,10 @@ export function DurationTrendsChart({ data, timeRange, theme }: DurationTrendsCh
                   fill={isHovered ? theme.colors.accent : theme.colors.bgMain}
                   stroke={theme.colors.accent}
                   strokeWidth={2}
-                  style={{ cursor: 'pointer', transition: 'r 0.15s ease' }}
+                  style={{
+                    cursor: 'pointer',
+                    transition: 'cx 0.5s cubic-bezier(0.4, 0, 0.2, 1), cy 0.5s cubic-bezier(0.4, 0, 0.2, 1), r 0.15s ease',
+                  }}
                   onMouseEnter={(e) => handleMouseEnter(point, e)}
                   onMouseLeave={handleMouseLeave}
                 />

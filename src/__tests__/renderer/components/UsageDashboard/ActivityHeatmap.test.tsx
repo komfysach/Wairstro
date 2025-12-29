@@ -346,4 +346,55 @@ describe('ActivityHeatmap', () => {
       }
     });
   });
+
+  describe('Smooth Animations', () => {
+    it('applies CSS transitions to cells for smooth color changes', () => {
+      const { container } = render(
+        <ActivityHeatmap
+          data={mockData}
+          timeRange="week"
+          theme={theme}
+        />
+      );
+
+      const cells = container.querySelectorAll('.rounded-sm.cursor-default');
+      expect(cells.length).toBeGreaterThan(0);
+
+      const firstCell = cells[0] as HTMLElement;
+      expect(firstCell.style.transition).toContain('background-color');
+      expect(firstCell.style.transition).toContain('0.5s');
+    });
+
+    it('uses cubic-bezier easing for smooth animation curves', () => {
+      const { container } = render(
+        <ActivityHeatmap
+          data={mockData}
+          timeRange="week"
+          theme={theme}
+        />
+      );
+
+      const cells = container.querySelectorAll('.rounded-sm.cursor-default');
+      expect(cells.length).toBeGreaterThan(0);
+
+      const firstCell = cells[0] as HTMLElement;
+      expect(firstCell.style.transition).toContain('cubic-bezier');
+    });
+
+    it('applies outline transition for hover effects', () => {
+      const { container } = render(
+        <ActivityHeatmap
+          data={mockData}
+          timeRange="week"
+          theme={theme}
+        />
+      );
+
+      const cells = container.querySelectorAll('.rounded-sm.cursor-default');
+      expect(cells.length).toBeGreaterThan(0);
+
+      const firstCell = cells[0] as HTMLElement;
+      expect(firstCell.style.transition).toContain('outline');
+    });
+  });
 });

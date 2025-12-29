@@ -342,7 +342,10 @@ export function SourceDistributionChart({
                     )}
                     fill={arc.color}
                     opacity={hoveredSource === null || hoveredSource === arc.source ? 1 : 0.5}
-                    className="transition-all duration-200 cursor-default"
+                    className="cursor-default"
+                    style={{
+                      transition: 'd 0.5s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease',
+                    }}
                     onMouseEnter={(e) => handleMouseEnter(arc.source, e)}
                     onMouseLeave={handleMouseLeave}
                   />
