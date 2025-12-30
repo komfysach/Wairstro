@@ -27,6 +27,8 @@ export interface GitWorktreeSectionProps {
   worktreeValidation: WorktreeValidationState;
   availableBranches: string[];
   ghCliStatus: GhCliStatus | null;
+  // SSH remote support
+  sshRemoteId?: string;
 }
 
 /**
@@ -57,7 +59,10 @@ export function GitWorktreeSection({
   worktreeValidation,
   availableBranches,
   ghCliStatus,
+  sshRemoteId,
 }: GitWorktreeSectionProps) {
+  // SSH remote awareness
+  const isRemoteSession = !!sshRemoteId;
   // Branch dropdown state
   const [showBranchDropdown, setShowBranchDropdown] = useState(false);
   const branchDropdownRef = useRef<HTMLDivElement>(null);
@@ -67,6 +72,8 @@ export function GitWorktreeSection({
 
   // Handle browse button click for base directory
   const handleBrowseBaseDir = async () => {
+    // Browse is only available for local sessions
+    if (isRemoteSession) return;
     const result = await window.maestro.dialog.selectFolder();
     if (result) {
       setWorktreeBaseDir(result);
@@ -175,7 +182,7 @@ export function GitWorktreeSection({
                 type="text"
                 value={worktreeBaseDir}
                 onChange={(e) => setWorktreeBaseDir(e.target.value)}
-                placeholder="/path/to/worktrees"
+                placeholder={isRemoteSession ? '/home/user/worktrees' : '/path/to/worktrees'}
                 className="flex-1 px-3 py-2 rounded border bg-transparent outline-none text-sm"
                 style={{
                   borderColor: theme.colors.border,
@@ -184,14 +191,20 @@ export function GitWorktreeSection({
               />
               <button
                 onClick={handleBrowseBaseDir}
-                className="px-3 py-2 rounded border hover:bg-white/5 transition-colors text-sm"
+                disabled={isRemoteSession}
+                className={`px-3 py-2 rounded border transition-colors text-sm ${
+                  isRemoteSession ? 'opacity-50 cursor-not-allowed' : 'hover:bg-white/5'
+                }`}
                 style={{ borderColor: theme.colors.border, color: theme.colors.textMain }}
+                title={isRemoteSession ? 'Browse is not available for remote sessions' : 'Browse for directory'}
               >
                 Browse
               </button>
             </div>
             <p className="text-[10px] mt-1" style={{ color: theme.colors.textDim }}>
-              Base directory where worktrees will be created
+              {isRemoteSession
+                ? 'Path on the remote server where worktrees will be created'
+                : 'Base directory where worktrees will be created'}
             </p>
           </div>
 

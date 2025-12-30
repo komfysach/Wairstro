@@ -20,9 +20,10 @@ interface LocalImageProps {
   alt?: string;
   theme: Theme;
   width?: number; // Optional width in pixels (from ![[image|300]] syntax)
+  sshRemoteId?: string; // SSH remote ID for remote file operations
 }
 
-const LocalImage = memo(({ src, alt, theme, width }: LocalImageProps) => {
+const LocalImage = memo(({ src, alt, theme, width, sshRemoteId }: LocalImageProps) => {
   const [dataUrl, setDataUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -57,7 +58,7 @@ const LocalImage = memo(({ src, alt, theme, width }: LocalImageProps) => {
     }
 
     setLoading(true);
-    window.maestro.fs.readFile(filePath)
+    window.maestro.fs.readFile(filePath, sshRemoteId)
       .then((result) => {
         if (result.startsWith('data:')) {
           setDataUrl(result);
@@ -70,7 +71,7 @@ const LocalImage = memo(({ src, alt, theme, width }: LocalImageProps) => {
         setError(`Failed to load image: ${err.message || 'Unknown error'}`);
         setLoading(false);
       });
-  }, [src]);
+  }, [src, sshRemoteId]);
 
   if (loading) {
     return (
@@ -186,6 +187,8 @@ interface MarkdownRendererProps {
   onFileClick?: (path: string) => void;
   /** Allow raw HTML passthrough via rehype-raw (may break GFM table rendering) */
   allowRawHtml?: boolean;
+  /** SSH remote ID for remote file operations */
+  sshRemoteId?: string;
 }
 
 /**
@@ -200,7 +203,7 @@ interface MarkdownRendererProps {
  * Note: Prose styles are injected at the TerminalOutput container level for performance.
  * This component assumes those styles are already present in a parent container.
  */
-export const MarkdownRenderer = memo(({ content, theme, onCopy, className = '', fileTree, cwd, projectRoot, onFileClick, allowRawHtml = false }: MarkdownRendererProps) => {
+export const MarkdownRenderer = memo(({ content, theme, onCopy, className = '', fileTree, cwd, projectRoot, onFileClick, allowRawHtml = false, sshRemoteId }: MarkdownRendererProps) => {
   // Memoize remark plugins to avoid recreating on every render
   const remarkPlugins = useMemo(() => {
     const plugins: any[] = [
@@ -280,6 +283,7 @@ export const MarkdownRenderer = memo(({ content, theme, onCopy, className = '', 
                 alt={alt}
                 theme={theme}
                 width={width}
+                sshRemoteId={sshRemoteId}
               />
             );
           }

@@ -9,6 +9,8 @@ interface ImageDiffViewerProps {
   theme: Theme;
   isNewFile: boolean;
   isDeletedFile: boolean;
+  /** SSH remote ID for remote file operations */
+  sshRemoteId?: string;
 }
 
 /**
@@ -20,7 +22,8 @@ export function ImageDiffViewer({
   cwd,
   theme,
   isNewFile,
-  isDeletedFile
+  isDeletedFile,
+  sshRemoteId
 }: ImageDiffViewerProps) {
   const [oldImage, setOldImage] = useState<string | null>(null);
   const [newImage, setNewImage] = useState<string | null>(null);
@@ -52,7 +55,7 @@ export function ImageDiffViewer({
       if (!isDeletedFile) {
         try {
           const fullPath = `${cwd}/${newPath}`;
-          const content = await window.maestro.fs.readFile(fullPath);
+          const content = await window.maestro.fs.readFile(fullPath, sshRemoteId);
           setNewImage(content);
         } catch (err) {
           setNewError(err instanceof Error ? err.message : 'Failed to load new image');
@@ -63,7 +66,7 @@ export function ImageDiffViewer({
     };
 
     loadImages();
-  }, [cwd, oldPath, newPath, isNewFile, isDeletedFile]);
+  }, [cwd, oldPath, newPath, isNewFile, isDeletedFile, sshRemoteId]);
 
   if (loading) {
     return (
