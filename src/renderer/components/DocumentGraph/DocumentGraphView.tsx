@@ -1,14 +1,15 @@
 /**
  * DocumentGraphView - Main container component for the markdown document graph visualization.
  *
- * Rewritten to use react-force-graph-2d for a smoother, Obsidian-like experience.
+ * Uses a canvas-based MindMap component with deterministic layout.
  *
  * Features:
- * - Force-directed graph with smooth physics simulation
+ * - Centered mind map layout with focus document in the middle
+ * - Left/right columns for alphabetized document links
+ * - External URLs clustered at the bottom
  * - Neighbor depth slider for focused ego-network views
- * - Node size based on connection count
  * - Search highlighting
- * - External links toggle
+ * - Keyboard navigation (arrow keys, Enter to recenter, O to open)
  * - Theme-aware styling throughout
  */
 
