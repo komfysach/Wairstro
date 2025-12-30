@@ -235,6 +235,12 @@ describe('system IPC handlers', () => {
         'sync:getCurrentStoragePath',
         'sync:selectSyncFolder',
         'sync:setCustomPath',
+        // Power management handlers
+        'power:setEnabled',
+        'power:isEnabled',
+        'power:getStatus',
+        'power:addReason',
+        'power:removeReason',
       ];
 
       for (const channel of expectedChannels) {

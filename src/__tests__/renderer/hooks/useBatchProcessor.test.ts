@@ -655,6 +655,13 @@ describe('useBatchProcessor hook', () => {
       agentSessions: {
         ...window.maestro.agentSessions,
         registerSessionOrigin: mockRegisterSessionOrigin
+      },
+      power: {
+        addReason: vi.fn(),
+        removeReason: vi.fn(),
+        setEnabled: vi.fn(),
+        isEnabled: vi.fn().mockResolvedValue(true),
+        getStatus: vi.fn().mockResolvedValue({ enabled: true, blocking: false, reasons: [], platform: 'darwin' })
       }
     };
   });
