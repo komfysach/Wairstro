@@ -3,7 +3,7 @@ import { Wand2, ExternalLink, Columns, Copy, Loader2, GitBranch, ArrowUp, ArrowD
 import { LogViewer } from './LogViewer';
 import { TerminalOutput } from './TerminalOutput';
 import { InputArea } from './InputArea';
-import { FilePreview } from './FilePreview';
+import { FilePreview, FilePreviewHandle } from './FilePreview';
 import { ErrorBoundary } from './ErrorBoundary';
 import { GitStatusWidget } from './GitStatusWidget';
 import { AgentSessionsBrowser } from './AgentSessionsBrowser';
@@ -293,6 +293,7 @@ export const MainPanel = React.memo(forwardRef<MainPanelHandle, MainPanelProps>(
   const [panelWidth, setPanelWidth] = useState(Infinity); // Start with Infinity so widgets show by default
   const headerRef = useRef<HTMLDivElement>(null);
   const filePreviewContainerRef = useRef<HTMLDivElement>(null);
+  const filePreviewRef = useRef<FilePreviewHandle>(null);
   const [configuredContextWindow, setConfiguredContextWindow] = useState(0);
 
   // Extract tab handlers from props
@@ -446,7 +447,12 @@ export const MainPanel = React.memo(forwardRef<MainPanelHandle, MainPanelProps>(
   useImperativeHandle(ref, () => ({
     refreshGitInfo: refreshGitStatus,
     focusFilePreview: () => {
-      filePreviewContainerRef.current?.focus();
+      // Use the FilePreview's focus method if available, otherwise fallback to container
+      if (filePreviewRef.current) {
+        filePreviewRef.current.focus();
+      } else {
+        filePreviewContainerRef.current?.focus();
+      }
     }
   }), [refreshGitStatus]);
 
@@ -1034,6 +1040,7 @@ export const MainPanel = React.memo(forwardRef<MainPanelHandle, MainPanelProps>(
           {previewFile ? (
             <div ref={filePreviewContainerRef} tabIndex={-1} className="flex-1 overflow-hidden outline-none">
               <FilePreview
+                ref={filePreviewRef}
                 file={previewFile}
                 onClose={() => {
                   setPreviewFile(null);

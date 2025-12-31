@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback, forwardRef, useImperativeHandle } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
@@ -67,6 +67,10 @@ interface FilePreviewProps {
   onOpenInGraph?: () => void;
   /** SSH remote ID for remote file operations */
   sshRemoteId?: string;
+}
+
+export interface FilePreviewHandle {
+  focus: () => void;
 }
 
 // Get language from filename extension
@@ -402,7 +406,7 @@ function remarkHighlight() {
   };
 }
 
-export function FilePreview({ file, onClose, theme, markdownEditMode, setMarkdownEditMode, onSave, shortcuts, fileTree, cwd, onFileClick, canGoBack, canGoForward, onNavigateBack, onNavigateForward, backHistory, forwardHistory, onNavigateToIndex, currentHistoryIndex, onOpenFuzzySearch, onShortcutUsed, ghCliAvailable, onPublishGist, onOpenInGraph, sshRemoteId }: FilePreviewProps) {
+export const FilePreview = forwardRef<FilePreviewHandle, FilePreviewProps>(function FilePreview({ file, onClose, theme, markdownEditMode, setMarkdownEditMode, onSave, shortcuts, fileTree, cwd, onFileClick, canGoBack, canGoForward, onNavigateBack, onNavigateForward, backHistory, forwardHistory, onNavigateToIndex, currentHistoryIndex, onOpenFuzzySearch, onShortcutUsed, ghCliAvailable, onPublishGist, onOpenInGraph, sshRemoteId }, ref) {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
   const [showCopyNotification, setShowCopyNotification] = useState(false);
@@ -430,6 +434,13 @@ export function FilePreview({ file, onClose, theme, markdownEditMode, setMarkdow
   const layerIdRef = useRef<string>();
   const matchElementsRef = useRef<HTMLElement[]>([]);
   const cancelButtonRef = useRef<HTMLButtonElement>(null);
+
+  // Expose focus method to parent via ref
+  useImperativeHandle(ref, () => ({
+    focus: () => {
+      containerRef.current?.focus();
+    }
+  }), []);
 
   // Track if content has been modified
   const hasChanges = markdownEditMode && editContent !== file?.content;
@@ -1754,4 +1765,4 @@ export function FilePreview({ file, onClose, theme, markdownEditMode, setMarkdow
 
     </div>
   );
-}
+});
