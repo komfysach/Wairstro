@@ -947,28 +947,25 @@ describe('FileExplorerPanel', () => {
       expect(screen.getByText('Directory not found')).toBeInTheDocument();
     });
 
-    it('shows Select New Directory button on error', () => {
+    it('shows Retry Connection button on error', () => {
       const session = createMockSession({
         fileTreeError: 'Permission denied'
       });
       render(<FileExplorerPanel {...defaultProps} session={session} />);
 
-      expect(screen.getByText('Select New Directory')).toBeInTheDocument();
+      expect(screen.getByText('Retry Connection')).toBeInTheDocument();
     });
 
-    it('calls updateSessionWorkingDirectory when Select New Directory is clicked', () => {
+    it('calls refreshFileTree when Retry Connection is clicked', () => {
       const session = createMockSession({
         fileTreeError: 'Permission denied'
       });
       render(<FileExplorerPanel {...defaultProps} session={session} />);
 
-      const button = screen.getByText('Select New Directory');
+      const button = screen.getByText('Retry Connection');
       fireEvent.click(button);
 
-      expect(defaultProps.updateSessionWorkingDirectory).toHaveBeenCalledWith(
-        'session-1',
-        expect.any(Function)
-      );
+      expect(defaultProps.refreshFileTree).toHaveBeenCalledWith('session-1');
     });
 
     it('applies error color to error message', () => {

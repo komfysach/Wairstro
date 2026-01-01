@@ -90,6 +90,8 @@ const RECOVERABLE_SSH_ERRORS = [
   /connection unexpectedly closed/i,
   /kex_exchange_identification/i,
   /read: Connection reset by peer/i,
+  /banner exchange/i, // SSH handshake failed - often due to stale ControlMaster sockets
+  /socket is not connected/i, // Connection dropped before handshake
 ];
 
 /**
@@ -147,6 +149,12 @@ async function execRemoteCommand(
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     const sshArgs = deps.buildSshArgs(config);
     sshArgs.push(remoteCommand);
+
+    // Log SSH command for debugging connection issues
+    if (attempt === 0) {
+      // eslint-disable-next-line no-console
+      console.log(`[remote-fs] SSH to ${config.host}: ssh ${sshArgs.slice(0, -1).join(' ')} "<command>"`);
+    }
 
     const result = await deps.execSsh('ssh', sshArgs);
     lastResult = result;

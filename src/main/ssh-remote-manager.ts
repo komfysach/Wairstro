@@ -70,6 +70,7 @@ export class SshRemoteManager {
     RequestTTY: 'no', // Don't request a TTY for command execution (avoids shell rc issues)
     ControlMaster: 'no', // Disable connection multiplexing to prevent "UNKNOWN port -1" errors when multiple agents connect to same server
     ControlPath: 'none', // Ensure no ControlPath is used from ~/.ssh/config
+    ControlPersist: 'no', // Don't persist control connections
   };
 
   /**
