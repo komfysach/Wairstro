@@ -264,7 +264,7 @@ export function registerProcessHandlers(deps: ProcessHandlerDependencies): void 
           // Build the SSH command that wraps the agent execution
           // The cwd is the local project path which may not exist on remote
           // Remote should use remoteWorkingDir from SSH config if set
-          const sshCommand = buildSshCommand(sshResult.config, {
+          const sshCommand = await buildSshCommand(sshResult.config, {
             command: config.command,
             args: sshArgs,
             // Use the local cwd - the SSH command builder will handle remote path resolution

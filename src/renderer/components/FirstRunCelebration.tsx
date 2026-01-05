@@ -18,6 +18,18 @@ import { MODAL_PRIORITIES } from '../constants/modalPriorities';
 // 15 minutes in milliseconds - threshold for "Standing Ovation" variation
 const STANDING_OVATION_THRESHOLD_MS = 15 * 60 * 1000;
 
+// Confetti colors - celebratory palette (defined outside component to avoid recreating on each render)
+const CONFETTI_COLORS = [
+  '#FFD700', // Gold
+  '#FF6B6B', // Red
+  '#4ECDC4', // Teal
+  '#45B7D1', // Blue
+  '#FFA726', // Orange
+  '#BA68C8', // Purple
+  '#F48FB1', // Pink
+  '#FFEAA7', // Yellow
+];
+
 interface FirstRunCelebrationProps {
   theme: Theme;
   /** Duration of the first Auto Run in milliseconds */
@@ -88,18 +100,6 @@ export function FirstRunCelebration({
   const goldColor = '#FFD700';
   const purpleAccent = theme.colors.accent;
 
-  // Confetti colors - celebratory palette
-  const confettiColors = [
-    '#FFD700', // Gold
-    '#FF6B6B', // Red
-    '#4ECDC4', // Teal
-    '#45B7D1', // Blue
-    '#FFA726', // Orange
-    '#BA68C8', // Purple
-    '#F48FB1', // Pink
-    '#FFEAA7', // Yellow
-  ];
-
   // Z-index layering: backdrop (99997) < confetti (99998) < modal (99999)
   const CONFETTI_Z_INDEX = 99998;
 
@@ -121,7 +121,7 @@ export function FirstRunCelebration({
       ticks: 300,
       flat: false,
       shapes: ['circle', 'star', 'square'] as ('circle' | 'star' | 'square')[],
-      colors: confettiColors,
+      colors: CONFETTI_COLORS,
       zIndex: CONFETTI_Z_INDEX,
       disableForReducedMotion: true,
     };
@@ -160,7 +160,7 @@ export function FirstRunCelebration({
         });
       }, 500);
     }
-  }, [confettiColors, isStandingOvation, goldColor]);
+  }, [isStandingOvation, goldColor]);
 
   // Fire confetti on mount
   useEffect(() => {

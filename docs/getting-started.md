@@ -22,9 +22,9 @@ Press `Cmd+Shift+N` / `Ctrl+Shift+N` to launch the **Onboarding Wizard**, which 
 1. Selecting an AI provider
 2. Choosing your project directory
 3. Having a discovery conversation where the AI learns about your project
-4. Generating an initial Auto Run document with tasks
+4. Generating an initial Auto Run Playbook with tasks
 
-The Wizard creates a fully configured agent with an Auto Run document folder ready to go.
+The Wizard creates a fully configured agent with an Auto Run document folder ready to go. Generated documents are saved to an `Initiation/` subfolder within `Auto Run Docs/` to keep them organized separately from documents you create later.
 
 ### Introductory Tour
 

@@ -184,20 +184,24 @@ export function WizardExitConfirmModal({
           <div className="mt-6 flex justify-center gap-3">
             <button
               onClick={onConfirmExit}
-              className="px-4 py-2 rounded-lg border text-sm font-medium hover:bg-white/5 transition-colors"
+              className="px-4 py-2 rounded-lg border text-sm font-medium hover:bg-white/5 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-1"
               style={{
                 borderColor: theme.colors.border,
                 color: theme.colors.textMain,
+                ['--tw-ring-color' as any]: theme.colors.accent,
+                ['--tw-ring-offset-color' as any]: theme.colors.bgSidebar,
               }}
             >
               Exit & Save Progress
             </button>
             <button
               onClick={onQuitWithoutSaving}
-              className="px-4 py-2 rounded-lg border text-sm font-medium hover:bg-white/5 transition-colors"
+              className="px-4 py-2 rounded-lg border text-sm font-medium hover:bg-white/5 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-1"
               style={{
                 borderColor: theme.colors.border,
                 color: theme.colors.textMain,
+                ['--tw-ring-color' as any]: theme.colors.accent,
+                ['--tw-ring-offset-color' as any]: theme.colors.bgSidebar,
               }}
             >
               Just Quit
@@ -205,10 +209,12 @@ export function WizardExitConfirmModal({
             <button
               ref={stayButtonRef}
               onClick={onCancel}
-              className="px-4 py-2 rounded-lg text-sm font-medium outline-none focus:ring-2 focus:ring-offset-1 transition-colors"
+              className="px-4 py-2 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-1 transition-colors"
               style={{
                 backgroundColor: theme.colors.accent,
                 color: theme.colors.accentForeground,
+                ['--tw-ring-color' as any]: theme.colors.accent,
+                ['--tw-ring-offset-color' as any]: theme.colors.bgSidebar,
               }}
             >
               Cancel

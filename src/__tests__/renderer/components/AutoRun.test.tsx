@@ -263,8 +263,8 @@ describe('AutoRun', () => {
       const props = createDefaultProps();
       renderWithProvider(<AutoRun {...props} />);
 
-      expect(screen.getByText('Edit')).toBeInTheDocument();
-      expect(screen.getByText('Preview')).toBeInTheDocument();
+      expect(screen.getByTitle('Edit document')).toBeInTheDocument();
+      expect(screen.getByTitle('Preview document')).toBeInTheDocument();
     });
 
     it('displays Run button when not locked', () => {
@@ -288,7 +288,7 @@ describe('AutoRun', () => {
       const props = createDefaultProps({ mode: 'preview' });
       renderWithProvider(<AutoRun {...props} />);
 
-      fireEvent.click(screen.getByText('Edit'));
+      fireEvent.click(screen.getByTitle('Edit document'));
       expect(props.onModeChange).toHaveBeenCalledWith('edit');
     });
 
@@ -296,7 +296,7 @@ describe('AutoRun', () => {
       const props = createDefaultProps({ mode: 'edit' });
       renderWithProvider(<AutoRun {...props} />);
 
-      fireEvent.click(screen.getByText('Preview'));
+      fireEvent.click(screen.getByTitle('Preview document'));
       expect(props.onModeChange).toHaveBeenCalledWith('preview');
     });
 
@@ -305,7 +305,7 @@ describe('AutoRun', () => {
       const props = createDefaultProps({ batchRunState });
       renderWithProvider(<AutoRun {...props} />);
 
-      expect(screen.getByText('Edit').closest('button')).toBeDisabled();
+      expect(screen.getByTitle('Editing disabled while Auto Run active')).toBeDisabled();
     });
   });
 
@@ -701,6 +701,43 @@ describe('AutoRun', () => {
       renderWithProvider(<AutoRun {...props} />);
 
       expect(screen.getByText('Stopping...')).toBeInTheDocument();
+    });
+  });
+
+  describe('Launch Wizard Button', () => {
+    it('displays wizard button when onLaunchWizard is provided', () => {
+      const onLaunchWizard = vi.fn();
+      const props = createDefaultProps({ onLaunchWizard });
+      renderWithProvider(<AutoRun {...props} />);
+
+      expect(screen.getByTitle('Launch In-Tab Wizard')).toBeInTheDocument();
+    });
+
+    it('does not display wizard button when onLaunchWizard is not provided', () => {
+      const props = createDefaultProps();
+      renderWithProvider(<AutoRun {...props} />);
+
+      expect(screen.queryByTitle('Launch In-Tab Wizard')).not.toBeInTheDocument();
+    });
+
+    it('calls onLaunchWizard when clicking wizard button', () => {
+      const onLaunchWizard = vi.fn();
+      const props = createDefaultProps({ onLaunchWizard });
+      renderWithProvider(<AutoRun {...props} />);
+
+      const wizardButton = screen.getByTitle('Launch In-Tab Wizard');
+      fireEvent.click(wizardButton);
+
+      expect(onLaunchWizard).toHaveBeenCalledTimes(1);
+    });
+
+    it('wizard button is hidden when no folder is configured', () => {
+      const onLaunchWizard = vi.fn();
+      const props = createDefaultProps({ onLaunchWizard, folderPath: null });
+      renderWithProvider(<AutoRun {...props} />);
+
+      // Should not show wizard button when folder isn't set
+      expect(screen.queryByTitle('Launch In-Tab Wizard')).not.toBeInTheDocument();
     });
   });
 
@@ -2116,8 +2153,8 @@ describe('Batch Run State UI', () => {
 
     // Stop button should be visible
     expect(screen.getByText('Stop')).toBeInTheDocument();
-    // Edit button should be disabled
-    expect(screen.getByText('Edit').closest('button')).toBeDisabled();
+    // Edit button should be disabled (title changes when locked)
+    expect(screen.getByTitle('Editing disabled while Auto Run active')).toBeDisabled();
   });
 
   it('shows textarea as readonly when locked', () => {
@@ -2423,9 +2460,9 @@ describe('hideTopControls Prop Behavior', () => {
     const props = createDefaultProps({ hideTopControls: false });
     renderWithProvider(<AutoRun {...props} />);
 
-    // All control buttons should be visible
-    expect(screen.getByText('Edit')).toBeInTheDocument();
-    expect(screen.getByText('Preview')).toBeInTheDocument();
+    // All control buttons should be visible (Edit/Preview use title since they're icon-only)
+    expect(screen.getByTitle('Edit document')).toBeInTheDocument();
+    expect(screen.getByTitle('Preview document')).toBeInTheDocument();
     expect(screen.getByText('Run')).toBeInTheDocument();
     expect(screen.getByTitle('Learn about Auto Runner')).toBeInTheDocument();
   });
@@ -2434,9 +2471,9 @@ describe('hideTopControls Prop Behavior', () => {
     const props = createDefaultProps({ hideTopControls: true });
     renderWithProvider(<AutoRun {...props} />);
 
-    // Top control bar buttons should be hidden
-    expect(screen.queryByText('Edit')).not.toBeInTheDocument();
-    expect(screen.queryByText('Preview')).not.toBeInTheDocument();
+    // Top control bar buttons should be hidden (Edit/Preview use title since they're icon-only)
+    expect(screen.queryByTitle('Edit document')).not.toBeInTheDocument();
+    expect(screen.queryByTitle('Preview document')).not.toBeInTheDocument();
     expect(screen.queryByText('Run')).not.toBeInTheDocument();
     expect(screen.queryByTitle('Learn about Auto Runner')).not.toBeInTheDocument();
   });

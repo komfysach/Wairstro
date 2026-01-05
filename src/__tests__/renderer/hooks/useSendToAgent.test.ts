@@ -442,6 +442,44 @@ describe('useSendToAgentWithSessions', () => {
     expect(mockSetSessions).toHaveBeenCalled();
   });
 
+  it('sets autoSendOnActivate flag on new session tab for automatic context injection', async () => {
+    const sessions = [createMockSession('existing-1')];
+
+    const { result } = renderHook(() =>
+      useSendToAgentWithSessions({
+        sessions,
+        setSessions: mockSetSessions,
+        onSessionCreated: mockOnSessionCreated,
+        onNavigateToSession: mockOnNavigateToSession,
+      })
+    );
+
+    const sourceSession = createMockSession('source-1', 'claude-code');
+
+    await act(async () => {
+      await result.current.executeTransfer(
+        sourceSession,
+        'tab-1',
+        'opencode',
+        { groomContext: true, createNewSession: true }
+      );
+    });
+
+    // Get the session that was added via setSessions
+    const setSessionsCall = mockSetSessions.mock.calls.find(
+      (call) => typeof call[0] === 'function'
+    );
+    expect(setSessionsCall).toBeDefined();
+    const updateFn = setSessionsCall![0] as (prev: Session[]) => Session[];
+    const updatedSessions = updateFn(sessions);
+    const newSession = updatedSessions.find((s) => s.id !== 'existing-1');
+
+    expect(newSession).toBeDefined();
+    expect(newSession!.aiTabs[0].autoSendOnActivate).toBe(true);
+    expect(newSession!.aiTabs[0].pendingMergedContext).toBeDefined();
+    expect(newSession!.aiTabs[0].inputValue).toContain('transferring context');
+  });
+
   it('calls onSessionCreated callback with new session info', async () => {
     const sessions = [createMockSession('existing-1')];
 

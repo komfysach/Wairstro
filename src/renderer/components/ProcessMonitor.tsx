@@ -34,7 +34,7 @@ interface ProcessNode {
   sessionId?: string;
   processSessionId?: string; // The full process session ID for killing processes (e.g., "abc123-ai-tab1")
   pid?: number;
-  processType?: 'ai' | 'terminal' | 'batch' | 'synopsis' | 'moderator' | 'participant';
+  processType?: 'ai' | 'terminal' | 'batch' | 'synopsis' | 'moderator' | 'participant' | 'wizard' | 'wizard-gen';
   isAlive?: boolean;
   expanded?: boolean;
   children?: ProcessNode[];
@@ -277,10 +277,14 @@ export function ProcessMonitor(props: ProcessMonitorProps) {
   };
 
   // Determine process type from session ID
-  const getProcessType = (processSessionId: string): 'ai' | 'terminal' | 'batch' | 'synopsis' => {
+  const getProcessType = (processSessionId: string): 'ai' | 'terminal' | 'batch' | 'synopsis' | 'wizard' | 'wizard-gen' => {
     if (processSessionId.endsWith('-terminal')) return 'terminal';
     if (processSessionId.match(/-batch-\d+$/)) return 'batch';
     if (processSessionId.match(/-synopsis-\d+$/)) return 'synopsis';
+    // Wizard document generation: inline-wizard-gen-{timestamp}-{random}
+    if (processSessionId.startsWith('inline-wizard-gen-')) return 'wizard-gen';
+    // Wizard conversation: inline-wizard-{timestamp}-{random}
+    if (processSessionId.startsWith('inline-wizard-')) return 'wizard';
     return 'ai';
   };
 
@@ -528,6 +532,45 @@ export function ProcessMonitor(props: ProcessMonitorProps) {
         };
         tree.push(groupChatsNode);
       }
+    }
+
+    // Add Wizard processes
+    // Wizard session IDs follow these patterns:
+    // - inline-wizard-{timestamp}-{random} (conversation phase)
+    // - inline-wizard-gen-{timestamp}-{random} (document generation phase)
+    const wizardProcesses = activeProcesses.filter(proc => proc.sessionId.startsWith('inline-wizard-'));
+
+    if (wizardProcesses.length > 0) {
+      const wizardNodes: ProcessNode[] = wizardProcesses.map(proc => {
+        const processType = getProcessType(proc.sessionId);
+        const isGeneration = processType === 'wizard-gen';
+        const label = isGeneration ? 'Playbook Generation' : 'Wizard Conversation';
+
+        return {
+          id: `process-${proc.sessionId}`,
+          type: 'process' as const,
+          label,
+          pid: proc.pid,
+          processType,
+          processSessionId: proc.sessionId,
+          isAlive: true,
+          toolType: proc.toolType,
+          cwd: proc.cwd,
+          startTime: proc.startTime,
+          command: proc.command,
+          args: proc.args,
+        };
+      });
+
+      const wizardSectionNode: ProcessNode = {
+        id: 'wizard-section',
+        type: 'group',
+        label: 'WIZARD PROCESSES',
+        emoji: '🧙',
+        expanded: expandedNodes.has('wizard-section'),
+        children: wizardNodes
+      };
+      tree.push(wizardSectionNode);
     }
 
     return tree;
@@ -785,6 +828,8 @@ export function ProcessMonitor(props: ProcessMonitorProps) {
     if (node.type === 'process') {
       // Determine if this is a group chat process
       const isGroupChatProcess = node.processType === 'moderator' || node.processType === 'participant';
+      // Determine if this is a wizard process
+      const isWizardProcess = node.processType === 'wizard' || node.processType === 'wizard-gen';
 
       return (
         <div
@@ -846,6 +891,29 @@ export function ProcessMonitor(props: ProcessMonitorProps) {
                 PARTICIPANT
               </span>
             )}
+            {/* Wizard badges */}
+            {node.processType === 'wizard' && (
+              <span
+                className="text-xs font-semibold px-1.5 py-0.5 rounded flex-shrink-0"
+                style={{
+                  backgroundColor: '#a855f7' + '20',
+                  color: '#a855f7'
+                }}
+              >
+                WIZARD
+              </span>
+            )}
+            {node.processType === 'wizard-gen' && (
+              <span
+                className="text-xs font-semibold px-1.5 py-0.5 rounded flex-shrink-0"
+                style={{
+                  backgroundColor: '#a855f7' + '20',
+                  color: '#a855f7'
+                }}
+              >
+                GENERATING
+              </span>
+            )}
             {/* Kill button */}
             {node.processSessionId && (
               <button
@@ -884,8 +952,8 @@ export function ProcessMonitor(props: ProcessMonitorProps) {
                 {node.agentSessionId.substring(0, 8)}...
               </span>
             )}
-            {/* For group chat processes, show tool type */}
-            {isGroupChatProcess && node.toolType && (
+            {/* For group chat and wizard processes, show tool type */}
+            {(isGroupChatProcess || isWizardProcess) && node.toolType && (
               <span className="text-xs font-mono" style={{ color: theme.colors.textDim }}>
                 {node.toolType}
               </span>

@@ -11,6 +11,7 @@ import { SshRemoteConfig } from '../../shared/types';
 import { shellEscape, buildShellCommand, shellEscapeForDoubleQuotes } from './shell-escape';
 import { expandTilde } from '../../shared/pathUtils';
 import { logger } from './logger';
+import { resolveSshPath } from './cliDetection';
 
 /**
  * Result of building an SSH command.
@@ -165,11 +166,14 @@ export function buildRemoteCommand(options: RemoteCommandOptions): string {
  * //   ]
  * // }
  */
-export function buildSshCommand(
+export async function buildSshCommand(
   config: SshRemoteConfig,
   remoteOptions: RemoteCommandOptions
-): SshCommandResult {
+): Promise<SshCommandResult> {
   const args: string[] = [];
+
+  // Resolve the SSH binary path (handles packaged Electron apps where PATH is limited)
+  const sshPath = await resolveSshPath();
 
   // Force TTY allocation - required for Claude Code's --print mode to produce output
   // Without a TTY, Claude Code with --print hangs indefinitely
@@ -262,11 +266,12 @@ export function buildSshCommand(
   logger.info('Built SSH command', '[ssh-command-builder]', {
     remoteCommand,
     wrappedCommand,
-    fullCommand: `ssh ${args.join(' ')}`,
+    sshPath,
+    fullCommand: `${sshPath} ${args.join(' ')}`,
   });
 
   return {
-    command: 'ssh',
+    command: sshPath,
     args,
   };
 }

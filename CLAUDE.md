@@ -605,7 +605,7 @@ src/renderer/components/Wizard/
 3. **Conversation** → AI asks clarifying questions, builds confidence score (0-100)
 4. **Phase Review** → View/edit generated Phase 1 document, choose to start tour
 
-When confidence reaches 80+ and agent signals "ready", user proceeds to Phase Review where Auto Run documents are generated and saved to `Auto Run Docs/`.
+When confidence reaches 80+ and agent signals "ready", user proceeds to Phase Review where Auto Run documents are generated and saved to `Auto Run Docs/Initiation/`. The `Initiation/` subfolder keeps wizard-generated documents separate from user-created playbooks.
 
 ### Triggering the Wizard
 
@@ -719,6 +719,52 @@ wizardCompleted: boolean    // First wizard completion
 tourCompleted: boolean      // First tour completion
 firstAutoRunCompleted: boolean  // Triggers celebration modal
 ```
+
+## Inline Wizard (`/wizard`)
+
+The Inline Wizard creates Auto Run Playbook documents from within an existing agent session. Unlike the full-screen Onboarding Wizard above, it runs inside a single tab.
+
+### Prerequisites
+
+- Auto Run document folder must be configured for the session
+- If not set, `/wizard` errors with instructions to configure it
+
+### User Flow
+
+1. **Start**: Type `/wizard` in any AI tab → tab enters wizard mode
+2. **Conversation**: Back-and-forth with agent, confidence gauge builds (0-100%)
+3. **Generation**: At 80%+ confidence, generates docs (Austin Facts shown, cancellable)
+4. **Completion**: Tab returns to normal with preserved context, docs in unique subfolder
+
+### Key Behaviors
+
+- Multiple wizards can run in different tabs simultaneously
+- Wizard state is **per-tab** (`AITab.wizardState`), not per-session
+- Documents written to unique subfolder under Auto Run folder (e.g., `Auto Run Docs/Project-Name/`)
+- On completion, tab renamed to "Project: {SubfolderName}"
+- Final AI message summarizes generated docs and next steps
+- Same `agentSessionId` preserved for context continuity
+
+### Architecture
+
+```
+src/renderer/components/InlineWizard/
+├── WizardConversationView.tsx  # Conversation phase UI
+├── WizardInputPanel.tsx        # Input with confidence gauge
+├── DocumentGenerationView.tsx  # Generation phase with Austin Facts
+└── ... (see index.ts for full documentation)
+
+src/renderer/hooks/useInlineWizard.ts    # Main hook
+src/renderer/contexts/InlineWizardContext.tsx  # State provider
+```
+
+### Customization Points
+
+| What | Where |
+|------|-------|
+| Modify inline wizard prompts | `src/prompts/wizard-*.md` |
+| Change confidence threshold | `READY_CONFIDENCE_THRESHOLD` in wizardPrompts.ts |
+| Modify generation UI | `DocumentGenerationView.tsx`, `AustinFactsDisplay.tsx` |
 
 ## Usage Dashboard
 

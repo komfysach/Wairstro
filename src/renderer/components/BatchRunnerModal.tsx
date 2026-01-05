@@ -293,7 +293,7 @@ export function BatchRunnerModal(props: BatchRunnerModalProps) {
       className="fixed inset-0 modal-overlay flex items-center justify-center z-[9999] animate-in fade-in duration-200"
       role="dialog"
       aria-modal="true"
-      aria-label="Batch Runner"
+      aria-label="Auto Run Configuration"
       tabIndex={-1}
     >
       <div
@@ -617,7 +617,7 @@ export function BatchRunnerModal(props: BatchRunnerModalProps) {
                   color: theme.colors.textMain,
                   minHeight: '200px'
                 }}
-                placeholder="Enter the prompt for the batch agent..."
+                placeholder="Enter the system prompt for auto-run..."
               />
               <button
                 onClick={() => setPromptComposerOpen(true)}
@@ -669,7 +669,7 @@ export function BatchRunnerModal(props: BatchRunnerModalProps) {
               documents.length === 0 ? 'No documents selected' :
               documents.length === missingDocCount ? 'All selected documents are missing' :
               hasNoTasks ? 'No unchecked tasks in documents' :
-              'Run batch processing'
+              'Start auto-run'
             }
           >
             <Play className="w-4 h-4" />

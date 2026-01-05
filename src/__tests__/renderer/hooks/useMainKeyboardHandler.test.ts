@@ -473,4 +473,117 @@ describe('useMainKeyboardHandler', () => {
       expect(mockSetActiveSessionId).toHaveBeenCalledWith('session-10');
     });
   });
+
+  describe('wizard tab restrictions', () => {
+    it('should disable toggleMode (Cmd+J) for wizard tabs', () => {
+      const { result } = renderHook(() => useMainKeyboardHandler());
+
+      const mockToggleInputMode = vi.fn();
+      const wizardTab = {
+        id: 'tab-1',
+        name: 'Wizard',
+        wizardState: { isActive: true },
+        logs: [],
+      };
+
+      result.current.keyboardHandlerRef.current = createMockContext({
+        isShortcut: (_e: KeyboardEvent, actionId: string) => actionId === 'toggleMode',
+        activeSession: {
+          id: 'session-1',
+          aiTabs: [wizardTab],
+          activeTabId: 'tab-1',
+          inputMode: 'ai',
+        },
+        activeSessionId: 'session-1',
+        toggleInputMode: mockToggleInputMode,
+      });
+
+      act(() => {
+        window.dispatchEvent(
+          new KeyboardEvent('keydown', {
+            key: 'j',
+            metaKey: true,
+            bubbles: true,
+          })
+        );
+      });
+
+      // toggleInputMode should NOT be called for wizard tabs
+      expect(mockToggleInputMode).not.toHaveBeenCalled();
+    });
+
+    it('should allow toggleMode (Cmd+J) for regular tabs', () => {
+      const { result } = renderHook(() => useMainKeyboardHandler());
+
+      const mockToggleInputMode = vi.fn();
+      const regularTab = {
+        id: 'tab-1',
+        name: 'Regular Tab',
+        logs: [],
+        // No wizardState
+      };
+
+      result.current.keyboardHandlerRef.current = createMockContext({
+        isShortcut: (_e: KeyboardEvent, actionId: string) => actionId === 'toggleMode',
+        activeSession: {
+          id: 'session-1',
+          aiTabs: [regularTab],
+          activeTabId: 'tab-1',
+          inputMode: 'ai',
+        },
+        activeSessionId: 'session-1',
+        toggleInputMode: mockToggleInputMode,
+      });
+
+      act(() => {
+        window.dispatchEvent(
+          new KeyboardEvent('keydown', {
+            key: 'j',
+            metaKey: true,
+            bubbles: true,
+          })
+        );
+      });
+
+      // toggleInputMode SHOULD be called for regular tabs
+      expect(mockToggleInputMode).toHaveBeenCalled();
+    });
+
+    it('should allow toggleMode when wizardState exists but isActive is false', () => {
+      const { result } = renderHook(() => useMainKeyboardHandler());
+
+      const mockToggleInputMode = vi.fn();
+      const completedWizardTab = {
+        id: 'tab-1',
+        name: 'Completed Wizard',
+        wizardState: { isActive: false }, // Wizard completed
+        logs: [],
+      };
+
+      result.current.keyboardHandlerRef.current = createMockContext({
+        isShortcut: (_e: KeyboardEvent, actionId: string) => actionId === 'toggleMode',
+        activeSession: {
+          id: 'session-1',
+          aiTabs: [completedWizardTab],
+          activeTabId: 'tab-1',
+          inputMode: 'ai',
+        },
+        activeSessionId: 'session-1',
+        toggleInputMode: mockToggleInputMode,
+      });
+
+      act(() => {
+        window.dispatchEvent(
+          new KeyboardEvent('keydown', {
+            key: 'j',
+            metaKey: true,
+            bubbles: true,
+          })
+        );
+      });
+
+      // toggleInputMode SHOULD be called when wizard is not active
+      expect(mockToggleInputMode).toHaveBeenCalled();
+    });
+  });
 });

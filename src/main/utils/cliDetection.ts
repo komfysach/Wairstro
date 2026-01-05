@@ -186,3 +186,55 @@ export function setCachedGhStatus(installed: boolean, authenticated: boolean): v
   ghAuthenticatedCache = authenticated;
   ghStatusCacheTime = Date.now();
 }
+
+// SSH CLI detection cache
+let sshPathCache: string | null = null;
+let sshDetectionDone = false;
+
+/**
+ * Detect the path to the ssh binary.
+ * Uses 'which' on Unix, 'where' on Windows with expanded PATH.
+ * Results are cached for performance.
+ */
+export async function detectSshPath(): Promise<string | null> {
+  if (sshDetectionDone) {
+    return sshPathCache;
+  }
+
+  const command = process.platform === 'win32' ? 'where' : 'which';
+  const env = getExpandedEnv();
+  const result = await execFileNoThrow(command, ['ssh'], undefined, env);
+
+  if (result.exitCode === 0 && result.stdout.trim()) {
+    sshPathCache = result.stdout.trim().split('\n')[0];
+  }
+
+  sshDetectionDone = true;
+  return sshPathCache;
+}
+
+/**
+ * Get the SSH binary path, auto-detecting if not already cached.
+ * Falls back to 'ssh' if detection fails (will use PATH at runtime).
+ * @returns The path to use for ssh commands
+ */
+export async function resolveSshPath(): Promise<string> {
+  await detectSshPath();
+  return sshPathCache || 'ssh';
+}
+
+/**
+ * Get the cached SSH path synchronously (returns null if detection hasn't run).
+ * Use resolveSshPath() for async detection with fallback.
+ */
+export function getSshPath(): string | null {
+  return sshPathCache;
+}
+
+/**
+ * Clear SSH path cache (for testing or re-detection).
+ */
+export function clearSshCache(): void {
+  sshPathCache = null;
+  sshDetectionDone = false;
+}

@@ -4,7 +4,7 @@
  * Functions tested:
  * - getActiveTab
  * - createTab
- * - closeTab
+ * - closeTab (including skipHistory option for wizard tabs)
  * - reopenClosedTab
  * - setActiveTab
  * - getWriteModeTab
@@ -15,6 +15,7 @@
  * - navigateToTabByIndex
  * - navigateToLastTab
  * - createMergedSession
+ * - hasActiveWizard
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -32,6 +33,7 @@ import {
   navigateToTabByIndex,
   navigateToLastTab,
   createMergedSession,
+  hasActiveWizard,
 } from '../../../renderer/utils/tabHelpers';
 import type { LogEntry } from '../../../renderer/types';
 import type { Session, AITab, ClosedTab } from '../../../renderer/types';
@@ -318,6 +320,72 @@ describe('tabHelpers', () => {
       const result = closeTab(session, 'tab-2');
 
       expect(result!.session.activeTabId).toBe('tab-1');
+    });
+
+    it('skips adding to history when skipHistory option is true', () => {
+      const tab1 = createMockTab({ id: 'tab-1' });
+      const tab2 = createMockTab({ id: 'tab-2' });
+      const session = createMockSession({
+        aiTabs: [tab1, tab2],
+        activeTabId: 'tab-1',
+        closedTabHistory: [],
+      });
+
+      const result = closeTab(session, 'tab-1', false, { skipHistory: true });
+
+      expect(result).not.toBeNull();
+      expect(result!.session.aiTabs).toHaveLength(1);
+      expect(result!.session.closedTabHistory).toHaveLength(0); // Not added to history
+    });
+
+    it('adds to history when skipHistory option is false', () => {
+      const tab1 = createMockTab({ id: 'tab-1' });
+      const tab2 = createMockTab({ id: 'tab-2' });
+      const session = createMockSession({
+        aiTabs: [tab1, tab2],
+        activeTabId: 'tab-1',
+        closedTabHistory: [],
+      });
+
+      const result = closeTab(session, 'tab-1', false, { skipHistory: false });
+
+      expect(result).not.toBeNull();
+      expect(result!.session.closedTabHistory).toHaveLength(1); // Added to history
+      expect(result!.session.closedTabHistory[0].tab.id).toBe('tab-1');
+    });
+
+    it('adds to history by default when no options provided', () => {
+      const tab1 = createMockTab({ id: 'tab-1' });
+      const tab2 = createMockTab({ id: 'tab-2' });
+      const session = createMockSession({
+        aiTabs: [tab1, tab2],
+        activeTabId: 'tab-1',
+        closedTabHistory: [],
+      });
+
+      const result = closeTab(session, 'tab-1');
+
+      expect(result).not.toBeNull();
+      expect(result!.session.closedTabHistory).toHaveLength(1); // Added to history by default
+    });
+
+    it('preserves existing history when skipHistory is true', () => {
+      const tab1 = createMockTab({ id: 'tab-1' });
+      const tab2 = createMockTab({ id: 'tab-2' });
+      const existingHistory: ClosedTab[] = [
+        { tab: createMockTab({ id: 'old-tab' }), index: 0, closedAt: Date.now() - 1000 },
+      ];
+      const session = createMockSession({
+        aiTabs: [tab1, tab2],
+        activeTabId: 'tab-1',
+        closedTabHistory: existingHistory,
+      });
+
+      const result = closeTab(session, 'tab-1', false, { skipHistory: true });
+
+      expect(result).not.toBeNull();
+      expect(result!.session.closedTabHistory).toHaveLength(1); // Still only the old one
+      expect(result!.session.closedTabHistory[0].tab.id).toBe('old-tab');
     });
   });
 
@@ -1202,6 +1270,60 @@ describe('tabHelpers', () => {
       expect(session.aiTabs[0].starred).toBe(false);
       expect(session.aiTabs[0].inputValue).toBe('');
       expect(session.aiTabs[0].stagedImages).toEqual([]);
+    });
+  });
+
+  describe('hasActiveWizard', () => {
+    it('returns false for tab with no wizardState', () => {
+      const tab = createMockTab({ id: 'tab-1' });
+      expect(hasActiveWizard(tab)).toBe(false);
+    });
+
+    it('returns false for tab with undefined wizardState', () => {
+      const tab = createMockTab({ id: 'tab-1', wizardState: undefined });
+      expect(hasActiveWizard(tab)).toBe(false);
+    });
+
+    it('returns false for tab with inactive wizardState', () => {
+      const tab = createMockTab({
+        id: 'tab-1',
+        wizardState: {
+          isActive: false,
+          mode: null,
+          confidence: 0,
+          conversationHistory: [],
+          previousUIState: { readOnlyMode: false, saveToHistory: true, showThinking: false },
+        },
+      });
+      expect(hasActiveWizard(tab)).toBe(false);
+    });
+
+    it('returns true for tab with active wizardState', () => {
+      const tab = createMockTab({
+        id: 'tab-1',
+        wizardState: {
+          isActive: true,
+          mode: 'new',
+          confidence: 50,
+          conversationHistory: [],
+          previousUIState: { readOnlyMode: false, saveToHistory: true, showThinking: false },
+        },
+      });
+      expect(hasActiveWizard(tab)).toBe(true);
+    });
+
+    it('returns true for tab with active wizard in iterate mode', () => {
+      const tab = createMockTab({
+        id: 'tab-1',
+        wizardState: {
+          isActive: true,
+          mode: 'iterate',
+          confidence: 75,
+          conversationHistory: [],
+          previousUIState: { readOnlyMode: false, saveToHistory: true, showThinking: false },
+        },
+      });
+      expect(hasActiveWizard(tab)).toBe(true);
     });
   });
 });

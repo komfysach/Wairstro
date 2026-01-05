@@ -53,6 +53,12 @@ export interface UseInputProcessingDeps {
   flushBatchedUpdates?: () => void;
   /** Handler for the /history built-in command (requests synopsis and saves to history) */
   onHistoryCommand?: () => Promise<void>;
+  /** Handler for the /wizard built-in command (starts the inline wizard for Auto Run documents) */
+  onWizardCommand?: (args: string) => void;
+  /** Handler for sending messages to the wizard (when wizard is active) */
+  onWizardSendMessage?: (content: string) => Promise<void>;
+  /** Whether the wizard is currently active for the active tab */
+  isWizardActive?: boolean;
 }
 
 /**
@@ -104,6 +110,9 @@ export function useInputProcessing(deps: UseInputProcessingDeps): UseInputProces
     processQueuedItemRef,
     flushBatchedUpdates,
     onHistoryCommand,
+    onWizardCommand,
+    onWizardSendMessage,
+    isWizardActive,
   } = deps;
 
   // Ref for the processInput function so external code can access the latest version
@@ -141,6 +150,25 @@ export function useInputProcessing(deps: UseInputProcessingDeps): UseInputProces
         onHistoryCommand().catch((error) => {
           console.error('[processInput] /history command failed:', error);
         });
+        return;
+      }
+
+      // Handle built-in /wizard command (only in AI mode)
+      // This starts the inline planning wizard for Auto Run documents
+      // The command can have optional arguments: /wizard <natural language input>
+      // Match exactly "/wizard" or "/wizard " followed by arguments (not "/wizardry" etc.)
+      const isWizardCommand = commandText === '/wizard' || commandText.startsWith('/wizard ');
+      if (!isTerminalMode && isWizardCommand && onWizardCommand) {
+        // Extract arguments after '/wizard ' (everything after the command)
+        const args = commandText.slice('/wizard'.length).trim();
+
+        setInputValue('');
+        setSlashCommandOpen(false);
+        syncAiInputToSession('');
+        if (inputRef.current) inputRef.current.style.height = 'auto';
+
+        // Execute the wizard command handler with the argument text
+        onWizardCommand(args);
         return;
       }
 
@@ -255,6 +283,29 @@ export function useInputProcessing(deps: UseInputProcessingDeps): UseInputProces
 
     const currentMode = activeSession.inputMode;
 
+    // Handle wizard mode - route messages to wizard sendMessage instead of normal AI processing
+    // This allows the wizard to have its own conversation without affecting the regular AI queue
+    if (currentMode === 'ai' && isWizardActive && onWizardSendMessage) {
+      // Don't allow slash commands in wizard mode (except /wizard which ends/restarts it)
+      if (effectiveInputValue.trim().startsWith('/') && !effectiveInputValue.trim().startsWith('/wizard')) {
+        // Ignore slash commands in wizard mode
+        console.log('[processInput] Ignoring slash command in wizard mode:', effectiveInputValue.trim());
+        return;
+      }
+
+      // Clear input
+      setInputValue('');
+      setStagedImages([]);
+      syncAiInputToSession('');
+      if (inputRef.current) inputRef.current.style.height = 'auto';
+
+      // Send to wizard
+      onWizardSendMessage(effectiveInputValue).catch((error) => {
+        console.error('[processInput] Wizard message failed:', error);
+      });
+      return;
+    }
+
     // Queue messages when AI is busy (only in AI mode)
     // For read-only mode tabs: only queue if THIS TAB is busy (allows parallel execution)
     // For write mode tabs: queue if ANY tab in session is busy (prevents conflicts)
@@ -322,54 +373,12 @@ export function useInputProcessing(deps: UseInputProcessingDeps): UseInputProces
           readOnlyMode: isReadOnlyMode,
         };
 
-        // CRITICAL: Check if the session is actually idle (no agent running)
-        // If so, we need to process immediately rather than just queuing.
-        // This handles the case where AutoRun is active but no interactive agent is running -
-        // the queue would never be processed because there's no onExit event to trigger it.
-        const sessionIsActuallyIdle = activeSession.state !== 'busy';
-
-        if (sessionIsActuallyIdle) {
-          // Session is idle - set up state and process immediately
-          // (same pattern as slash command handling above)
-          setSessions((prev) =>
-            prev.map((s) => {
-              if (s.id !== activeSessionId) return s;
-
-              // Set the target tab to busy
-              const updatedAiTabs = s.aiTabs.map((tab) =>
-                tab.id === queuedItem.tabId
-                  ? { ...tab, state: 'busy' as const, thinkingStartTime: Date.now() }
-                  : tab
-              );
-
-              return {
-                ...s,
-                state: 'busy' as SessionState,
-                busySource: 'ai',
-                thinkingStartTime: Date.now(),
-                currentCycleTokens: 0,
-                currentCycleBytes: 0,
-                aiTabs: updatedAiTabs,
-                // Don't add to queue - we're processing immediately
-              };
-            })
-          );
-
-          // Clear input
-          setInputValue('');
-          setStagedImages([]);
-          syncAiInputToSession('');
-          if (inputRef.current) inputRef.current.style.height = 'auto';
-
-          // Process immediately after state is set up
-          // 50ms delay allows React to flush the setState above
-          setTimeout(() => {
-            processQueuedItemRef.current?.(activeSessionId, queuedItem);
-          }, 50);
-          return;
-        }
-
-        // Session is actually busy - add to queue for processing when current item finishes
+        // Add to queue - will be processed when:
+        // - Auto Run completes (via onProcessQueueAfterCompletion callback)
+        // - Current agent task completes (via onExit handler)
+        // Note: We intentionally do NOT process immediately even if session is idle,
+        // because when Auto Run is active, write-mode messages should wait for Auto Run
+        // to complete to prevent file conflicts.
         setSessions((prev) =>
           prev.map((s) => {
             if (s.id !== activeSessionId) return s;
@@ -909,6 +918,7 @@ export function useInputProcessing(deps: UseInputProcessingDeps): UseInputProces
     setSessions,
     flushBatchedUpdates,
     onHistoryCommand,
+    onWizardCommand,
   ]);
 
   // Update ref for external access

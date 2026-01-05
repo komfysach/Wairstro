@@ -14,6 +14,18 @@ import { WizardExitConfirmModal } from './WizardExitConfirmModal';
 import { ScreenReaderAnnouncement } from './ScreenReaderAnnouncement';
 import type { Theme } from '../../types';
 
+/**
+ * Selector for all focusable elements within a container
+ */
+const FOCUSABLE_SELECTOR = [
+  'button:not([disabled]):not([tabindex="-1"])',
+  'input:not([disabled]):not([tabindex="-1"])',
+  'select:not([disabled]):not([tabindex="-1"])',
+  'textarea:not([disabled]):not([tabindex="-1"])',
+  'a[href]:not([tabindex="-1"])',
+  '[tabindex]:not([tabindex="-1"]):not([disabled])',
+].join(', ');
+
 /** Duration of the fade-out animation in ms */
 const FADE_OUT_DURATION = 150;
 /** Duration of the fade-in animation in ms */
@@ -60,9 +72,9 @@ function getStepTitle(step: WizardStep): string {
     case 'conversation':
       return 'Project Discovery';
     case 'preparing-plan':
-      return 'Preparing Action Plans';
+      return 'Preparing Playbooks';
     case 'phase-review':
-      return 'Review Your Action Plans';
+      return 'Review Your Playbooks';
     default:
       return 'Setup Wizard';
   }
@@ -98,6 +110,9 @@ export function MaestroWizard({
   // State for exit confirmation modal
   const [showExitConfirm, setShowExitConfirm] = useState(false);
 
+  // State for thinking toggle (shared across screens via ref callback)
+  const [showThinking, setShowThinking] = useState(false);
+
   // Track wizard start time for duration calculation
   const wizardStartTimeRef = useRef<number>(0);
   // Track if wizard start has been recorded for this open session
@@ -114,6 +129,9 @@ export function MaestroWizard({
   // State for screen reader announcements
   const [announcement, setAnnouncement] = useState('');
   const [announcementKey, setAnnouncementKey] = useState(0);
+
+  // Ref for modal element (used for keyboard event handling)
+  const modalRef = useRef<HTMLDivElement>(null);
 
   // Refs for stable callbacks
   const closeWizardRef = useRef(closeWizard);
@@ -266,23 +284,107 @@ export function MaestroWizard({
     }
   }, [state.isOpen, showExitConfirm, registerLayer, unregisterLayer, handleCloseRequest]);
 
-  // Capture-phase handler to intercept Cmd+E before it reaches the main app
+  // Capture-phase handler for global shortcuts that should work anywhere in the modal
+  // This ensures Cmd+Shift+K (thinking toggle) works even when focus is on header elements
+  useEffect(() => {
+    if (!state.isOpen) return;
+
+    const modal = modalRef.current;
+    if (!modal) return;
+
+    const handleCaptureKeyDown = (e: KeyboardEvent) => {
+      // Cmd+Shift+K to toggle thinking display (only on conversation step)
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'k') {
+        if (state.currentStep === 'conversation') {
+          e.preventDefault();
+          e.stopPropagation();
+          setShowThinking((prev) => !prev);
+        }
+      }
+    };
+
+    // Use capture phase to intercept before any other handlers
+    modal.addEventListener('keydown', handleCaptureKeyDown, { capture: true });
+    return () => modal.removeEventListener('keydown', handleCaptureKeyDown, { capture: true });
+  }, [state.isOpen, state.currentStep]);
+
+  // Bubble-phase handler to stop Cmd+E from reaching the main app after wizard handles it
   // This prevents the wizard's edit/preview toggle from leaking to the AutoRun component
   useEffect(() => {
     if (!state.isOpen) return;
 
-    const handleCaptureKeyDown = (e: KeyboardEvent) => {
-      // Intercept Cmd+E to prevent it from reaching the main app's AutoRun
+    const modal = modalRef.current;
+    if (!modal) return;
+
+    const handleBubbleKeyDown = (e: KeyboardEvent) => {
+      // Stop Cmd+E from bubbling further after the wizard's internal handlers process it
       if ((e.metaKey || e.ctrlKey) && e.key === 'e' && !e.shiftKey) {
-        // Don't preventDefault here - let the wizard's internal handlers process it
-        // Just stop it from propagating to the main app
+        // By the time this bubble-phase handler runs, the wizard's React handlers
+        // have already processed the event. Now we stop it from reaching the main app.
         e.stopPropagation();
       }
     };
 
-    // Use capture phase to intercept before bubbling
-    document.addEventListener('keydown', handleCaptureKeyDown, true);
-    return () => document.removeEventListener('keydown', handleCaptureKeyDown, true);
+    modal.addEventListener('keydown', handleBubbleKeyDown, false);
+    return () => modal.removeEventListener('keydown', handleBubbleKeyDown, false);
+  }, [state.isOpen]);
+
+  // Focus trap - keep Tab navigation within the modal
+  useEffect(() => {
+    if (!state.isOpen || showExitConfirm) return;
+
+    const modal = modalRef.current;
+    if (!modal) return;
+
+    const handleFocusTrap = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab') return;
+
+      // Get all focusable elements within the modal
+      const focusableElements = modal.querySelectorAll(FOCUSABLE_SELECTOR);
+      const focusableArray = Array.from(focusableElements) as HTMLElement[];
+
+      if (focusableArray.length === 0) return;
+
+      const firstElement = focusableArray[0];
+      const lastElement = focusableArray[focusableArray.length - 1];
+      const activeElement = document.activeElement;
+
+      // Check if focus is within the modal
+      const focusIsInModal = modal.contains(activeElement);
+
+      if (e.shiftKey) {
+        // Shift+Tab: going backwards
+        if (!focusIsInModal || activeElement === firstElement) {
+          e.preventDefault();
+          lastElement.focus();
+        }
+      } else {
+        // Tab: going forwards
+        if (!focusIsInModal || activeElement === lastElement) {
+          e.preventDefault();
+          firstElement.focus();
+        }
+      }
+    };
+
+    // Use capture phase to intercept Tab before it reaches other handlers
+    document.addEventListener('keydown', handleFocusTrap, { capture: true });
+    return () => document.removeEventListener('keydown', handleFocusTrap, { capture: true });
+  }, [state.isOpen, showExitConfirm]);
+
+  // Focus the modal when it opens to ensure focus is trapped
+  useEffect(() => {
+    if (state.isOpen && modalRef.current) {
+      // Focus the first focusable element in the modal
+      const focusableElements = modalRef.current.querySelectorAll(FOCUSABLE_SELECTOR);
+      const firstFocusable = focusableElements[0] as HTMLElement | undefined;
+      if (firstFocusable) {
+        // Small delay to let the modal render
+        requestAnimationFrame(() => {
+          firstFocusable.focus();
+        });
+      }
+    }
   }, [state.isOpen]);
 
   /**
@@ -297,7 +399,7 @@ export function MaestroWizard({
       case 'directory-selection':
         return <DirectorySelectionScreen theme={theme} />;
       case 'conversation':
-        return <ConversationScreen theme={theme} />;
+        return <ConversationScreen theme={theme} showThinking={showThinking} setShowThinking={setShowThinking} />;
       case 'preparing-plan':
         return <PreparingPlanScreen theme={theme} />;
       case 'phase-review':
@@ -312,7 +414,7 @@ export function MaestroWizard({
       default:
         return null;
     }
-  }, [displayedStep, theme, onLaunchSession, onWizardComplete]);
+  }, [displayedStep, theme, onLaunchSession, onWizardComplete, showThinking]);
 
   // Don't render if wizard is not open
   if (!state.isOpen) {
@@ -341,6 +443,7 @@ export function MaestroWizard({
       />
 
       <div
+        ref={modalRef}
         className="w-[90vw] h-[80vh] max-w-5xl rounded-xl border shadow-2xl flex flex-col overflow-hidden wizard-modal"
         style={{
           backgroundColor: theme.colors.bgMain,
@@ -436,8 +539,8 @@ export function MaestroWizard({
                     goToStep(targetStep);
                   }
                 }}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors hover:bg-white/10"
-                style={{ color: theme.colors.textDim }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-offset-1"
+                style={{ color: theme.colors.textDim, ['--tw-ring-color' as any]: theme.colors.accent, ['--tw-ring-offset-color' as any]: theme.colors.bgSidebar }}
                 title="Go back"
                 aria-label="Go back to previous step"
               >
@@ -461,8 +564,8 @@ export function MaestroWizard({
             {/* Close button */}
             <button
               onClick={handleCloseRequest}
-              className="p-2 rounded-lg hover:bg-white/10 transition-colors"
-              style={{ color: theme.colors.textDim }}
+              className="p-2 rounded-lg hover:bg-white/10 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-1"
+              style={{ color: theme.colors.textDim, ['--tw-ring-color' as any]: theme.colors.accent, ['--tw-ring-offset-color' as any]: theme.colors.bgSidebar }}
               title="Close wizard (Escape)"
               aria-label="Close wizard"
             >

@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect, memo } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Plus, Star, Copy, Edit2, Mail, Pencil, Search, GitMerge, ArrowRightCircle, Minimize2, Download, Clipboard, Minus, ArrowLeftToLine, ArrowRightToLine, Share2 } from 'lucide-react';
+import { X, Plus, Star, Copy, Edit2, Mail, Pencil, Search, GitMerge, ArrowRightCircle, Minimize2, Download, Clipboard, Share2, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import type { AITab, Theme } from '../types';
 import { hasDraft } from '../utils/tabHelpers';
 
@@ -63,18 +63,14 @@ interface TabProps {
   onExportHtml?: () => void;
   /** Handler to publish tab context as GitHub Gist */
   onPublishGist?: () => void;
-  /** Handler to close other tabs */
-  onCloseOthers?: () => void;
-  /** Handler to close tabs to the left */
-  onCloseLeft?: () => void;
-  /** Handler to close tabs to the right */
-  onCloseRight?: () => void;
+  /** Handler to move tab to first position */
+  onMoveToFirst?: () => void;
+  /** Handler to move tab to last position */
+  onMoveToLast?: () => void;
   /** Is this the first tab? */
   isFirstTab?: boolean;
   /** Is this the last tab? */
   isLastTab?: boolean;
-  /** Is this the only tab? */
-  hasOnlyOneTab?: boolean;
   shortcutHint?: number | null;
   registerRef?: (el: HTMLDivElement | null) => void;
   hasDraft?: boolean;
@@ -147,12 +143,10 @@ function Tab({
   onCopyContext,
   onExportHtml,
   onPublishGist,
-  onCloseOthers,
-  onCloseLeft,
-  onCloseRight,
+  onMoveToFirst,
+  onMoveToLast,
   isFirstTab,
   isLastTab,
-  hasOnlyOneTab,
   shortcutHint,
   registerRef,
   hasDraft
@@ -174,8 +168,8 @@ function Tab({
     setIsHovered(true);
     // Only show overlay if there's something meaningful to show:
     // - Tabs with sessions: always show (for session actions)
-    // - Tabs without sessions: only show if there are multiple tabs (for close actions)
-    if (!tab.agentSessionId && hasOnlyOneTab) return;
+    // - Tabs without sessions: show if there are move actions available
+    if (!tab.agentSessionId && isFirstTab && isLastTab) return;
 
     // Open overlay after delay
     hoverTimeoutRef.current = setTimeout(() => {
@@ -266,21 +260,15 @@ function Tab({
     setOverlayOpen(false);
   };
 
-  const handleCloseOthersClick = (e: React.MouseEvent) => {
+  const handleMoveToFirstClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    onCloseOthers?.();
+    onMoveToFirst?.();
     setOverlayOpen(false);
   };
 
-  const handleCloseLeftClick = (e: React.MouseEvent) => {
+  const handleMoveToLastClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    onCloseLeft?.();
-    setOverlayOpen(false);
-  };
-
-  const handleCloseRightClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    onCloseRight?.();
+    onMoveToLast?.();
     setOverlayOpen(false);
   };
 
@@ -610,52 +598,32 @@ function Tab({
               </button>
             )}
 
-            {/* Tab Close Actions Section - divider and close options */}
-            <div className="my-1 border-t" style={{ borderColor: theme.colors.border }} />
+            {/* Tab Move Actions Section - divider and move options */}
+            {(onMoveToFirst || onMoveToLast) && (
+              <div className="my-1 border-t" style={{ borderColor: theme.colors.border }} />
+            )}
 
-            {/* Close Tab - always available */}
-            <button
-              onClick={handleCloseClick}
-              className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs transition-colors hover:bg-white/10"
-              style={{ color: theme.colors.textMain }}
-            >
-              <X className="w-3.5 h-3.5" style={{ color: theme.colors.textDim }} />
-              Close
-            </button>
-
-            {/* Close Others - suppressed if only one tab */}
-            {!hasOnlyOneTab && (
+            {/* Move to First Position - suppressed if already first tab or no handler */}
+            {onMoveToFirst && (
               <button
-                onClick={handleCloseOthersClick}
+                onClick={handleMoveToFirstClick}
                 className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs transition-colors hover:bg-white/10"
                 style={{ color: theme.colors.textMain }}
               >
-                <Minus className="w-3.5 h-3.5" style={{ color: theme.colors.textDim }} />
-                Close Others
+                <ChevronsLeft className="w-3.5 h-3.5" style={{ color: theme.colors.textDim }} />
+                Move to First Position
               </button>
             )}
 
-            {/* Close Tabs to the Left - suppressed if first tab */}
-            {!isFirstTab && (
+            {/* Move to Last Position - suppressed if already last tab or no handler */}
+            {onMoveToLast && (
               <button
-                onClick={handleCloseLeftClick}
+                onClick={handleMoveToLastClick}
                 className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs transition-colors hover:bg-white/10"
                 style={{ color: theme.colors.textMain }}
               >
-                <ArrowLeftToLine className="w-3.5 h-3.5" style={{ color: theme.colors.textDim }} />
-                Close Tabs to the Left
-              </button>
-            )}
-
-            {/* Close Tabs to the Right - suppressed if last tab */}
-            {!isLastTab && (
-              <button
-                onClick={handleCloseRightClick}
-                className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs transition-colors hover:bg-white/10"
-                style={{ color: theme.colors.textMain }}
-              >
-                <ArrowRightToLine className="w-3.5 h-3.5" style={{ color: theme.colors.textDim }} />
-                Close Tabs to the Right
+                <ChevronsRight className="w-3.5 h-3.5" style={{ color: theme.colors.textDim }} />
+                Move to Last Position
               </button>
             )}
           </div>
@@ -794,46 +762,21 @@ function TabBarInner({
     };
   }, [tabs.length, displayedTabs.length]);
 
-  const handleCloseOthers = useCallback((tabId: string) => {
-    // Close all VISIBLE tabs except the specified one
-    displayedTabs.forEach(tab => {
-      if (tab.id !== tabId) {
-        onTabClose(tab.id);
-      }
-    });
-    // Set the specified tab as active if it wasn't already
-    if (activeTabId !== tabId) {
-      onTabSelect(tabId);
+  const handleMoveToFirst = useCallback((tabId: string) => {
+    // Find the current index in the FULL tabs array (not filtered)
+    const currentIndex = tabs.findIndex(t => t.id === tabId);
+    if (currentIndex > 0 && onTabReorder) {
+      onTabReorder(currentIndex, 0);
     }
-  }, [displayedTabs, activeTabId, onTabClose, onTabSelect]);
+  }, [tabs, onTabReorder]);
 
-  const handleCloseLeft = useCallback((tabId: string) => {
-    // Find position in VISIBLE tabs
-    const clickedTabIndex = displayedTabs.findIndex(t => t.id === tabId);
-    // Close all VISIBLE tabs to the left of the clicked tab
-    for (let i = 0; i < clickedTabIndex; i++) {
-      onTabClose(displayedTabs[i].id);
+  const handleMoveToLast = useCallback((tabId: string) => {
+    // Find the current index in the FULL tabs array (not filtered)
+    const currentIndex = tabs.findIndex(t => t.id === tabId);
+    if (currentIndex < tabs.length - 1 && onTabReorder) {
+      onTabReorder(currentIndex, tabs.length - 1);
     }
-    // Set the clicked tab as active if the active tab was to the left
-    const activeTabIndex = displayedTabs.findIndex(t => t.id === activeTabId);
-    if (activeTabIndex < clickedTabIndex) {
-      onTabSelect(tabId);
-    }
-  }, [displayedTabs, activeTabId, onTabClose, onTabSelect]);
-
-  const handleCloseRight = useCallback((tabId: string) => {
-    // Find position in VISIBLE tabs
-    const clickedTabIndex = displayedTabs.findIndex(t => t.id === tabId);
-    // Close all VISIBLE tabs to the right of the clicked tab
-    for (let i = displayedTabs.length - 1; i > clickedTabIndex; i--) {
-      onTabClose(displayedTabs[i].id);
-    }
-    // Set the clicked tab as active if the active tab was to the right
-    const activeTabIndex = displayedTabs.findIndex(t => t.id === activeTabId);
-    if (activeTabIndex > clickedTabIndex) {
-      onTabSelect(tabId);
-    }
-  }, [displayedTabs, activeTabId, onTabClose, onTabSelect]);
+  }, [tabs, onTabReorder]);
 
   return (
     <div
@@ -900,11 +843,9 @@ function TabBarInner({
         // Show separator between inactive tabs (not adjacent to active tab)
         const showSeparator = index > 0 && !isActive && !isPrevActive;
 
-        // Calculate position info for close actions (within visible tabs)
-        const displayedTabIndex = displayedTabs.findIndex(t => t.id === tab.id);
-        const isFirstTab = displayedTabIndex === 0;
-        const isLastTab = displayedTabIndex === displayedTabs.length - 1;
-        const hasOnlyOneTab = displayedTabs.length === 1;
+        // Calculate position info for move actions (within FULL tabs array, not filtered)
+        const isFirstTab = originalIndex === 0;
+        const isLastTab = originalIndex === tabs.length - 1;
 
         return (
           <React.Fragment key={tab.id}>
@@ -937,12 +878,10 @@ function TabBarInner({
               onCopyContext={onCopyContext && (tab.logs?.length ?? 0) >= 1 ? () => onCopyContext(tab.id) : undefined}
               onExportHtml={onExportHtml ? () => onExportHtml(tab.id) : undefined}
               onPublishGist={onPublishGist && ghCliAvailable && (tab.logs?.length ?? 0) >= 1 ? () => onPublishGist(tab.id) : undefined}
-              onCloseOthers={() => handleCloseOthers(tab.id)}
-              onCloseLeft={() => handleCloseLeft(tab.id)}
-              onCloseRight={() => handleCloseRight(tab.id)}
+              onMoveToFirst={!isFirstTab && onTabReorder ? () => handleMoveToFirst(tab.id) : undefined}
+              onMoveToLast={!isLastTab && onTabReorder ? () => handleMoveToLast(tab.id) : undefined}
               isFirstTab={isFirstTab}
               isLastTab={isLastTab}
-              hasOnlyOneTab={hasOnlyOneTab}
               shortcutHint={!showUnreadOnly && originalIndex < 9 ? originalIndex + 1 : null}
               hasDraft={hasDraft(tab)}
               registerRef={(el) => {

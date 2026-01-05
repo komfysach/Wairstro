@@ -102,6 +102,26 @@ export function TourOverlay({
   // Track maximum step viewed (1-indexed for reporting)
   const maxStepViewedRef = useRef(1);
 
+  // Use refs for callbacks to avoid recreating handlers on every render
+  // This prevents infinite loops caused by unstable callback references
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+  const onTourCompleteRef = useRef(onTourComplete);
+  onTourCompleteRef.current = onTourComplete;
+  const onTourSkipRef = useRef(onTourSkip);
+  onTourSkipRef.current = onTourSkip;
+  const onTourStartRef = useRef(onTourStart);
+  onTourStartRef.current = onTourStart;
+
+  // Stable onComplete callback that uses refs
+  const handleComplete = useCallback(() => {
+    // Tour completed - user viewed all steps
+    if (onTourCompleteRef.current) {
+      onTourCompleteRef.current(maxStepViewedRef.current);
+    }
+    onCloseRef.current();
+  }, []);
+
   const {
     currentStep,
     currentStepIndex,
@@ -116,38 +136,34 @@ export function TourOverlay({
     isLastStep,
   } = useTour({
     isOpen,
-    onComplete: () => {
-      // Tour completed - user viewed all steps
-      if (onTourComplete) {
-        onTourComplete(maxStepViewedRef.current);
-      }
-      onClose();
-    },
+    onComplete: handleComplete,
     startStep,
   });
 
   // Wrapper for skipTour that calls analytics callback
+  // Uses ref for onTourSkip to keep skipTour stable
   const skipTour = useCallback(() => {
     // Tour skipped before completion
-    if (onTourSkip) {
-      onTourSkip(maxStepViewedRef.current);
+    if (onTourSkipRef.current) {
+      onTourSkipRef.current(maxStepViewedRef.current);
     }
     internalSkipTour();
-  }, [internalSkipTour, onTourSkip]);
+  }, [internalSkipTour]);
 
   // Track tour start when it opens
+  // Uses ref for onTourStart to avoid effect re-running on callback changes
   useEffect(() => {
     if (isOpen && !tourStartedRef.current) {
       tourStartedRef.current = true;
       maxStepViewedRef.current = 1; // Reset to 1 (first step)
-      if (onTourStart) {
-        onTourStart();
+      if (onTourStartRef.current) {
+        onTourStartRef.current();
       }
     } else if (!isOpen) {
       // Reset when tour closes
       tourStartedRef.current = false;
     }
-  }, [isOpen, onTourStart]);
+  }, [isOpen]);
 
   // Track the maximum step viewed
   useEffect(() => {

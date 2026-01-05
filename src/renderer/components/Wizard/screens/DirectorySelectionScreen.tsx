@@ -230,12 +230,11 @@ export function DirectorySelectionScreen({ theme }: DirectorySelectionScreenProp
       if (selectedPath) {
         setDirectoryPath(selectedPath);
         await validateDirectory(selectedPath);
-        // Focus the continue button after selection if valid
+        // Focus the continue button after selection - use longer timeout to ensure
+        // React has re-rendered with updated state and the button is visible
         setTimeout(() => {
-          if (canProceedToNext()) {
-            continueButtonRef.current?.focus();
-          }
-        }, 100);
+          continueButtonRef.current?.focus();
+        }, 150);
       }
     } catch (error) {
       console.error('Browse failed:', error);
@@ -243,7 +242,7 @@ export function DirectorySelectionScreen({ theme }: DirectorySelectionScreenProp
     }
 
     setIsBrowsing(false);
-  }, [setDirectoryPath, validateDirectory, canProceedToNext, setDirectoryError]);
+  }, [setDirectoryPath, validateDirectory, setDirectoryError]);
 
   /**
    * Attempt to proceed to next step
@@ -313,6 +312,14 @@ export function DirectorySelectionScreen({ theme }: DirectorySelectionScreenProp
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     switch (e.key) {
       case 'Enter':
+        // If Browse button is focused, click it instead of trying to proceed
+        if (document.activeElement === browseButtonRef.current) {
+          e.preventDefault();
+          if (!isBrowsing) {
+            handleBrowse();
+          }
+          return;
+        }
         e.preventDefault();
         if (canProceedToNext() && !isValidating) {
           attemptNextStep();
@@ -324,7 +331,7 @@ export function DirectorySelectionScreen({ theme }: DirectorySelectionScreenProp
         previousStep();
         break;
     }
-  }, [canProceedToNext, isValidating, attemptNextStep, previousStep]);
+  }, [canProceedToNext, isValidating, attemptNextStep, previousStep, isBrowsing, handleBrowse]);
 
   /**
    * Handle continue button click
@@ -474,11 +481,13 @@ export function DirectorySelectionScreen({ theme }: DirectorySelectionScreenProp
                 ref={browseButtonRef}
                 onClick={handleBrowse}
                 disabled={isBrowsing}
-                className="px-6 py-3 rounded-lg font-medium transition-all flex items-center gap-2 outline-none"
+                className="px-6 py-3 rounded-lg font-medium transition-all flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-offset-2"
                 style={{
                   backgroundColor: theme.colors.accent,
                   color: theme.colors.accentForeground,
                   opacity: isBrowsing ? 0.7 : 1,
+                  ['--tw-ring-color' as any]: theme.colors.accent,
+                  ['--tw-ring-offset-color' as any]: theme.colors.bgMain,
                 }}
               >
                 {isBrowsing ? (
@@ -668,13 +677,15 @@ export function DirectorySelectionScreen({ theme }: DirectorySelectionScreenProp
             ref={continueButtonRef}
             onClick={handleContinue}
             disabled={!isValid || isValidating}
-            className="px-12 py-3 rounded-lg font-medium transition-all outline-none"
+            className="px-12 py-3 rounded-lg font-medium transition-all focus:outline-none focus:ring-2 focus:ring-offset-2"
             style={{
               backgroundColor: isValid && !isValidating ? theme.colors.accent : theme.colors.border,
               color: isValid && !isValidating ? theme.colors.accentForeground : theme.colors.textDim,
               cursor: isValid && !isValidating ? 'pointer' : 'not-allowed',
               opacity: isValid && !isValidating ? 1 : 0.6,
               minWidth: '200px',
+              ['--tw-ring-color' as any]: theme.colors.accent,
+              ['--tw-ring-offset-color' as any]: theme.colors.bgMain,
             }}
           >
             Continue

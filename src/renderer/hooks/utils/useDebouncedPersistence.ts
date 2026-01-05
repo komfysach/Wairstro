@@ -20,12 +20,18 @@ const MAX_PERSISTED_LOGS_PER_TAB = 100;
 
 /**
  * Prepare a session for persistence by:
- * 1. Truncating logs in each AI tab to MAX_PERSISTED_LOGS_PER_TAB entries
- * 2. Resetting runtime-only state (busy state, thinking time, etc.)
- * 3. Excluding runtime-only fields (closedTabHistory, agentError, etc.)
+ * 1. Filtering out tabs with active wizard state (incomplete wizards should not persist)
+ * 2. Truncating logs in each AI tab to MAX_PERSISTED_LOGS_PER_TAB entries
+ * 3. Resetting runtime-only state (busy state, thinking time, etc.)
+ * 4. Excluding runtime-only fields (closedTabHistory, agentError, etc.)
  *
  * This ensures sessions don't get stuck in busy state after app restart,
  * since underlying processes are gone after restart.
+ *
+ * Incomplete wizard tabs are discarded because:
+ * - They represent temporary wizard sessions that haven't completed
+ * - Completed wizards have their wizardState cleared and tab converted to regular sessions
+ * - Restoring incomplete wizard state would leave the user in a broken state
  *
  * This is a local copy to avoid circular imports in session persistence logic.
  */
@@ -35,8 +41,26 @@ const prepareSessionForPersistence = (session: Session): Session => {
     return session;
   }
 
+  // Filter out tabs with active wizard state - incomplete wizards should not persist
+  // When a wizard completes, wizardState is cleared (set to undefined) and the tab
+  // becomes a regular session that should persist.
+  const nonWizardTabs = session.aiTabs.filter(tab => !tab.wizardState?.isActive);
+
+  // If all tabs were wizard tabs, create a fresh empty tab to avoid empty session
+  const tabsToProcess = nonWizardTabs.length > 0 ? nonWizardTabs : [{
+    id: session.aiTabs[0].id, // Keep the first tab's ID for consistency
+    agentSessionId: null,
+    name: null,
+    starred: false,
+    logs: [],
+    inputValue: '',
+    stagedImages: [],
+    createdAt: Date.now(),
+    state: 'idle' as const,
+  }];
+
   // Truncate logs and reset runtime state in each tab
-  const truncatedTabs = session.aiTabs.map(tab => ({
+  const truncatedTabs = tabsToProcess.map(tab => ({
     ...tab,
     logs: tab.logs.length > MAX_PERSISTED_LOGS_PER_TAB
       ? tab.logs.slice(-MAX_PERSISTED_LOGS_PER_TAB)
@@ -45,15 +69,22 @@ const prepareSessionForPersistence = (session: Session): Session => {
     state: 'idle' as const,
     thinkingStartTime: undefined,
     agentError: undefined,
+    // Clear wizard state entirely from persistence (even inactive wizard state)
+    wizardState: undefined,
   }));
 
   // Return session without runtime-only fields
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { closedTabHistory, agentError, agentErrorPaused, agentErrorTabId, ...sessionWithoutRuntimeFields } = session;
+  const { closedTabHistory, agentError, agentErrorPaused, agentErrorTabId, sshConnectionFailed, ...sessionWithoutRuntimeFields } = session;
+
+  // Ensure activeTabId points to a valid tab (it might have been a wizard tab that got filtered)
+  const activeTabExists = truncatedTabs.some(tab => tab.id === session.activeTabId);
+  const newActiveTabId = activeTabExists ? session.activeTabId : truncatedTabs[0]?.id;
 
   return {
     ...sessionWithoutRuntimeFields,
     aiTabs: truncatedTabs,
+    activeTabId: newActiveTabId,
     // Reset runtime-only session state - processes don't survive app restart
     state: 'idle',
     busySource: undefined,

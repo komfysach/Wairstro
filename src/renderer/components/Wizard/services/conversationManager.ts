@@ -69,6 +69,10 @@ export interface ConversationCallbacks {
   onReceiving?: () => void;
   /** Called with partial output chunks (for streaming display) */
   onChunk?: OutputChunkCallback;
+  /** Called with thinking content chunks from the AI (for showThinking display) */
+  onThinkingChunk?: (content: string) => void;
+  /** Called when a tool execution event is received (for showThinking display) */
+  onToolExecution?: (toolEvent: { toolName: string; state?: unknown; timestamp: number }) => void;
   /** Called when response is complete */
   onComplete?: (result: SendMessageResult) => void;
   /** Called when an error occurs */
@@ -101,6 +105,10 @@ interface ConversationSession {
   dataListenerCleanup?: () => void;
   /** Cleanup function for exit listener */
   exitListenerCleanup?: () => void;
+  /** Cleanup function for thinking chunk listener */
+  thinkingListenerCleanup?: () => void;
+  /** Cleanup function for tool execution listener */
+  toolExecutionListenerCleanup?: () => void;
   /** Timeout ID for response timeout (for cleanup) */
   responseTimeoutId?: NodeJS.Timeout;
 }
@@ -303,6 +311,31 @@ class ConversationManager {
         }
       );
 
+      // Set up thinking chunk listener - uses the dedicated event from process-manager
+      // This receives parsed thinking content (isPartial text) that's already extracted
+      if (this.session!.callbacks?.onThinkingChunk) {
+        this.session!.thinkingListenerCleanup = window.maestro.process.onThinkingChunk?.(
+          (sessionId: string, content: string) => {
+            if (sessionId === this.session?.sessionId && content) {
+              this.session.callbacks?.onThinkingChunk?.(content);
+            }
+          }
+        );
+      }
+
+      // Set up tool execution listener - shows tool use (Read, Write, etc.) when showThinking is enabled
+      // This is important because in batch mode, we don't get streaming assistant messages,
+      // but we DO get tool execution events which show what the agent is doing
+      if (this.session!.callbacks?.onToolExecution) {
+        this.session!.toolExecutionListenerCleanup = window.maestro.process.onToolExecution?.(
+          (sessionId: string, toolEvent: { toolName: string; state?: unknown; timestamp: number }) => {
+            if (sessionId === this.session?.sessionId) {
+              this.session.callbacks?.onToolExecution?.(toolEvent);
+            }
+          }
+        );
+      }
+
       // Set up exit listener
       this.session!.exitListenerCleanup = window.maestro.process.onExit(
         (sessionId: string, code: number) => {
@@ -403,8 +436,12 @@ class ConversationManager {
 
     switch (agentId) {
       case 'claude-code': {
-        // Claude Code: start with base args, add --include-partial-messages for streaming
+        // Claude Code: start with base args, add required flags for streaming and thinking
         const args = [...(agent.args || [])];
+        // Ensure stream-json output format for proper parsing and thinking-chunk events
+        if (!args.includes('--output-format')) {
+          args.push('--output-format', 'stream-json');
+        }
         if (!args.includes('--include-partial-messages')) {
           args.push('--include-partial-messages');
         }
@@ -551,6 +588,14 @@ class ConversationManager {
     if (this.session?.exitListenerCleanup) {
       this.session.exitListenerCleanup();
       this.session.exitListenerCleanup = undefined;
+    }
+    if (this.session?.thinkingListenerCleanup) {
+      this.session.thinkingListenerCleanup();
+      this.session.thinkingListenerCleanup = undefined;
+    }
+    if (this.session?.toolExecutionListenerCleanup) {
+      this.session.toolExecutionListenerCleanup();
+      this.session.toolExecutionListenerCleanup = undefined;
     }
     if (this.session?.responseTimeoutId) {
       clearTimeout(this.session.responseTimeoutId);

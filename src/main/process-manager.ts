@@ -13,6 +13,7 @@ import type { AgentError, SshRemoteConfig } from '../shared/types';
 import { detectNodeVersionManagerBinPaths, expandTilde } from '../shared/pathUtils';
 import { getAgentCapabilities } from './agent-capabilities';
 import { shellEscapeForDoubleQuotes } from './utils/shell-escape';
+import { getExpandedEnv } from './utils/cliDetection';
 
 // Re-export parser types for consumers
 export type { ParsedEvent, AgentOutputParser } from './parsers';
@@ -920,8 +921,25 @@ export class ProcessManager extends EventEmitter {
                     // NOTE: We do NOT emit partial text to 'data' because it causes streaming content
                     // to appear in the main output even when thinking is disabled. The final 'result'
                     // message contains the properly formatted complete response.
+
+                    // DEBUG: Log thinking-chunk emission conditions
+                    if (event.type === 'text') {
+                      logger.debug('[ProcessManager] Checking thinking-chunk conditions', 'ProcessManager', {
+                        sessionId,
+                        eventType: event.type,
+                        isPartial: event.isPartial,
+                        hasText: !!event.text,
+                        textLength: event.text?.length,
+                        textPreview: event.text?.substring(0, 100),
+                      });
+                    }
+
                     if (event.type === 'text' && event.isPartial && event.text) {
                       // Emit thinking chunk for real-time display (renderer shows only if tab.showThinking is true)
+                      logger.debug('[ProcessManager] Emitting thinking-chunk', 'ProcessManager', {
+                        sessionId,
+                        textLength: event.text.length,
+                      });
                       this.emit('thinking-chunk', sessionId, event.text);
 
                       // Accumulate for result fallback (in case result message doesn't have text)
@@ -1797,9 +1815,12 @@ export class ProcessManager extends EventEmitter {
     });
 
     // Spawn the SSH process
+    // Use getExpandedEnv() to ensure SSH can be found in packaged Electron apps
+    // where PATH may not include /usr/bin
+    const expandedEnv = getExpandedEnv();
     const childProcess = spawn('ssh', sshArgs, {
       env: {
-        ...process.env,
+        ...expandedEnv,
         // Ensure SSH can find the key and config
         HOME: process.env.HOME,
         SSH_AUTH_SOCK: process.env.SSH_AUTH_SOCK,

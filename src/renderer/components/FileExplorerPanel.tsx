@@ -628,12 +628,13 @@ function FileExplorerPanelInner(props: FileExplorerPanelProps) {
               {/* For agent sessions, show a refresh button instead */}
               {session.toolType !== 'terminal' && (
                 <button
-                  onClick={() => refreshFileTree(session.id)}
-                  className="flex items-center gap-2 px-3 py-2 rounded border hover:bg-white/5 transition-colors text-xs"
+                  onClick={handleRefresh}
+                  disabled={isRefreshing}
+                  className="flex items-center gap-2 px-3 py-2 rounded border hover:bg-white/5 transition-colors text-xs disabled:opacity-50 disabled:cursor-not-allowed"
                   style={{ borderColor: theme.colors.border, color: theme.colors.textMain }}
                 >
-                  <RefreshCw className="w-4 h-4" />
-                  Retry Connection
+                  <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                  {isRefreshing ? 'Connecting...' : 'Retry Connection'}
                 </button>
               )}
             </>

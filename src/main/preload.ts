@@ -317,6 +317,9 @@ contextBridge.exposeInMainWorld('maestro', {
     // NEW: Single-call grooming (recommended) - spawns batch process and returns response
     groomContext: (projectRoot: string, agentType: string, prompt: string) =>
       ipcRenderer.invoke('context:groomContext', projectRoot, agentType, prompt) as Promise<string>,
+    // Cancel all active grooming sessions
+    cancelGrooming: () =>
+      ipcRenderer.invoke('context:cancelGrooming') as Promise<void>,
     // DEPRECATED: Create a temporary session for context grooming
     createGroomingSession: (projectRoot: string, agentType: string) =>
       ipcRenderer.invoke('context:createGroomingSession', projectRoot, agentType) as Promise<string>,
@@ -1205,6 +1208,8 @@ contextBridge.exposeInMainWorld('maestro', {
   autorun: {
     listDocs: (folderPath: string, sshRemoteId?: string) =>
       ipcRenderer.invoke('autorun:listDocs', folderPath, sshRemoteId),
+    hasDocuments: (folderPath: string): Promise<{ hasDocuments: boolean }> =>
+      ipcRenderer.invoke('autorun:hasDocuments', folderPath),
     readDoc: (folderPath: string, filename: string, sshRemoteId?: string) =>
       ipcRenderer.invoke('autorun:readDoc', folderPath, filename, sshRemoteId),
     writeDoc: (folderPath: string, filename: string, content: string, sshRemoteId?: string) =>
@@ -1638,6 +1643,34 @@ contextBridge.exposeInMainWorld('maestro', {
     // Get database size in bytes
     getDatabaseSize: () =>
       ipcRenderer.invoke('stats:get-database-size') as Promise<number>,
+
+    // Record session creation (for lifecycle tracking)
+    recordSessionCreated: (event: {
+      sessionId: string;
+      agentType: string;
+      projectPath?: string;
+      createdAt: number;
+      isRemote?: boolean;
+    }) => ipcRenderer.invoke('stats:record-session-created', event) as Promise<string | null>,
+
+    // Record session closure (for lifecycle tracking)
+    recordSessionClosed: (sessionId: string, closedAt: number) =>
+      ipcRenderer.invoke('stats:record-session-closed', sessionId, closedAt) as Promise<boolean>,
+
+    // Get session lifecycle events within a time range
+    getSessionLifecycle: (range: 'day' | 'week' | 'month' | 'year' | 'all') =>
+      ipcRenderer.invoke('stats:get-session-lifecycle', range) as Promise<
+        Array<{
+          id: string;
+          sessionId: string;
+          agentType: string;
+          projectPath?: string;
+          createdAt: number;
+          closedAt?: number;
+          duration?: number;
+          isRemote?: boolean;
+        }>
+      >,
   },
 
   // Leaderboard API (runmaestro.ai integration)
@@ -2505,6 +2538,9 @@ export interface MaestroAPI {
     listDocs: (
       folderPath: string
     ) => Promise<{ success: boolean; files: string[]; error?: string }>;
+    hasDocuments: (
+      folderPath: string
+    ) => Promise<{ hasDocuments: boolean }>;
     readDoc: (
       folderPath: string,
       filename: string

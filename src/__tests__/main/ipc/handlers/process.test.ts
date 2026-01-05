@@ -51,6 +51,77 @@ vi.mock('node-pty', () => ({
   spawn: vi.fn(),
 }));
 
+// Mock ssh-command-builder to handle async buildSshCommand
+// This mock dynamically builds the SSH command based on input to support all test cases
+vi.mock('../../../../main/utils/ssh-command-builder', () => ({
+  buildSshCommand: vi.fn().mockImplementation(async (config, remoteOptions) => {
+    const args: string[] = ['-tt'];
+
+    // Add identity file if provided
+    if (config.privateKeyPath) {
+      args.push('-i', config.privateKeyPath.replace('~', '/Users/test'));
+    }
+
+    // Add SSH options
+    args.push('-o', 'BatchMode=yes');
+    args.push('-o', 'StrictHostKeyChecking=accept-new');
+    args.push('-o', 'ConnectTimeout=10');
+
+    // Add port if not default
+    if (config.port !== 22) {
+      args.push('-p', config.port.toString());
+    }
+
+    // Build destination
+    args.push(`${config.username}@${config.host}`);
+
+    // Build the remote command parts
+    const commandParts: string[] = [];
+
+    // Add cd if cwd or remoteWorkingDir is set
+    const effectiveCwd = remoteOptions.cwd || config.remoteWorkingDir;
+    if (effectiveCwd) {
+      commandParts.push(`cd '${effectiveCwd}'`);
+    }
+
+    // Add env vars if present
+    const mergedEnv = { ...(config.remoteEnv || {}), ...(remoteOptions.env || {}) };
+    const envParts: string[] = [];
+    for (const [key, value] of Object.entries(mergedEnv)) {
+      envParts.push(`${key}='${value}'`);
+    }
+
+    // Build command with args
+    const cmdWithArgs = `'${remoteOptions.command}' ${remoteOptions.args.map((a: string) => `'${a}'`).join(' ')}`.trim();
+
+    // Combine env + command
+    const fullCmd = envParts.length > 0 ? `${envParts.join(' ')} ${cmdWithArgs}` : cmdWithArgs;
+    commandParts.push(fullCmd);
+
+    // Join with &&
+    const remoteCommand = commandParts.join(' && ');
+    args.push(`$SHELL -lc "${remoteCommand}"`);
+
+    return { command: 'ssh', args };
+  }),
+  buildRemoteCommand: vi.fn((opts) => {
+    const parts: string[] = [];
+    if (opts.cwd) {
+      parts.push(`cd '${opts.cwd}'`);
+    }
+    const envParts: string[] = [];
+    if (opts.env) {
+      for (const [key, value] of Object.entries(opts.env)) {
+        envParts.push(`${key}='${value}'`);
+      }
+    }
+    const cmdWithArgs = `'${opts.command}' ${opts.args.map((a: string) => `'${a}'`).join(' ')}`.trim();
+    const fullCmd = envParts.length > 0 ? `${envParts.join(' ')} ${cmdWithArgs}` : cmdWithArgs;
+    parts.push(fullCmd);
+    return parts.join(' && ');
+  }),
+}));
+
 describe('process IPC handlers', () => {
   let handlers: Map<string, Function>;
   let mockProcessManager: {

@@ -362,6 +362,12 @@ const mockMaestro = {
       bySource: { user: 0, auto: 0 },
       byDay: [],
     }),
+    getStats: vi.fn().mockResolvedValue([]),
+    startAutoRun: vi.fn().mockResolvedValue('auto-run-id'),
+    endAutoRun: vi.fn().mockResolvedValue(true),
+    recordAutoTask: vi.fn().mockResolvedValue('task-id'),
+    getAutoRunSessions: vi.fn().mockResolvedValue([]),
+    getAutoRunTasks: vi.fn().mockResolvedValue([]),
     exportCsv: vi.fn().mockResolvedValue(''),
     onStatsUpdate: vi.fn().mockReturnValue(() => {}),
     getDatabaseSize: vi.fn().mockResolvedValue(1024 * 1024), // 1MB mock
@@ -371,6 +377,10 @@ const mockMaestro = {
       deletedAutoRunSessions: 0,
       deletedAutoRunTasks: 0,
     }),
+    // Session lifecycle tracking
+    recordSessionCreated: vi.fn().mockResolvedValue('lifecycle-id'),
+    recordSessionClosed: vi.fn().mockResolvedValue(true),
+    getSessionLifecycle: vi.fn().mockResolvedValue([]),
   },
   sshRemote: {
     getConfigs: vi.fn().mockResolvedValue({ success: true, configs: [] }),

@@ -181,7 +181,32 @@ export function useBatchProcessor({
   onProcessQueueAfterCompletion
 }: UseBatchProcessorProps): UseBatchProcessorReturn {
   // Batch states per session using reducer pattern for predictable state transitions
-  const [batchRunStates, dispatch] = useReducer(batchReducer, {});
+  const [batchRunStates, dispatchRaw] = useReducer(batchReducer, {});
+
+  // Wrap dispatch to update ref synchronously, fixing race condition where
+  // debounced callbacks read stale ref state before React re-renders
+  const dispatch = useCallback((action: Parameters<typeof batchReducer>[1]) => {
+    const prevRef = batchRunStatesRef.current;
+    dispatchRaw(action);
+    // Synchronously update ref with the new state so debounced callbacks see it
+    // This must happen after dispatch since the reducer computes the new state
+    // Note: We apply the reducer directly to compute what the new state will be
+    batchRunStatesRef.current = batchReducer(batchRunStatesRef.current, action);
+
+    // DEBUG: Log dispatch to trace state updates
+    if (action.type === 'START_BATCH' || action.type === 'UPDATE_PROGRESS' || action.type === 'SET_STOPPING' || action.type === 'COMPLETE_BATCH') {
+      const sessionId = action.sessionId;
+      console.log('[BatchProcessor:dispatch]', action.type, {
+        sessionId,
+        prevIsRunning: prevRef[sessionId]?.isRunning,
+        newIsRunning: batchRunStatesRef.current[sessionId]?.isRunning,
+        prevIsStopping: prevRef[sessionId]?.isStopping,
+        newIsStopping: batchRunStatesRef.current[sessionId]?.isStopping,
+        prevCompleted: prevRef[sessionId]?.completedTasksAcrossAllDocs,
+        newCompleted: batchRunStatesRef.current[sessionId]?.completedTasksAcrossAllDocs,
+      });
+    }
+  }, []);
 
   // Custom prompts per session
   const [customPrompts, setCustomPrompts] = useState<Record<string, string>>({});
@@ -204,12 +229,16 @@ export function useBatchProcessor({
   const errorResolutionRefs = useRef<Record<string, ErrorResolutionEntry>>({});
 
   // Track whether the component is still mounted to prevent state updates after unmount
-  const isMountedRef = useRef(true);
+  const isMountedRef = useRef(false);
 
-  // Cleanup effect: reject all error resolution promises and clear refs on unmount
+  // Mount/unmount effect: set isMountedRef on mount, clear on unmount
+  // This handles React 18 StrictMode double-render and ensures ref is always correct
   useEffect(() => {
+    isMountedRef.current = true;
+    console.log('[BatchProcessor] Mounted, isMountedRef set to true');
     return () => {
       isMountedRef.current = false;
+      console.log('[BatchProcessor] Unmounting, isMountedRef set to false');
 
       // Reject all pending error resolution promises with 'abort' to unblock any waiting async code
       // This prevents memory leaks from promises that would never resolve
@@ -245,47 +274,59 @@ export function useBatchProcessor({
   }, []);
 
   // Use extracted debounce hook for batch state updates (replaces manual debounce logic)
-  const { scheduleUpdate: scheduleDebouncedUpdate } = useSessionDebounce<Record<string, BatchRunState>>({
+  const { scheduleUpdate: scheduleDebouncedUpdate, flushUpdate: flushDebouncedUpdate } = useSessionDebounce<Record<string, BatchRunState>>({
     delayMs: BATCH_STATE_DEBOUNCE_MS,
     onUpdate: useCallback((sessionId: string, updater: (prev: Record<string, BatchRunState>) => Record<string, BatchRunState>) => {
       // Apply the updater and get the new state for broadcasting
       // Note: We use a ref to capture the new state since dispatch doesn't return it
       let newStateForSession: BatchRunState | null = null;
 
-      // For reducer, we need to convert the updater to an action
-      // Since the updater pattern doesn't map directly to actions, we wrap it
-      // by reading current state and computing the new state
-      const currentState = batchRunStatesRef.current;
-      const newState = updater(currentState);
-      newStateForSession = newState[sessionId] || null;
+      try {
+        // For reducer, we need to convert the updater to an action
+        // Since the updater pattern doesn't map directly to actions, we wrap it
+        // by reading current state and computing the new state
+        const currentState = batchRunStatesRef.current;
+        const newState = updater(currentState);
+        newStateForSession = newState[sessionId] || null;
 
-      // Dispatch UPDATE_PROGRESS with the computed changes
-      // For complex state changes, we extract the session's new state and dispatch appropriately
-      if (newStateForSession) {
-        const prevSessionState = currentState[sessionId] || DEFAULT_BATCH_STATE;
-
-        // Dispatch UPDATE_PROGRESS with any changed fields
-        dispatch({
-          type: 'UPDATE_PROGRESS',
+        // DEBUG: Log to trace progress updates
+        console.log('[BatchProcessor:onUpdate] Debounce fired:', {
           sessionId,
-          payload: {
-            currentDocumentIndex: newStateForSession.currentDocumentIndex !== prevSessionState.currentDocumentIndex ? newStateForSession.currentDocumentIndex : undefined,
-            currentDocTasksTotal: newStateForSession.currentDocTasksTotal !== prevSessionState.currentDocTasksTotal ? newStateForSession.currentDocTasksTotal : undefined,
-            currentDocTasksCompleted: newStateForSession.currentDocTasksCompleted !== prevSessionState.currentDocTasksCompleted ? newStateForSession.currentDocTasksCompleted : undefined,
-            totalTasksAcrossAllDocs: newStateForSession.totalTasksAcrossAllDocs !== prevSessionState.totalTasksAcrossAllDocs ? newStateForSession.totalTasksAcrossAllDocs : undefined,
-            completedTasksAcrossAllDocs: newStateForSession.completedTasksAcrossAllDocs !== prevSessionState.completedTasksAcrossAllDocs ? newStateForSession.completedTasksAcrossAllDocs : undefined,
-            totalTasks: newStateForSession.totalTasks !== prevSessionState.totalTasks ? newStateForSession.totalTasks : undefined,
-            completedTasks: newStateForSession.completedTasks !== prevSessionState.completedTasks ? newStateForSession.completedTasks : undefined,
-            currentTaskIndex: newStateForSession.currentTaskIndex !== prevSessionState.currentTaskIndex ? newStateForSession.currentTaskIndex : undefined,
-            sessionIds: newStateForSession.sessionIds !== prevSessionState.sessionIds ? newStateForSession.sessionIds : undefined,
-            accumulatedElapsedMs: newStateForSession.accumulatedElapsedMs !== prevSessionState.accumulatedElapsedMs ? newStateForSession.accumulatedElapsedMs : undefined,
-            lastActiveTimestamp: newStateForSession.lastActiveTimestamp !== prevSessionState.lastActiveTimestamp ? newStateForSession.lastActiveTimestamp : undefined,
-            loopIteration: newStateForSession.loopIteration !== prevSessionState.loopIteration ? newStateForSession.loopIteration : undefined,
-          }
+          refHasSession: !!currentState[sessionId],
+          refCompletedTasks: currentState[sessionId]?.completedTasksAcrossAllDocs,
+          newCompletedTasks: newStateForSession?.completedTasksAcrossAllDocs,
         });
-      }
 
-      broadcastAutoRunState(sessionId, newStateForSession);
+        // Dispatch UPDATE_PROGRESS with the computed changes
+        // For complex state changes, we extract the session's new state and dispatch appropriately
+        if (newStateForSession) {
+          const prevSessionState = currentState[sessionId] || DEFAULT_BATCH_STATE;
+
+          // Dispatch UPDATE_PROGRESS with any changed fields
+          dispatch({
+            type: 'UPDATE_PROGRESS',
+            sessionId,
+            payload: {
+              currentDocumentIndex: newStateForSession.currentDocumentIndex !== prevSessionState.currentDocumentIndex ? newStateForSession.currentDocumentIndex : undefined,
+              currentDocTasksTotal: newStateForSession.currentDocTasksTotal !== prevSessionState.currentDocTasksTotal ? newStateForSession.currentDocTasksTotal : undefined,
+              currentDocTasksCompleted: newStateForSession.currentDocTasksCompleted !== prevSessionState.currentDocTasksCompleted ? newStateForSession.currentDocTasksCompleted : undefined,
+              totalTasksAcrossAllDocs: newStateForSession.totalTasksAcrossAllDocs !== prevSessionState.totalTasksAcrossAllDocs ? newStateForSession.totalTasksAcrossAllDocs : undefined,
+              completedTasksAcrossAllDocs: newStateForSession.completedTasksAcrossAllDocs !== prevSessionState.completedTasksAcrossAllDocs ? newStateForSession.completedTasksAcrossAllDocs : undefined,
+              totalTasks: newStateForSession.totalTasks !== prevSessionState.totalTasks ? newStateForSession.totalTasks : undefined,
+              completedTasks: newStateForSession.completedTasks !== prevSessionState.completedTasks ? newStateForSession.completedTasks : undefined,
+              currentTaskIndex: newStateForSession.currentTaskIndex !== prevSessionState.currentTaskIndex ? newStateForSession.currentTaskIndex : undefined,
+              sessionIds: newStateForSession.sessionIds !== prevSessionState.sessionIds ? newStateForSession.sessionIds : undefined,
+              accumulatedElapsedMs: newStateForSession.accumulatedElapsedMs !== prevSessionState.accumulatedElapsedMs ? newStateForSession.accumulatedElapsedMs : undefined,
+              lastActiveTimestamp: newStateForSession.lastActiveTimestamp !== prevSessionState.lastActiveTimestamp ? newStateForSession.lastActiveTimestamp : undefined,
+              loopIteration: newStateForSession.loopIteration !== prevSessionState.loopIteration ? newStateForSession.loopIteration : undefined,
+            }
+          });
+        }
+
+        broadcastAutoRunState(sessionId, newStateForSession);
+      } catch (error) {
+        console.error('[BatchProcessor:onUpdate] ERROR in debounce callback:', error);
+      }
     }, [broadcastAutoRunState])
   });
 
@@ -316,6 +357,9 @@ export function useBatchProcessor({
   const documentProcessor = useDocumentProcessor();
 
   // Helper to get batch state for a session
+  // Note: This reads from React state (not the ref) because consumers need React
+  // to trigger re-renders when state changes. The ref is used internally for
+  // synchronous access in debounced callbacks.
   const getBatchState = useCallback((sessionId: string): BatchRunState => {
     return batchRunStates[sessionId] || DEFAULT_BATCH_STATE;
   }, [batchRunStates]);
@@ -360,8 +404,43 @@ export function useBatchProcessor({
     updater: (prev: Record<string, BatchRunState>) => Record<string, BatchRunState>,
     immediate: boolean = false
   ) => {
-    scheduleDebouncedUpdate(sessionId, updater, immediate);
-  }, [scheduleDebouncedUpdate]);
+    // DEBUG: Bypass debouncing entirely to test if that's the issue
+    // Apply update directly without debouncing
+    const currentState = batchRunStatesRef.current;
+    const newState = updater(currentState);
+    const newStateForSession = newState[sessionId] || null;
+
+    console.log('[BatchProcessor:updateBatchStateAndBroadcast] DIRECT update (no debounce)', {
+      sessionId,
+      prevCompleted: currentState[sessionId]?.completedTasksAcrossAllDocs,
+      newCompleted: newStateForSession?.completedTasksAcrossAllDocs,
+    });
+
+    if (newStateForSession) {
+      const prevSessionState = currentState[sessionId] || DEFAULT_BATCH_STATE;
+
+      dispatch({
+        type: 'UPDATE_PROGRESS',
+        sessionId,
+        payload: {
+          currentDocumentIndex: newStateForSession.currentDocumentIndex !== prevSessionState.currentDocumentIndex ? newStateForSession.currentDocumentIndex : undefined,
+          currentDocTasksTotal: newStateForSession.currentDocTasksTotal !== prevSessionState.currentDocTasksTotal ? newStateForSession.currentDocTasksTotal : undefined,
+          currentDocTasksCompleted: newStateForSession.currentDocTasksCompleted !== prevSessionState.currentDocTasksCompleted ? newStateForSession.currentDocTasksCompleted : undefined,
+          totalTasksAcrossAllDocs: newStateForSession.totalTasksAcrossAllDocs !== prevSessionState.totalTasksAcrossAllDocs ? newStateForSession.totalTasksAcrossAllDocs : undefined,
+          completedTasksAcrossAllDocs: newStateForSession.completedTasksAcrossAllDocs !== prevSessionState.completedTasksAcrossAllDocs ? newStateForSession.completedTasksAcrossAllDocs : undefined,
+          totalTasks: newStateForSession.totalTasks !== prevSessionState.totalTasks ? newStateForSession.totalTasks : undefined,
+          completedTasks: newStateForSession.completedTasks !== prevSessionState.completedTasks ? newStateForSession.completedTasks : undefined,
+          currentTaskIndex: newStateForSession.currentTaskIndex !== prevSessionState.currentTaskIndex ? newStateForSession.currentTaskIndex : undefined,
+          sessionIds: newStateForSession.sessionIds !== prevSessionState.sessionIds ? newStateForSession.sessionIds : undefined,
+          accumulatedElapsedMs: newStateForSession.accumulatedElapsedMs !== prevSessionState.accumulatedElapsedMs ? newStateForSession.accumulatedElapsedMs : undefined,
+          lastActiveTimestamp: newStateForSession.lastActiveTimestamp !== prevSessionState.lastActiveTimestamp ? newStateForSession.lastActiveTimestamp : undefined,
+          loopIteration: newStateForSession.loopIteration !== prevSessionState.loopIteration ? newStateForSession.loopIteration : undefined,
+        }
+      });
+    }
+
+    broadcastAutoRunState(sessionId, newStateForSession);
+  }, [broadcastAutoRunState]);
 
   // Update ref to always have latest updateBatchStateAndBroadcast (fixes HMR stale closure)
   updateBatchStateAndBroadcastRef.current = updateBatchStateAndBroadcast;
@@ -432,7 +511,7 @@ export function useBatchProcessor({
     // Calculate initial total tasks across all documents
     let initialTotalTasks = 0;
     for (const doc of documents) {
-      const { taskCount } = await readDocAndCountTasks(folderPath, doc.filename);
+      const { taskCount } = await readDocAndCountTasks(folderPath, doc.filename, sshRemoteId);
       initialTotalTasks += taskCount;
     }
 
@@ -636,7 +715,7 @@ export function useBatchProcessor({
         const docEntry = documents[docIndex];
 
         // Read document and count tasks
-        let { taskCount: remainingTasks, content: docContent, checkedCount: docCheckedCount } = await readDocAndCountTasks(folderPath, docEntry.filename);
+        let { taskCount: remainingTasks, content: docContent, checkedCount: docCheckedCount } = await readDocAndCountTasks(folderPath, docEntry.filename, sshRemoteId);
         let docTasksTotal = remainingTasks;
 
         // Handle documents with no unchecked tasks
@@ -646,7 +725,7 @@ export function useBatchProcessor({
             // Use docCheckedCount from readDocAndCountTasks instead of calling countCheckedTasks again
             if (docCheckedCount > 0) {
               const resetContent = uncheckAllTasks(docContent);
-              await window.maestro.autorun.writeDoc(folderPath, docEntry.filename + '.md', resetContent);
+              await window.maestro.autorun.writeDoc(folderPath, docEntry.filename + '.md', resetContent, sshRemoteId);
               // Update task count in state
               const resetTaskCount = countUnfinishedTasks(resetContent);
               updateBatchStateAndBroadcastRef.current!(sessionId, prev => ({
@@ -681,7 +760,7 @@ export function useBatchProcessor({
             effectiveFilename = workingCopyPath;
 
             // Re-read the working copy for task counting
-            const workingCopyResult = await readDocAndCountTasks(folderPath, effectiveFilename);
+            const workingCopyResult = await readDocAndCountTasks(folderPath, effectiveFilename, sshRemoteId);
             remainingTasks = workingCopyResult.taskCount;
             docContent = workingCopyResult.content;
             docCheckedCount = workingCopyResult.checkedCount;
@@ -754,6 +833,7 @@ export function useBatchProcessor({
                 loopIteration: loopIteration + 1, // 1-indexed
                 effectiveCwd,
                 customPrompt: prompt,
+                sshRemoteId,
               },
               effectiveFilename, // Use working copy path for reset-on-completion docs
               docCheckedCount,
@@ -845,6 +925,7 @@ export function useBatchProcessor({
               // This correctly accounts for both completed tasks and newly added tasks
               const nextTotalAcrossAllDocs = Math.max(0, prevState.totalTasksAcrossAllDocs + totalTasksChange);
               const nextTotalTasks = Math.max(0, prevState.totalTasks + totalTasksChange);
+
               return {
                 ...prev,
                 [sessionId]: {
@@ -992,7 +1073,7 @@ export function useBatchProcessor({
           // For loop mode, re-count tasks in the original document for next iteration
           // (original is unchanged, so it still has all unchecked tasks)
           if (loopEnabled) {
-            const { taskCount: resetTaskCount } = await readDocAndCountTasks(folderPath, docEntry.filename);
+            const { taskCount: resetTaskCount } = await readDocAndCountTasks(folderPath, docEntry.filename, sshRemoteId);
             updateBatchStateAndBroadcastRef.current!(sessionId, prev => ({
               ...prev,
               [sessionId]: {
@@ -1060,7 +1141,7 @@ export function useBatchProcessor({
         for (const doc of documents) {
           if (doc.resetOnCompletion) continue;
 
-          const { taskCount } = await readDocAndCountTasks(folderPath, doc.filename);
+          const { taskCount } = await readDocAndCountTasks(folderPath, doc.filename, sshRemoteId);
           if (taskCount > 0) {
             anyNonResetDocsHaveTasks = true;
             break;
@@ -1077,7 +1158,7 @@ export function useBatchProcessor({
       // Re-scan all documents to get fresh task counts for next loop (tasks may have been added/removed)
       let newTotalTasks = 0;
       for (const doc of documents) {
-        const { taskCount } = await readDocAndCountTasks(folderPath, doc.filename);
+        const { taskCount } = await readDocAndCountTasks(folderPath, doc.filename, sshRemoteId);
         newTotalTasks += taskCount;
       }
 
@@ -1297,38 +1378,41 @@ export function useBatchProcessor({
       }
     }
 
-    // Guard against state updates after unmount (async code may still be running)
-    if (isMountedRef.current) {
-      // Reset state for this session using COMPLETE_BATCH action
-      // (not updateBatchStateAndBroadcast which only supports UPDATE_PROGRESS)
-      dispatch({
-        type: 'COMPLETE_BATCH',
+    // Critical: Always flush debounced updates and dispatch COMPLETE_BATCH to clean up state.
+    // These operations are safe regardless of mount state - React handles reducer dispatches gracefully,
+    // and broadcasts are external calls that don't affect React state.
+    console.log('[BatchProcessor:startBatchRun] Flushing debounced updates before COMPLETE_BATCH');
+    flushDebouncedUpdate(sessionId);
+
+    // Reset state for this session using COMPLETE_BATCH action
+    // (not updateBatchStateAndBroadcast which only supports UPDATE_PROGRESS)
+    dispatch({
+      type: 'COMPLETE_BATCH',
+      sessionId,
+      finalSessionIds: agentSessionIds
+    });
+    // Broadcast state change to web clients
+    broadcastAutoRunState(sessionId, null);
+
+    // Call completion callback if provided (only if still mounted to avoid warnings)
+    if (isMountedRef.current && onComplete) {
+      onComplete({
         sessionId,
-        finalSessionIds: agentSessionIds
+        sessionName: session.name || session.cwd.split('/').pop() || 'Unknown',
+        completedTasks: totalCompletedTasks,
+        totalTasks: initialTotalTasks,
+        wasStopped,
+        elapsedTimeMs: totalElapsedMs
       });
-      // Broadcast state change
-      broadcastAutoRunState(sessionId, null);
+    }
 
-      // Call completion callback if provided
-      if (onComplete) {
-        onComplete({
-          sessionId,
-          sessionName: session.name || session.cwd.split('/').pop() || 'Unknown',
-          completedTasks: totalCompletedTasks,
-          totalTasks: initialTotalTasks,
-          wasStopped,
-          elapsedTimeMs: totalElapsedMs
-        });
-      }
-
-      // Process any queued items that were waiting during batch run
-      // This ensures pending user messages are processed after Auto Run ends
-      if (onProcessQueueAfterCompletion) {
-        // Use setTimeout to let state updates settle before processing queue
-        setTimeout(() => {
-          onProcessQueueAfterCompletion(sessionId);
-        }, 0);
-      }
+    // Process any queued items that were waiting during batch run
+    // This ensures pending user messages are processed after Auto Run ends
+    if (isMountedRef.current && onProcessQueueAfterCompletion) {
+      // Use setTimeout to let state updates settle before processing queue
+      setTimeout(() => {
+        onProcessQueueAfterCompletion(sessionId);
+      }, 0);
     }
 
     // Clean up time tracking, error resolution, and stop request flag
@@ -1342,14 +1426,16 @@ export function useBatchProcessor({
     // Allow system to sleep now that Auto Run is complete
     window.maestro.power.removeReason(`autorun:${sessionId}`);
   // Note: updateBatchStateAndBroadcast is accessed via ref to avoid stale closure in long-running async
-  }, [onUpdateSession, onSpawnAgent, onAddHistoryEntry, onComplete, onPRResult, audioFeedbackEnabled, audioFeedbackCommand, timeTracking, onProcessQueueAfterCompletion]);
+  // flushDebouncedUpdate is stable (empty deps in useSessionDebounce) so adding it doesn't cause re-renders
+  }, [onUpdateSession, onSpawnAgent, onAddHistoryEntry, onComplete, onPRResult, audioFeedbackEnabled, audioFeedbackCommand, timeTracking, onProcessQueueAfterCompletion, flushDebouncedUpdate]);
 
   /**
    * Request to stop the batch run for a specific session after current task completes
+   * Note: No isMountedRef check here - stop requests should always be honored.
+   * All operations are safe: ref updates, reducer dispatch (React handles gracefully), and broadcasts.
    */
   const stopBatchRun = useCallback((sessionId: string) => {
-    if (!isMountedRef.current) return;
-
+    console.log('[BatchProcessor:stopBatchRun] Called with sessionId:', sessionId);
     stopRequestedRefs.current[sessionId] = true;
     const errorResolution = errorResolutionRefs.current[sessionId];
     if (errorResolution) {

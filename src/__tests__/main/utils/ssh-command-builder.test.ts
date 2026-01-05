@@ -15,6 +15,11 @@ vi.mock('os', async () => {
   };
 });
 
+// Mock resolveSshPath to return predictable 'ssh' path
+vi.mock('../../../main/utils/cliDetection', () => ({
+  resolveSshPath: vi.fn().mockResolvedValue('ssh'),
+}));
+
 describe('ssh-command-builder', () => {
   beforeEach(() => {
     // Reset mock to ensure consistent behavior
@@ -40,7 +45,7 @@ describe('ssh-command-builder', () => {
     // Note: The command itself is NOT escaped - it comes from agent config (trusted).
     // Only arguments, cwd, and env values are escaped as they may contain user input.
 
-    it('builds a simple command without cwd or env', () => {
+    it('builds a simple command without cwd or env', async () => {
       const result = buildRemoteCommand({
         command: 'claude',
         args: ['--print', '--verbose'],
@@ -49,7 +54,7 @@ describe('ssh-command-builder', () => {
       expect(result).toBe("claude '--print' '--verbose'");
     });
 
-    it('builds a command with cwd', () => {
+    it('builds a command with cwd', async () => {
       const result = buildRemoteCommand({
         command: 'claude',
         args: ['--print'],
@@ -58,7 +63,7 @@ describe('ssh-command-builder', () => {
       expect(result).toBe("cd '/home/user/project' && claude '--print'");
     });
 
-    it('builds a command with environment variables', () => {
+    it('builds a command with environment variables', async () => {
       const result = buildRemoteCommand({
         command: 'claude',
         args: ['--print'],
@@ -67,7 +72,7 @@ describe('ssh-command-builder', () => {
       expect(result).toBe("ANTHROPIC_API_KEY='sk-test-key' claude '--print'");
     });
 
-    it('builds a command with cwd and env', () => {
+    it('builds a command with cwd and env', async () => {
       const result = buildRemoteCommand({
         command: 'claude',
         args: ['--print', 'hello'],
@@ -82,7 +87,7 @@ describe('ssh-command-builder', () => {
       );
     });
 
-    it('escapes special characters in cwd', () => {
+    it('escapes special characters in cwd', async () => {
       const result = buildRemoteCommand({
         command: 'claude',
         args: [],
@@ -91,7 +96,7 @@ describe('ssh-command-builder', () => {
       expect(result).toBe("cd '/home/user/project'\\''s name' && claude");
     });
 
-    it('escapes special characters in env values', () => {
+    it('escapes special characters in env values', async () => {
       const result = buildRemoteCommand({
         command: 'claude',
         args: [],
@@ -100,7 +105,7 @@ describe('ssh-command-builder', () => {
       expect(result).toBe("API_KEY='key'\\''with'\\''quotes' claude");
     });
 
-    it('escapes special characters in arguments', () => {
+    it('escapes special characters in arguments', async () => {
       const result = buildRemoteCommand({
         command: 'echo',
         args: ['hello; rm -rf /', '$(whoami)'],
@@ -109,7 +114,7 @@ describe('ssh-command-builder', () => {
       expect(result).toBe("echo 'hello; rm -rf /' '$(whoami)'");
     });
 
-    it('handles empty arguments array', () => {
+    it('handles empty arguments array', async () => {
       const result = buildRemoteCommand({
         command: 'ls',
         args: [],
@@ -117,7 +122,7 @@ describe('ssh-command-builder', () => {
       expect(result).toBe('ls');
     });
 
-    it('ignores invalid environment variable names', () => {
+    it('ignores invalid environment variable names', async () => {
       const result = buildRemoteCommand({
         command: 'claude',
         args: [],
@@ -132,7 +137,7 @@ describe('ssh-command-builder', () => {
       expect(result).toBe("VALID_VAR='value1' _ALSO_VALID='value4' claude");
     });
 
-    it('handles empty env object', () => {
+    it('handles empty env object', async () => {
       const result = buildRemoteCommand({
         command: 'claude',
         args: [],
@@ -141,7 +146,7 @@ describe('ssh-command-builder', () => {
       expect(result).toBe('claude');
     });
 
-    it('handles undefined env', () => {
+    it('handles undefined env', async () => {
       const result = buildRemoteCommand({
         command: 'claude',
         args: [],
@@ -152,8 +157,8 @@ describe('ssh-command-builder', () => {
   });
 
   describe('buildSshCommand', () => {
-    it('builds basic SSH command', () => {
-      const result = buildSshCommand(baseConfig, {
+    it('builds basic SSH command', async () => {
+      const result = await buildSshCommand(baseConfig, {
         command: 'claude',
         args: ['--print'],
       });
@@ -187,8 +192,8 @@ describe('ssh-command-builder', () => {
        * - WORKS:  ssh -tt user@host 'zsh -lc "claude --print -- hi"'
        */
 
-      it('uses -tt flag for forced TTY allocation (first argument)', () => {
-        const result = buildSshCommand(baseConfig, {
+      it('uses -tt flag for forced TTY allocation (first argument)', async () => {
+        const result = await buildSshCommand(baseConfig, {
           command: 'claude',
           args: ['--print', '--verbose'],
         });
@@ -197,8 +202,8 @@ describe('ssh-command-builder', () => {
         expect(result.args[0]).toBe('-tt');
       });
 
-      it('includes RequestTTY=force in SSH options', () => {
-        const result = buildSshCommand(baseConfig, {
+      it('includes RequestTTY=force in SSH options', async () => {
+        const result = await buildSshCommand(baseConfig, {
           command: 'claude',
           args: ['--print'],
         });
@@ -211,8 +216,8 @@ describe('ssh-command-builder', () => {
         expect(result.args[requestTtyIndex]).toBe('RequestTTY=force');
       });
 
-      it('never uses -T (disable TTY) which breaks Claude Code', () => {
-        const result = buildSshCommand(baseConfig, {
+      it('never uses -T (disable TTY) which breaks Claude Code', async () => {
+        const result = await buildSshCommand(baseConfig, {
           command: 'claude',
           args: ['--print'],
         });
@@ -221,8 +226,8 @@ describe('ssh-command-builder', () => {
         expect(result.args).not.toContain('-T');
       });
 
-      it('never uses RequestTTY=no which breaks Claude Code', () => {
-        const result = buildSshCommand(baseConfig, {
+      it('never uses RequestTTY=no which breaks Claude Code', async () => {
+        const result = await buildSshCommand(baseConfig, {
           command: 'claude',
           args: ['--print'],
         });
@@ -235,8 +240,8 @@ describe('ssh-command-builder', () => {
       });
     });
 
-    it('includes default SSH options', () => {
-      const result = buildSshCommand(baseConfig, {
+    it('includes default SSH options', async () => {
+      const result = await buildSshCommand(baseConfig, {
         command: 'claude',
         args: [],
       });
@@ -247,8 +252,8 @@ describe('ssh-command-builder', () => {
       expect(result.args).toContain('ConnectTimeout=10');
     });
 
-    it('expands tilde in privateKeyPath', () => {
-      const result = buildSshCommand(baseConfig, {
+    it('expands tilde in privateKeyPath', async () => {
+      const result = await buildSshCommand(baseConfig, {
         command: 'claude',
         args: [],
       });
@@ -257,9 +262,9 @@ describe('ssh-command-builder', () => {
       expect(result.args).not.toContain('~/.ssh/id_ed25519');
     });
 
-    it('uses non-standard port', () => {
+    it('uses non-standard port', async () => {
       const config = { ...baseConfig, port: 2222 };
-      const result = buildSshCommand(config, {
+      const result = await buildSshCommand(config, {
         command: 'claude',
         args: [],
       });
@@ -268,9 +273,9 @@ describe('ssh-command-builder', () => {
       expect(result.args[portIndex + 1]).toBe('2222');
     });
 
-    it('uses remoteWorkingDir from config when no cwd in options', () => {
+    it('uses remoteWorkingDir from config when no cwd in options', async () => {
       const config = { ...baseConfig, remoteWorkingDir: '/opt/projects' };
-      const result = buildSshCommand(config, {
+      const result = await buildSshCommand(config, {
         command: 'claude',
         args: ['--print'],
       });
@@ -280,9 +285,9 @@ describe('ssh-command-builder', () => {
       expect(remoteCommand).toContain("cd '/opt/projects'");
     });
 
-    it('prefers option cwd over config remoteWorkingDir', () => {
+    it('prefers option cwd over config remoteWorkingDir', async () => {
       const config = { ...baseConfig, remoteWorkingDir: '/opt/projects' };
-      const result = buildSshCommand(config, {
+      const result = await buildSshCommand(config, {
         command: 'claude',
         args: [],
         cwd: '/home/user/specific-project',
@@ -293,12 +298,12 @@ describe('ssh-command-builder', () => {
       expect(remoteCommand).not.toContain('/opt/projects');
     });
 
-    it('merges remote config env with option env', () => {
+    it('merges remote config env with option env', async () => {
       const config = {
         ...baseConfig,
         remoteEnv: { CONFIG_VAR: 'from-config', SHARED_VAR: 'config-value' },
       };
-      const result = buildSshCommand(config, {
+      const result = await buildSshCommand(config, {
         command: 'claude',
         args: [],
         env: { OPTION_VAR: 'from-option', SHARED_VAR: 'option-value' },
@@ -313,8 +318,8 @@ describe('ssh-command-builder', () => {
       expect(remoteCommand).not.toContain("SHARED_VAR='config-value'");
     });
 
-    it('handles config without remoteEnv or remoteWorkingDir', () => {
-      const result = buildSshCommand(baseConfig, {
+    it('handles config without remoteEnv or remoteWorkingDir', async () => {
+      const result = await buildSshCommand(baseConfig, {
         command: 'claude',
         args: ['--print', 'hello'],
       });
@@ -325,8 +330,8 @@ describe('ssh-command-builder', () => {
       expect(wrappedCommand).not.toContain('cd');
     });
 
-    it('includes the remote command as the last argument', () => {
-      const result = buildSshCommand(baseConfig, {
+    it('includes the remote command as the last argument', async () => {
+      const result = await buildSshCommand(baseConfig, {
         command: 'claude',
         args: ['--print', 'hello world'],
       });
@@ -337,8 +342,8 @@ describe('ssh-command-builder', () => {
       expect(lastArg).toContain('hello world');
     });
 
-    it('properly formats the SSH command for spawning', () => {
-      const result = buildSshCommand(baseConfig, {
+    it('properly formats the SSH command for spawning', async () => {
+      const result = await buildSshCommand(baseConfig, {
         command: 'claude',
         args: ['--print'],
         cwd: '/home/user/project',
@@ -361,9 +366,9 @@ describe('ssh-command-builder', () => {
       expect(oIndices.every(i => i < pIndex)).toBe(true);
     });
 
-    it('handles absolute privateKeyPath (no tilde)', () => {
+    it('handles absolute privateKeyPath (no tilde)', async () => {
       const config = { ...baseConfig, privateKeyPath: '/home/user/.ssh/key' };
-      const result = buildSshCommand(config, {
+      const result = await buildSshCommand(config, {
         command: 'claude',
         args: [],
       });
@@ -371,8 +376,8 @@ describe('ssh-command-builder', () => {
       expect(result.args).toContain('/home/user/.ssh/key');
     });
 
-    it('handles complex arguments with special characters', () => {
-      const result = buildSshCommand(baseConfig, {
+    it('handles complex arguments with special characters', async () => {
+      const result = await buildSshCommand(baseConfig, {
         command: 'git',
         args: ['commit', '-m', "fix: it's a bug with $VARIABLES"],
       });
@@ -395,7 +400,7 @@ describe('ssh-command-builder', () => {
     // agent configuration (system-controlled, not user input). This is
     // intentional - escaping it would break PATH resolution.
 
-    it('prevents command injection via args', () => {
+    it('prevents command injection via args', async () => {
       const result = buildRemoteCommand({
         command: 'echo',
         args: ['safe', '$(rm -rf /)', '`whoami`'],
@@ -404,7 +409,7 @@ describe('ssh-command-builder', () => {
       expect(result).toBe("echo 'safe' '$(rm -rf /)' '`whoami`'");
     });
 
-    it('prevents command injection via cwd', () => {
+    it('prevents command injection via cwd', async () => {
       const result = buildRemoteCommand({
         command: 'ls',
         args: [],
@@ -413,7 +418,7 @@ describe('ssh-command-builder', () => {
       expect(result).toBe("cd '/tmp; rm -rf /' && ls");
     });
 
-    it('prevents command injection via env values', () => {
+    it('prevents command injection via env values', async () => {
       const result = buildRemoteCommand({
         command: 'echo',
         args: [],
@@ -422,7 +427,7 @@ describe('ssh-command-builder', () => {
       expect(result).toBe("TRAP='$(rm -rf /)' echo");
     });
 
-    it('rejects env vars with invalid names', () => {
+    it('rejects env vars with invalid names', async () => {
       const result = buildRemoteCommand({
         command: 'echo',
         args: [],
@@ -440,7 +445,7 @@ describe('ssh-command-builder', () => {
       expect(result).not.toContain('in$valid');
     });
 
-    it('prevents shell variable expansion in args', () => {
+    it('prevents shell variable expansion in args', async () => {
       const result = buildRemoteCommand({
         command: 'echo',
         args: ['$HOME', '${PATH}', '$SHELL'],
@@ -449,7 +454,7 @@ describe('ssh-command-builder', () => {
       expect(result).toBe("echo '$HOME' '${PATH}' '$SHELL'");
     });
 
-    it('handles newlines in arguments safely', () => {
+    it('handles newlines in arguments safely', async () => {
       const result = buildRemoteCommand({
         command: 'echo',
         args: ['line1\nline2; rm -rf /'],
@@ -460,7 +465,7 @@ describe('ssh-command-builder', () => {
   });
 
   describe('useSshConfig mode', () => {
-    it('omits identity file when useSshConfig is true and no key provided', () => {
+    it('omits identity file when useSshConfig is true and no key provided', async () => {
       const config: SshRemoteConfig = {
         ...baseConfig,
         useSshConfig: true,
@@ -468,7 +473,7 @@ describe('ssh-command-builder', () => {
         username: '', // Empty - will be inherited from SSH config
       };
 
-      const result = buildSshCommand(config, {
+      const result = await buildSshCommand(config, {
         command: 'claude',
         args: ['--print'],
       });
@@ -480,7 +485,7 @@ describe('ssh-command-builder', () => {
       expect(result.args).not.toContain('testuser@dev.example.com');
     });
 
-    it('includes identity file when useSshConfig is true but key is provided as override', () => {
+    it('includes identity file when useSshConfig is true but key is provided as override', async () => {
       const config: SshRemoteConfig = {
         ...baseConfig,
         useSshConfig: true,
@@ -488,7 +493,7 @@ describe('ssh-command-builder', () => {
         username: '',
       };
 
-      const result = buildSshCommand(config, {
+      const result = await buildSshCommand(config, {
         command: 'claude',
         args: ['--print'],
       });
@@ -498,7 +503,7 @@ describe('ssh-command-builder', () => {
       expect(result.args).toContain('/Users/testuser/.ssh/custom_key');
     });
 
-    it('uses user@host when username is provided as override in SSH config mode', () => {
+    it('uses user@host when username is provided as override in SSH config mode', async () => {
       const config: SshRemoteConfig = {
         ...baseConfig,
         useSshConfig: true,
@@ -506,7 +511,7 @@ describe('ssh-command-builder', () => {
         username: 'override-user', // Explicit override
       };
 
-      const result = buildSshCommand(config, {
+      const result = await buildSshCommand(config, {
         command: 'claude',
         args: ['--print'],
       });
@@ -515,7 +520,7 @@ describe('ssh-command-builder', () => {
       expect(result.args).toContain('override-user@dev.example.com');
     });
 
-    it('omits port flag when using SSH config with default port', () => {
+    it('omits port flag when using SSH config with default port', async () => {
       const config: SshRemoteConfig = {
         ...baseConfig,
         useSshConfig: true,
@@ -524,7 +529,7 @@ describe('ssh-command-builder', () => {
         username: '',
       };
 
-      const result = buildSshCommand(config, {
+      const result = await buildSshCommand(config, {
         command: 'claude',
         args: ['--print'],
       });
@@ -533,7 +538,7 @@ describe('ssh-command-builder', () => {
       expect(result.args).not.toContain('-p');
     });
 
-    it('includes port flag when using SSH config with non-default port', () => {
+    it('includes port flag when using SSH config with non-default port', async () => {
       const config: SshRemoteConfig = {
         ...baseConfig,
         useSshConfig: true,
@@ -542,7 +547,7 @@ describe('ssh-command-builder', () => {
         username: '',
       };
 
-      const result = buildSshCommand(config, {
+      const result = await buildSshCommand(config, {
         command: 'claude',
         args: ['--print'],
       });
@@ -552,7 +557,7 @@ describe('ssh-command-builder', () => {
       expect(result.args).toContain('2222');
     });
 
-    it('includes standard SSH options in SSH config mode', () => {
+    it('includes standard SSH options in SSH config mode', async () => {
       const config: SshRemoteConfig = {
         ...baseConfig,
         useSshConfig: true,
@@ -560,7 +565,7 @@ describe('ssh-command-builder', () => {
         username: '',
       };
 
-      const result = buildSshCommand(config, {
+      const result = await buildSshCommand(config, {
         command: 'claude',
         args: ['--print'],
       });
@@ -572,7 +577,7 @@ describe('ssh-command-builder', () => {
       expect(result.args).toContain('ConnectTimeout=10');
     });
 
-    it('supports SSH config host pattern as the host value', () => {
+    it('supports SSH config host pattern as the host value', async () => {
       const config: SshRemoteConfig = {
         id: 'test-remote',
         name: 'Dev Server',
@@ -585,7 +590,7 @@ describe('ssh-command-builder', () => {
         sshConfigHost: 'dev-server',
       };
 
-      const result = buildSshCommand(config, {
+      const result = await buildSshCommand(config, {
         command: 'claude',
         args: ['--print'],
       });
@@ -599,10 +604,10 @@ describe('ssh-command-builder', () => {
   });
 
   describe('prompt handling', () => {
-    it('includes prompt in args with -- separator', () => {
+    it('includes prompt in args with -- separator', async () => {
       // This tests that when a prompt is passed in the args (as process.ts does),
       // it gets properly escaped and included in the SSH command
-      const result = buildSshCommand(baseConfig, {
+      const result = await buildSshCommand(baseConfig, {
         command: 'claude',
         args: ['--print', '--verbose', '--', 'project status?'],
       });
@@ -615,8 +620,8 @@ describe('ssh-command-builder', () => {
       expect(remoteCommand).toContain('project status?');
     });
 
-    it('includes prompt without -- separator for agents that dont support it', () => {
-      const result = buildSshCommand(baseConfig, {
+    it('includes prompt without -- separator for agents that dont support it', async () => {
+      const result = await buildSshCommand(baseConfig, {
         command: 'opencode',
         args: ['--print', 'project status?'],
       });
@@ -628,8 +633,8 @@ describe('ssh-command-builder', () => {
       // Should not have standalone '--' before the prompt
     });
 
-    it('properly escapes prompts with special characters', () => {
-      const result = buildSshCommand(baseConfig, {
+    it('properly escapes prompts with special characters', async () => {
+      const result = await buildSshCommand(baseConfig, {
         command: 'claude',
         args: ['--print', '--', "what's the $PATH variable?"],
       });
@@ -639,8 +644,8 @@ describe('ssh-command-builder', () => {
       expect(remoteCommand).toContain('\\$PATH');
     });
 
-    it('handles multi-line prompts', () => {
-      const result = buildSshCommand(baseConfig, {
+    it('handles multi-line prompts', async () => {
+      const result = await buildSshCommand(baseConfig, {
         command: 'claude',
         args: ['--print', '--', 'line1\nline2\nline3'],
       });

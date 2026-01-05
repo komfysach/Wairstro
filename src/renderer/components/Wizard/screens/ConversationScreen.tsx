@@ -16,6 +16,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { Brain } from 'lucide-react';
 import type { Theme } from '../../../types';
 import { useWizard, type WizardMessage } from '../WizardContext';
 import {
@@ -36,6 +37,10 @@ import { ScreenReaderAnnouncement } from '../ScreenReaderAnnouncement';
 
 interface ConversationScreenProps {
   theme: Theme;
+  /** Whether to show AI thinking content instead of filler phrases */
+  showThinking: boolean;
+  /** Callback to toggle thinking display (controlled by parent for global shortcut) */
+  setShowThinking: (value: boolean | ((prev: boolean) => boolean)) => void;
 }
 
 /**
@@ -106,7 +111,7 @@ function ConfidenceMeter({
           className="text-xs mt-1 text-center"
           style={{ color: theme.colors.success }}
         >
-          Ready to create your action plan!
+          Ready to create your Playbook!
         </p>
       )}
     </div>
@@ -353,9 +358,137 @@ function TypingIndicator({
 }
 
 /**
+ * Extract a descriptive detail string from tool input
+ * Looks for common properties like command, pattern, file_path, query
+ */
+function getToolDetail(input: unknown): string | null {
+  if (!input || typeof input !== 'object') return null;
+  const inputObj = input as Record<string, unknown>;
+  // Check common tool input properties in order of preference
+  const detail =
+    (inputObj.command as string) ||
+    (inputObj.pattern as string) ||
+    (inputObj.file_path as string) ||
+    (inputObj.query as string) ||
+    (inputObj.path as string) ||
+    null;
+  return detail;
+}
+
+/**
+ * ToolExecutionEntry - Individual tool execution item in thinking display
+ */
+function ToolExecutionEntry({
+  tool,
+  theme,
+}: {
+  tool: { toolName: string; state?: unknown; timestamp: number };
+  theme: Theme;
+}): JSX.Element {
+  const state = tool.state as { status?: string; input?: unknown } | undefined;
+  const status = state?.status || 'running';
+  const toolDetail = getToolDetail(state?.input);
+
+  return (
+    <div
+      className="flex items-start gap-2 py-1 text-xs font-mono"
+      style={{ color: theme.colors.textDim }}
+    >
+      <span
+        className="px-1.5 py-0.5 rounded text-[10px] shrink-0"
+        style={{
+          backgroundColor: status === 'complete' ? `${theme.colors.success}30` : `${theme.colors.accent}30`,
+          color: status === 'complete' ? theme.colors.success : theme.colors.accent,
+        }}
+      >
+        {tool.toolName}
+      </span>
+      {status === 'complete' ? (
+        <span className="shrink-0 pt-0.5" style={{ color: theme.colors.success }}>✓</span>
+      ) : (
+        <span className="animate-pulse shrink-0 pt-0.5" style={{ color: theme.colors.warning }}>●</span>
+      )}
+      {toolDetail && (
+        <span
+          className="opacity-70 break-all whitespace-pre-wrap"
+          style={{ color: theme.colors.textMain }}
+        >
+          {toolDetail}
+        </span>
+      )}
+    </div>
+  );
+}
+
+/**
+ * ThinkingDisplay - Shows AI thinking content when showThinking is enabled.
+ * Displays raw thinking content and tool executions similar to the normal AI terminal.
+ */
+function ThinkingDisplay({
+  theme,
+  agentName,
+  thinkingContent,
+  toolExecutions,
+}: {
+  theme: Theme;
+  agentName: string;
+  thinkingContent: string;
+  toolExecutions: Array<{ toolName: string; state?: unknown; timestamp: number }>;
+}): JSX.Element {
+  return (
+    <div className="flex justify-start mb-4" data-testid="wizard-thinking-display">
+      <div
+        className="max-w-[80%] rounded-lg rounded-bl-none px-4 py-3 border-l-2"
+        style={{
+          backgroundColor: theme.colors.bgActivity,
+          borderColor: theme.colors.accent,
+        }}
+      >
+        <div className="flex items-center gap-2 mb-2">
+          <span
+            className="text-xs font-medium"
+            style={{ color: theme.colors.accent }}
+          >
+            {formatAgentName(agentName)}
+          </span>
+          <span
+            className="text-[10px] px-1.5 py-0.5 rounded"
+            style={{
+              backgroundColor: `${theme.colors.accent}30`,
+              color: theme.colors.accent,
+            }}
+          >
+            thinking
+          </span>
+        </div>
+
+        {/* Tool executions - show what agent is doing */}
+        {toolExecutions.length > 0 && (
+          <div className="mb-2 border-b pb-2" style={{ borderColor: `${theme.colors.border}60` }}>
+            {toolExecutions.map((tool, idx) => (
+              <ToolExecutionEntry key={`${tool.toolName}-${tool.timestamp}-${idx}`} tool={tool} theme={theme} />
+            ))}
+          </div>
+        )}
+
+        {/* Thinking content or fallback */}
+        <div
+          className="text-sm whitespace-pre-wrap font-mono"
+          style={{ color: theme.colors.textDim, opacity: 0.85 }}
+          data-testid="thinking-display-content"
+        >
+          {thinkingContent || (toolExecutions.length === 0 ? 'Reasoning...' : '')}
+          <span className="animate-pulse ml-1" data-testid="thinking-cursor">▊</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
  * ConversationScreen - Project discovery conversation
  */
-export function ConversationScreen({ theme }: ConversationScreenProps): JSX.Element {
+export function ConversationScreen({ theme, showThinking, setShowThinking }: ConversationScreenProps): JSX.Element {
   const {
     state,
     addMessage,
@@ -383,6 +516,10 @@ export function ConversationScreen({ theme }: ConversationScreenProps): JSX.Elem
   const [fillerPhrase, setFillerPhrase] = useState('');
   // Track detected provider error for showing recovery hints
   const [detectedError, setDetectedError] = useState<WizardError | null>(null);
+  // Accumulated thinking content when showThinking is enabled (showThinking prop controls display)
+  const [thinkingContent, setThinkingContent] = useState('');
+  // Tool execution events for showThinking display (shows what agent is doing)
+  const [toolExecutions, setToolExecutions] = useState<Array<{ toolName: string; state?: unknown; timestamp: number }>>([]);
 
   // Screen reader announcement state
   const [announcement, setAnnouncement] = useState('');
@@ -393,6 +530,13 @@ export function ConversationScreen({ theme }: ConversationScreenProps): JSX.Elem
 
   // Ref to prevent double-adding the initial question (React StrictMode protection)
   const initialQuestionAddedRef = useRef(false);
+
+  // Ref to track current showThinking state for use inside callbacks
+  // This allows the onThinkingChunk callback to always be registered but only accumulate when enabled
+  const showThinkingRef = useRef(showThinking);
+  useEffect(() => {
+    showThinkingRef.current = showThinking;
+  }, [showThinking]);
 
   // Refs
   const containerRef = useRef<HTMLDivElement>(null);
@@ -522,7 +666,7 @@ export function ConversationScreen({ theme }: ConversationScreenProps): JSX.Elem
   useEffect(() => {
     if (state.isReadyToProceed && !prevReadyRef.current) {
       setAnnouncement(
-        `Confidence level ${state.confidenceLevel}%. Ready to proceed! You can now create your action plan.`
+        `Confidence level ${state.confidenceLevel}%. Ready to proceed! You can now create your Playbook.`
       );
       setAnnouncementKey((prev) => prev + 1);
     }
@@ -550,6 +694,8 @@ export function ConversationScreen({ theme }: ConversationScreenProps): JSX.Elem
     setConversationError(null);
     setDetectedError(null);
     setStreamingText('');
+    setThinkingContent(''); // Clear previous thinking content
+    setToolExecutions([]); // Clear previous tool executions
     setFillerPhrase(getNextFillerPhrase());
 
     // If this is the first message, add the initial question to history first
@@ -633,9 +779,33 @@ export function ConversationScreen({ theme }: ConversationScreenProps): JSX.Elem
               // Ignore parse errors
             }
           },
+          // Thinking content comes via the dedicated onThinkingChunk callback
+          // This receives parsed thinking content from process-manager's thinking-chunk event
+          // IMPORTANT: Always register the callback so we capture thinking even if toggled on mid-response
+          // Use ref to check current showThinking state inside callback
+          // Skip JSON-looking content (the structured response) to avoid brief flash of JSON
+          onThinkingChunk: (content) => {
+            if (showThinkingRef.current) {
+              // Don't accumulate JSON responses - they're the final answer, not thinking
+              const trimmed = content.trim();
+              if (trimmed.startsWith('{"') && (trimmed.includes('"confidence"') || trimmed.includes('"message"'))) {
+                return; // Skip structured response JSON
+              }
+              setThinkingContent((prev) => prev + content);
+            }
+          },
+          // Tool execution events show what the agent is doing (Read, Write, etc.)
+          // These are crucial for showThinking mode since batch mode doesn't stream assistant messages
+          onToolExecution: (toolEvent) => {
+            if (showThinkingRef.current) {
+              setToolExecutions((prev) => [...prev, toolEvent]);
+            }
+          },
           onComplete: (sendResult) => {
-            // Clear streaming text when response is complete
+            // Clear streaming text, thinking content, and tool executions when response is complete
             setStreamingText('');
+            setThinkingContent('');
+            setToolExecutions([]);
 
             console.log('[ConversationScreen] onComplete:', {
               success: sendResult.success,
@@ -738,6 +908,8 @@ export function ConversationScreen({ theme }: ConversationScreenProps): JSX.Elem
     setConversationError(null);
     setDetectedError(null);
     setStreamingText('');
+    setThinkingContent(''); // Clear previous thinking content
+    setToolExecutions([]); // Clear previous tool executions
     setFillerPhrase(getNextFillerPhrase());
 
     // Don't show the normal initial question for continue mode
@@ -816,8 +988,28 @@ export function ConversationScreen({ theme }: ConversationScreenProps): JSX.Elem
               // Ignore parse errors
             }
           },
+          // Thinking content callback - always register, check ref inside
+          // Skip JSON-looking content (the structured response) to avoid brief flash of JSON
+          onThinkingChunk: (content) => {
+            if (showThinkingRef.current) {
+              // Don't accumulate JSON responses - they're the final answer, not thinking
+              const trimmed = content.trim();
+              if (trimmed.startsWith('{"') && (trimmed.includes('"confidence"') || trimmed.includes('"message"'))) {
+                return; // Skip structured response JSON
+              }
+              setThinkingContent((prev) => prev + content);
+            }
+          },
+          // Tool execution callback - shows what agent is doing
+          onToolExecution: (toolEvent) => {
+            if (showThinkingRef.current) {
+              setToolExecutions((prev) => [...prev, toolEvent]);
+            }
+          },
           onComplete: (sendResult) => {
             setStreamingText('');
+            setThinkingContent('');
+            setToolExecutions([]);
 
             if (sendResult.success && sendResult.response) {
               addMessage(createAssistantMessage(sendResult.response));
@@ -919,6 +1111,7 @@ export function ConversationScreen({ theme }: ConversationScreenProps): JSX.Elem
   /**
    * Handle keyboard events at container level
    * Note: Cmd+Enter is handled by the textarea directly to avoid double-firing
+   * Note: Cmd+Shift+K is handled at the MaestroWizard level to work from anywhere in modal
    */
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -1006,7 +1199,7 @@ export function ConversationScreen({ theme }: ConversationScreenProps): JSX.Elem
           />
         ))}
 
-        {/* Streaming Response or Typing Indicator */}
+        {/* Streaming Response, Thinking Display, or Typing Indicator */}
         {state.isConversationLoading && (
           streamingText ? (
             <div className="flex justify-start mb-4">
@@ -1026,7 +1219,24 @@ export function ConversationScreen({ theme }: ConversationScreenProps): JSX.Elem
                 </div>
               </div>
             </div>
+          ) : showThinking && (thinkingContent || toolExecutions.length > 0) ? (
+            // Show thinking content and/or tool executions when enabled and we have content
+            <ThinkingDisplay
+              theme={theme}
+              agentName={state.agentName || 'Agent'}
+              thinkingContent={thinkingContent}
+              toolExecutions={toolExecutions}
+            />
+          ) : showThinking ? (
+            // Show minimal thinking display when enabled but no content yet
+            <ThinkingDisplay
+              theme={theme}
+              agentName={state.agentName || 'Agent'}
+              thinkingContent=""
+              toolExecutions={[]}
+            />
           ) : (
+            // Show filler phrase typing indicator
             <TypingIndicator
               theme={theme}
               agentName={state.agentName || 'Agent'}
@@ -1074,10 +1284,12 @@ export function ConversationScreen({ theme }: ConversationScreenProps): JSX.Elem
             <div className="flex justify-center gap-2">
               <button
                 onClick={handleRetry}
-                className="px-4 py-1.5 rounded text-sm font-medium transition-colors"
+                className="px-4 py-1.5 rounded text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-1"
                 style={{
                   backgroundColor: theme.colors.error,
                   color: 'white',
+                  ['--tw-ring-color' as any]: theme.colors.error,
+                  ['--tw-ring-offset-color' as any]: theme.colors.bgMain,
                 }}
               >
                 {detectedError && !detectedError.canRetry
@@ -1090,11 +1302,13 @@ export function ConversationScreen({ theme }: ConversationScreenProps): JSX.Elem
               {detectedError && !detectedError.canRetry && (
                 <button
                   onClick={previousStep}
-                  className="px-4 py-1.5 rounded text-sm font-medium transition-colors"
+                  className="px-4 py-1.5 rounded text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-1"
                   style={{
                     backgroundColor: theme.colors.bgSidebar,
                     color: theme.colors.textMain,
                     border: `1px solid ${theme.colors.border}`,
+                    ['--tw-ring-color' as any]: theme.colors.accent,
+                    ['--tw-ring-offset-color' as any]: theme.colors.bgMain,
                   }}
                 >
                   Go Back
@@ -1117,18 +1331,20 @@ export function ConversationScreen({ theme }: ConversationScreenProps): JSX.Elem
               className="text-sm font-medium mb-3"
               style={{ color: theme.colors.success }}
             >
-              I think I have a good understanding of your project. Ready to create your action plan?
+              I think I have a good understanding of your project. Ready to create your Playbook?
             </p>
             <button
               onClick={handleLetsGo}
-              className="px-6 py-2.5 rounded-lg text-sm font-bold transition-all hover:scale-105"
+              className="px-6 py-2.5 rounded-lg text-sm font-bold transition-all hover:scale-105 focus:outline-none focus:ring-2 focus:ring-offset-2"
               style={{
                 backgroundColor: theme.colors.success,
                 color: theme.colors.bgMain,
                 boxShadow: `0 4px 12px ${theme.colors.success}40`,
+                ['--tw-ring-color' as any]: theme.colors.success,
+                ['--tw-ring-offset-color' as any]: theme.colors.bgMain,
               }}
             >
-              Let's Get Started! 🚀
+              Let's Get Started!
             </button>
             <p
               className="text-xs mt-3"
@@ -1188,7 +1404,7 @@ export function ConversationScreen({ theme }: ConversationScreenProps): JSX.Elem
           <button
             onClick={handleSendMessage}
             disabled={!inputValue.trim() || state.isConversationLoading}
-            className="px-4 rounded-lg font-medium transition-all flex items-center gap-2 shrink-0 self-end"
+            className="px-4 rounded-lg font-medium transition-all flex items-center gap-2 shrink-0 self-end focus:outline-none focus:ring-2 focus:ring-offset-2"
             style={{
               backgroundColor:
                 inputValue.trim() && !state.isConversationLoading
@@ -1203,6 +1419,8 @@ export function ConversationScreen({ theme }: ConversationScreenProps): JSX.Elem
                   ? 'pointer'
                   : 'not-allowed',
               height: '48px',
+              ['--tw-ring-color' as any]: theme.colors.accent,
+              ['--tw-ring-offset-color' as any]: theme.colors.bgSidebar,
             }}
           >
             {state.isConversationLoading ? (
@@ -1229,8 +1447,31 @@ export function ConversationScreen({ theme }: ConversationScreenProps): JSX.Elem
           </button>
         </div>
 
-        {/* Keyboard hints */}
-        <div className="mt-4 flex justify-center gap-6">
+        {/* Controls and keyboard hints */}
+        <div className="mt-4 flex justify-center gap-6 items-center">
+          {/* Show Thinking toggle with keyboard shortcut */}
+          <span
+            className="text-xs flex items-center gap-1"
+            style={{ color: theme.colors.textDim }}
+          >
+            <kbd
+              className="px-1.5 py-0.5 rounded text-xs"
+              style={{ backgroundColor: theme.colors.border }}
+            >
+              ⌘⇧K
+            </kbd>
+            <button
+              onClick={() => setShowThinking(!showThinking)}
+              className={`flex items-center gap-1 px-2 py-1 rounded hover:bg-white/5 transition-opacity focus:outline-none focus:ring-2 focus:ring-offset-1 ${
+                showThinking ? 'opacity-100' : 'opacity-50 hover:opacity-100'
+              }`}
+              title={showThinking ? 'Hide AI thinking (show filler messages)' : 'Show AI thinking'}
+              style={showThinking ? { color: theme.colors.accent, ['--tw-ring-color' as any]: theme.colors.accent, ['--tw-ring-offset-color' as any]: theme.colors.bgSidebar } : { color: theme.colors.textDim, ['--tw-ring-color' as any]: theme.colors.accent, ['--tw-ring-offset-color' as any]: theme.colors.bgSidebar }}
+            >
+              <Brain className="w-3 h-3" />
+              <span>Thinking</span>
+            </button>
+          </span>
           <span
             className="text-xs flex items-center gap-1"
             style={{ color: theme.colors.textDim }}

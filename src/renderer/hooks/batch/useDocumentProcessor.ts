@@ -55,6 +55,11 @@ export interface DocumentProcessorConfig {
    * Custom prompt to use for task processing
    */
   customPrompt: string;
+
+  /**
+   * SSH remote ID for remote file operations (when session is SSH-enabled)
+   */
+  sshRemoteId?: string;
 }
 
 /**
@@ -176,11 +181,13 @@ export interface UseDocumentProcessorReturn {
    * Read a document and count its tasks
    * @param folderPath - Folder containing the document
    * @param filename - Document filename (without .md extension)
+   * @param sshRemoteId - Optional SSH remote ID for remote file operations
    * @returns Document content and task counts
    */
   readDocAndCountTasks: (
     folderPath: string,
-    filename: string
+    filename: string,
+    sshRemoteId?: string
   ) => Promise<DocumentReadResult>;
 
   /**
@@ -229,8 +236,8 @@ export function useDocumentProcessor(): UseDocumentProcessorReturn {
    * Read a document and count its tasks
    */
   const readDocAndCountTasks = useCallback(
-    async (folderPath: string, filename: string): Promise<DocumentReadResult> => {
-      const result = await window.maestro.autorun.readDoc(folderPath, filename + '.md');
+    async (folderPath: string, filename: string, sshRemoteId?: string): Promise<DocumentReadResult> => {
+      const result = await window.maestro.autorun.readDoc(folderPath, filename + '.md', sshRemoteId);
 
       if (!result.success || !result.content) {
         return { content: '', taskCount: 0, checkedCount: 0 };
@@ -265,9 +272,17 @@ export function useDocumentProcessor(): UseDocumentProcessorReturn {
         loopIteration,
         effectiveCwd,
         customPrompt,
+        sshRemoteId,
       } = config;
 
       const docFilePath = `${folderPath}/${filename}.md`;
+
+      // Read document content (passes sshRemoteId for remote file operations)
+      const docReadResult = await window.maestro.autorun.readDoc(
+        folderPath,
+        filename + '.md',
+        sshRemoteId
+      );
 
       // Build template context for this task
       const templateContext: TemplateContext = {
@@ -279,15 +294,6 @@ export function useDocumentProcessor(): UseDocumentProcessorReturn {
         documentName: filename,
         documentPath: docFilePath,
       };
-
-      // Substitute template variables in the prompt
-      const finalPrompt = substituteTemplateVariables(customPrompt, templateContext);
-
-      // Read document content and expand template variables in it
-      const docReadResult = await window.maestro.autorun.readDoc(
-        folderPath,
-        filename + '.md'
-      );
 
       if (docReadResult.success && docReadResult.content) {
         const expandedDocContent = substituteTemplateVariables(
@@ -301,10 +307,14 @@ export function useDocumentProcessor(): UseDocumentProcessorReturn {
           await window.maestro.autorun.writeDoc(
             folderPath,
             filename + '.md',
-            expandedDocContent
+            expandedDocContent,
+            sshRemoteId
           );
         }
       }
+
+      // Substitute template variables in the prompt
+      const finalPrompt = substituteTemplateVariables(customPrompt, templateContext);
 
       // Capture start time for elapsed time tracking
       const taskStartTime = Date.now();
@@ -333,7 +343,7 @@ export function useDocumentProcessor(): UseDocumentProcessorReturn {
       }
 
       // Re-read document to get updated task count and content
-      const afterResult = await readDocAndCountTasks(folderPath, filename);
+      const afterResult = await readDocAndCountTasks(folderPath, filename, sshRemoteId);
       const { content: contentAfterTask, taskCount: newRemainingTasks, checkedCount: newCheckedCount } = afterResult;
 
       // Calculate tasks completed based on newly checked tasks

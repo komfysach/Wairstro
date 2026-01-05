@@ -137,11 +137,17 @@ export class ClaudeOutputParser implements AgentOutputParser {
     // Handle assistant messages (streaming partial responses)
     if (msg.type === 'assistant') {
       const text = this.extractTextFromMessage(msg);
+      const thinkingText = this.extractThinkingFromMessage(msg);
       const toolUseBlocks = this.extractToolUseBlocks(msg);
+
+      // For thinking content, prioritize thinking blocks over text blocks
+      // This ensures extended thinking (Claude 3.7+, Claude 4+) content streams properly
+      // When thinking blocks are present, emit them as partial content for thinking-chunk events
+      const contentToEmit = thinkingText || text;
 
       return {
         type: 'text',
-        text,
+        text: contentToEmit,
         sessionId: msg.session_id,
         isPartial: true,
         toolUseBlocks: toolUseBlocks.length > 0 ? toolUseBlocks : undefined,
@@ -201,12 +207,11 @@ export class ClaudeOutputParser implements AgentOutputParser {
    * Extract text content from a Claude assistant message
    *
    * Only extracts 'text' type blocks - explicitly excludes:
-   * - 'thinking' blocks (extended thinking reasoning content)
+   * - 'thinking' blocks (handled by extractThinkingFromMessage)
    * - 'redacted_thinking' blocks (safety-encrypted thinking)
    * - 'tool_use' blocks (handled separately by extractToolUseBlocks)
    *
-   * Extended thinking content is emitted separately via thinking-chunk events
-   * and controlled by the tab's showThinking setting in the renderer.
+   * @see extractThinkingFromMessage for thinking content extraction
    */
   private extractTextFromMessage(msg: ClaudeRawMessage): string {
     if (!msg.message?.content) {
@@ -223,6 +228,32 @@ export class ClaudeOutputParser implements AgentOutputParser {
     return msg.message.content
       .filter((block) => block.type === 'text' && block.text)
       .map((block) => block.text!)
+      .join('');
+  }
+
+  /**
+   * Extract thinking content from a Claude assistant message
+   *
+   * Extracts 'thinking' type blocks from extended thinking (Claude 3.7+, Claude 4+).
+   * This content represents the model's internal reasoning process.
+   *
+   * Note: 'redacted_thinking' blocks are excluded as they contain encrypted content
+   * that cannot be displayed.
+   */
+  private extractThinkingFromMessage(msg: ClaudeRawMessage): string {
+    if (!msg.message?.content) {
+      return '';
+    }
+
+    // Content must be array for thinking blocks
+    if (typeof msg.message.content === 'string') {
+      return '';
+    }
+
+    // Extract thinking blocks (excluding redacted_thinking which is encrypted)
+    return msg.message.content
+      .filter((block) => block.type === 'thinking' && block.thinking)
+      .map((block) => block.thinking!)
       .join('');
   }
 
@@ -314,9 +345,9 @@ export class ClaudeOutputParser implements AgentOutputParser {
       }
       // If no error field in JSON, this is normal output - don't check it
     } catch {
-      // Not JSON - skip pattern matching entirely
-      // Errors should come through structured JSON, stderr, or exit codes
-      // Pattern matching on arbitrary text causes false positives
+      // Not pure JSON - try to extract embedded JSON from stderr messages
+      // Example: "Error streaming...: 400 {"type":"error","error":{"type":"invalid_request_error","message":"..."}}"
+      errorText = this.extractErrorFromMixedLine(line);
     }
 
     // If no error text was extracted, no error to detect
@@ -345,6 +376,37 @@ export class ClaudeOutputParser implements AgentOutputParser {
   }
 
   /**
+   * Extract error message from a line that contains embedded JSON.
+   * Handles stderr output like:
+   * "Error streaming, falling back to non-streaming mode: 400 {"type":"error","error":{"type":"invalid_request_error","message":"prompt is too long: 206491 tokens > 200000 maximum"}}"
+   */
+  private extractErrorFromMixedLine(line: string): string | null {
+    // Look for embedded JSON in the line
+    const jsonStart = line.indexOf('{');
+    if (jsonStart === -1) {
+      return null;
+    }
+
+    try {
+      const jsonPart = line.substring(jsonStart);
+      const parsed = JSON.parse(jsonPart);
+
+      // Handle nested error structure from API: { "type": "error", "error": { "message": "..." } }
+      if (parsed.error?.message) {
+        return parsed.error.message;
+      }
+      // Handle flat error structure: { "type": "error", "message": "..." }
+      if (parsed.message) {
+        return parsed.message;
+      }
+    } catch {
+      // JSON parsing failed, ignore
+    }
+
+    return null;
+  }
+
+  /**
    * Detect an error from process exit information
    */
   detectErrorFromExit(
@@ -357,7 +419,29 @@ export class ClaudeOutputParser implements AgentOutputParser {
       return null;
     }
 
-    // Check stderr and stdout for error patterns
+    // First try to extract detailed error from embedded JSON in stderr
+    // This handles messages like: "Error streaming...: 400 {"type":"error","error":{"message":"prompt is too long: 206491 tokens > 200000 maximum"}}"
+    const extractedError = this.extractErrorFromMixedLine(stderr);
+    if (extractedError) {
+      const patterns = getErrorPatterns(this.agentId);
+      const match = matchErrorPattern(patterns, extractedError);
+      if (match) {
+        return {
+          type: match.type,
+          message: match.message,
+          recoverable: match.recoverable,
+          agentId: this.agentId,
+          timestamp: Date.now(),
+          raw: {
+            exitCode,
+            stderr,
+            stdout,
+          },
+        };
+      }
+    }
+
+    // Check stderr and stdout for error patterns (fallback to raw text matching)
     const combined = `${stderr}\n${stdout}`;
     const patterns = getErrorPatterns(this.agentId);
     const match = matchErrorPattern(patterns, combined);

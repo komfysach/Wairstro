@@ -99,6 +99,8 @@ interface RightPanelProps {
   onFileClick?: (path: string) => void;
   // Marketplace modal
   onOpenMarketplace?: () => void;
+  // Launch inline wizard in new tab
+  onLaunchWizard?: () => void;
   /** Callback to open graph view focused on a specific file (relative path to session.cwd) */
   onFocusFileInGraph?: (relativePath: string) => void;
   /** Path of the last opened document graph focus file (for quick re-open) */
@@ -125,7 +127,7 @@ export const RightPanel = memo(forwardRef<RightPanelHandle, RightPanelProps>(fun
     onSkipCurrentDocument, onAbortBatchOnError, onResumeAfterError,
     onJumpToAgentSession, onResumeSession,
     onOpenSessionAsTab, onOpenAboutModal, onFileClick,
-    onOpenMarketplace,
+    onOpenMarketplace, onLaunchWizard,
     onFocusFileInGraph, lastGraphFocusFile, onOpenLastDocumentGraph
   } = props;
 
@@ -296,6 +298,7 @@ export const RightPanel = memo(forwardRef<RightPanelHandle, RightPanelProps>(fun
     sessionState: session.state,
     shortcuts,
     onOpenMarketplace,
+    onLaunchWizard,
   };
 
   return (

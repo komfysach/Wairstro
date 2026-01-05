@@ -176,7 +176,7 @@ export function AutoRunnerHelpModal({ theme, onClose }: AutoRunnerHelpModalProps
               style={{ color: theme.colors.textDim }}
             >
               <p>
-                Click <strong style={{ color: theme.colors.textMain }}>Run</strong> to open the batch runner.
+                Click <strong style={{ color: theme.colors.textMain }}>Run</strong> to configure auto-run.
                 By default, the currently selected document is ready to run.
               </p>
               <p>
@@ -200,7 +200,7 @@ export function AutoRunnerHelpModal({ theme, onClose }: AutoRunnerHelpModalProps
               style={{ color: theme.colors.textDim }}
             >
               <p>
-                Click <strong style={{ color: theme.colors.textMain }}>"+ Add Docs"</strong> in the batch runner
+                Click <strong style={{ color: theme.colors.textMain }}>"+ Add Docs"</strong> in the configuration
                 to select additional documents. Documents are processed sequentially in the order shown.
               </p>
               <p>

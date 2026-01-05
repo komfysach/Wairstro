@@ -686,25 +686,25 @@ function runProvider(
  * @param cwd - Remote working directory (optional, uses sshConfig.remoteWorkingDir if not provided)
  * @param stdinContent - Optional content to write to stdin
  */
-function runProviderViaSsh(
+async function runProviderViaSsh(
   provider: ProviderConfig,
   sshConfig: SshRemoteConfig,
   args: string[],
   cwd?: string,
   stdinContent?: string
 ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
+  // Build the SSH command using the same utility as the main codebase
+  const sshCommand = await buildSshCommand(sshConfig, {
+    command: provider.command,
+    args,
+    cwd: cwd || sshConfig.remoteWorkingDir,
+  });
+
+  console.log(`🌐 SSH Command: ${sshCommand.command} ${sshCommand.args.join(' ')}`);
+
   return new Promise((resolve) => {
     let stdout = '';
     let stderr = '';
-
-    // Build the SSH command using the same utility as the main codebase
-    const sshCommand = buildSshCommand(sshConfig, {
-      command: provider.command,
-      args,
-      cwd: cwd || sshConfig.remoteWorkingDir,
-    });
-
-    console.log(`🌐 SSH Command: ${sshCommand.command} ${sshCommand.args.join(' ')}`);
 
     const proc = spawn(sshCommand.command, sshCommand.args, {
       cwd: TEST_CWD, // Local cwd doesn't matter for SSH
@@ -751,7 +751,7 @@ function runProviderViaSsh(
  * Check if SSH connection is working by running a simple command
  */
 async function testSshConnection(sshConfig: SshRemoteConfig): Promise<{ success: boolean; error?: string }> {
-  const sshCommand = buildSshCommand(sshConfig, {
+  const sshCommand = await buildSshCommand(sshConfig, {
     command: 'echo',
     args: ['SSH_CONNECTION_OK'],
   });
@@ -821,7 +821,7 @@ async function isProviderAvailableViaSsh(
 ): Promise<boolean> {
   try {
     // Use 'which' or 'command -v' to check if the command exists
-    const sshCommand = buildSshCommand(sshConfig, {
+    const sshCommand = await buildSshCommand(sshConfig, {
       command: 'command',
       args: ['-v', provider.command],
     });
@@ -1797,7 +1797,7 @@ describe.skipIf(SKIP_SSH_INTEGRATION)('SSH Provider Integration Tests', () => {
       }
 
       // Run a simple command to verify SSH command execution works
-      const sshCommand = buildSshCommand(sshConfig, {
+      const sshCommand = await buildSshCommand(sshConfig, {
         command: 'pwd',
         args: [],
         cwd: sshConfig.remoteWorkingDir,

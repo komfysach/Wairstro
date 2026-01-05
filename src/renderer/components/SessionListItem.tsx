@@ -230,7 +230,7 @@ export function SessionListItem({
             <span
               className="text-[10px] font-bold px-1.5 py-0.5 rounded"
               style={{ backgroundColor: theme.colors.warning + '30', color: theme.colors.warning }}
-              title="Auto-batch session through Maestro"
+              title="Auto-run session"
             >
               AUTO
             </span>

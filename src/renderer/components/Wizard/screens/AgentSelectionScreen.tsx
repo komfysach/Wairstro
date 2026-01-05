@@ -726,8 +726,8 @@ export function AgentSelectionScreen({ theme }: AgentSelectionScreenProps): JSX.
         <div className="flex items-center justify-between mb-6">
           <button
             onClick={handleCloseConfig}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-white/10 transition-colors"
-            style={{ color: theme.colors.textDim }}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-white/10 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-1"
+            style={{ color: theme.colors.textDim, ['--tw-ring-color' as any]: theme.colors.accent, ['--tw-ring-offset-color' as any]: theme.colors.bgMain }}
           >
             <ArrowLeft className="w-4 h-4" />
             Back
@@ -836,10 +836,12 @@ export function AgentSelectionScreen({ theme }: AgentSelectionScreenProps): JSX.
         <div className="flex justify-center mt-6">
           <button
             onClick={handleCloseConfig}
-            className="px-8 py-2.5 rounded-lg font-medium transition-all outline-none"
+            className="px-8 py-2.5 rounded-lg font-medium transition-all focus:outline-none focus:ring-2 focus:ring-offset-2"
             style={{
               backgroundColor: theme.colors.accent,
               color: theme.colors.accentForeground,
+              ['--tw-ring-color' as any]: theme.colors.accent,
+              ['--tw-ring-offset-color' as any]: theme.colors.bgMain,
             }}
           >
             Done
@@ -1068,12 +1070,14 @@ export function AgentSelectionScreen({ theme }: AgentSelectionScreenProps): JSX.
           <button
             onClick={handleContinue}
             disabled={!canProceedToNext()}
-            className="px-8 py-2.5 rounded-lg font-medium transition-all outline-none whitespace-nowrap"
+            className="px-8 py-2.5 rounded-lg font-medium transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 whitespace-nowrap"
             style={{
               backgroundColor: canProceedToNext() ? theme.colors.accent : theme.colors.border,
               color: canProceedToNext() ? theme.colors.accentForeground : theme.colors.textDim,
               cursor: canProceedToNext() ? 'pointer' : 'not-allowed',
               opacity: canProceedToNext() ? 1 : 0.6,
+              ['--tw-ring-color' as any]: theme.colors.accent,
+              ['--tw-ring-offset-color' as any]: theme.colors.bgMain,
             }}
           >
             Continue

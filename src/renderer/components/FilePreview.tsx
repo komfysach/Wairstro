@@ -773,11 +773,8 @@ export const FilePreview = forwardRef<FilePreviewHandle, FilePreviewProps>(funct
         }
       }
 
-      // Update match count - only reset index if it's truly out of bounds and not already 0
+      // Update match count
       setTotalMatches(allRanges.length);
-      if (allRanges.length > 0 && currentMatchIndex >= allRanges.length && currentMatchIndex !== 0) {
-        setCurrentMatchIndex(0);
-      }
 
       // Create highlights
       if (allRanges.length > 0) {

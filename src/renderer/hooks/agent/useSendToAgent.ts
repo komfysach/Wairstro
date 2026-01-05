@@ -647,11 +647,11 @@ Please confirm you've reviewed this context and let me know you're ready to cont
         id: `transfer-notice-${Date.now()}`,
         timestamp: Date.now(),
         source: 'system',
-        text: `Context transferred from ${sourceAgentName}. ${
+        text: `Context transferred from "${sourceName}" (${sourceAgentName}).${
           options.groomContext
-            ? `Groomed and optimized for ${getAgentDisplayName(targetAgent)}.`
-            : 'Original context preserved.'
-        } Send a message to share the context with the agent.`,
+            ? ` Groomed and optimized for ${getAgentDisplayName(targetAgent)}.`
+            : ''
+        }`,
       };
 
       const activeTab = newSession.aiTabs[0];
@@ -659,8 +659,11 @@ Please confirm you've reviewed this context and let me know you're ready to cont
         activeTab.logs = [transferNotice];
         // Set pendingMergedContext so it gets injected into the first message
         activeTab.pendingMergedContext = pendingMergedContext;
-        // Pre-populate the input field with a prompt to send
-        activeTab.inputValue = 'Please review the context above and let me know when you\'re ready to continue.';
+        // Pre-populate the input field with the context introduction message
+        activeTab.inputValue = 'I\'m transferring context from another session. Please review it and let me know when you\'re ready to continue.';
+        // Set flag to auto-send this message when the tab becomes active
+        // This ensures the context is actually sent to the agent immediately
+        activeTab.autoSendOnActivate = true;
       }
 
       // Add new session to state

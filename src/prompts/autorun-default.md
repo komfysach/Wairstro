@@ -12,6 +12,43 @@ If you need to create the working folder, do so.
 
 ---
 
+## Structured Output Artifacts
+
+When creating documentation, research notes, reports, or any knowledge artifacts (not source code), use **structured Markdown** by default:
+
+### YAML Front Matter
+```yaml
+---
+type: research | note | report | analysis | reference
+title: Descriptive Title
+created: YYYY-MM-DD
+tags:
+  - relevant-tag
+related:
+  - "[[Other-Document]]"
+---
+```
+
+### Wiki-Link Cross-References
+Use `[[Document-Name]]` syntax to connect related documents. This enables graph exploration in Maestro's DocGraph viewer and tools like Obsidian.
+
+### Folder Organization
+Organize artifacts in logical folders by entity type or domain:
+```
+docs/
+├── research/
+│   ├── topic-a.md
+│   └── topic-b.md
+├── architecture/
+│   └── system-design.md
+└── decisions/
+    └── adr-001-choice.md
+```
+
+**When to apply:** Research findings, competitive analysis, architecture decisions, technical specs, meeting notes, reference docs, glossaries.
+
+**When NOT to apply:** Source code files, config files (JSON/YAML), generated assets, temporary files.
+
 ## Instructions
 
 1. Project Orientation

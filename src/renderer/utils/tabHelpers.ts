@@ -31,6 +31,17 @@ export function hasDraft(tab: AITab): boolean {
 }
 
 /**
+ * Check if a tab has an active (unfinished) wizard session.
+ * Used to determine if closing the tab should show a confirmation modal.
+ *
+ * @param tab - The AI tab to check
+ * @returns True if the tab has an active wizard that hasn't completed
+ */
+export function hasActiveWizard(tab: AITab): boolean {
+  return tab.wizardState?.isActive === true;
+}
+
+/**
  * Get the list of navigable tabs based on filter settings.
  * When showUnreadOnly is true, only returns unread tabs and tabs with unsent drafts/staged images.
  * When false (default), returns all tabs.
@@ -168,6 +179,14 @@ export function createTab(session: Session, options: CreateTabOptions = {}): Cre
 }
 
 /**
+ * Options for closing a tab.
+ */
+export interface CloseTabOptions {
+  /** If true, skip adding to closed tab history (e.g., for wizard tabs) */
+  skipHistory?: boolean;
+}
+
+/**
  * Result of closing a tab - contains the closed tab info and updated session.
  */
 export interface CloseTabResult {
@@ -176,8 +195,9 @@ export interface CloseTabResult {
 }
 
 /**
- * Close an AI tab and add it to the closed tab history.
- * The closed tab is stored in closedTabHistory for potential restoration via Cmd+Shift+T.
+ * Close an AI tab and optionally add it to the closed tab history.
+ * The closed tab is stored in closedTabHistory for potential restoration via Cmd+Shift+T,
+ * unless skipHistory is true (e.g., for wizard tabs which should not be restorable).
  * If the closed tab was active, the next tab (or previous if at end) becomes active.
  * When showUnreadOnly is true, prioritizes switching to the next unread tab.
  * If closing the last tab, a fresh new tab is created to replace it.
@@ -185,6 +205,7 @@ export interface CloseTabResult {
  * @param session - The Maestro session containing the tab
  * @param tabId - The ID of the tab to close
  * @param showUnreadOnly - If true, prioritize switching to the next unread tab
+ * @param options - Optional close options (e.g., skipHistory for wizard tabs)
  * @returns Object containing the closed tab info and updated session, or null if tab not found
  *
  * @example
@@ -193,8 +214,12 @@ export interface CloseTabResult {
  *   const { closedTab, session: updatedSession } = result;
  *   console.log(`Closed tab at index ${closedTab.index}`);
  * }
+ *
+ * @example
+ * // Close wizard tab without adding to history
+ * const result = closeTab(session, 'wizard-tab-id', false, { skipHistory: true });
  */
-export function closeTab(session: Session, tabId: string, showUnreadOnly = false): CloseTabResult | null {
+export function closeTab(session: Session, tabId: string, showUnreadOnly = false, options: CloseTabOptions = {}): CloseTabResult | null {
   if (!session || !session.aiTabs || session.aiTabs.length === 0) {
     return null;
   }
@@ -260,8 +285,11 @@ export function closeTab(session: Session, tabId: string, showUnreadOnly = false
     }
   }
 
-  // Add to closed tab history, maintaining max size
-  const updatedHistory = [closedTab, ...(session.closedTabHistory || [])].slice(0, MAX_CLOSED_TAB_HISTORY);
+  // Add to closed tab history unless skipHistory is set (e.g., for wizard tabs)
+  // Wizard tabs should not be restorable via Cmd+Shift+T
+  const updatedHistory = options.skipHistory
+    ? (session.closedTabHistory || [])
+    : [closedTab, ...(session.closedTabHistory || [])].slice(0, MAX_CLOSED_TAB_HISTORY);
 
   // Create updated session
   const updatedSession: Session = {

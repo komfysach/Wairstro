@@ -23,6 +23,8 @@ export interface GenerationConfig {
   projectName: string;
   /** Full conversation history from project discovery */
   conversationHistory: WizardMessage[];
+  /** Optional subfolder within Auto Run Docs (e.g., "Initiation") */
+  subfolder?: string;
 }
 
 /**
@@ -314,7 +316,7 @@ export const wizardDebugLogger = new WizardDebugLogger();
  * - Name files as Phase-XX-Description.md
  */
 export function generateDocumentGenerationPrompt(config: GenerationConfig): string {
-  const { projectName, directoryPath, conversationHistory } = config;
+  const { projectName, directoryPath, conversationHistory, subfolder } = config;
   const projectDisplay = projectName || 'this project';
 
   // Build conversation summary
@@ -326,13 +328,18 @@ export function generateDocumentGenerationPrompt(config: GenerationConfig): stri
     })
     .join('\n\n');
 
+  // Build the full Auto Run folder path (including subfolder if specified)
+  const autoRunFolderPath = subfolder
+    ? `${AUTO_RUN_FOLDER_NAME}/${subfolder}`
+    : AUTO_RUN_FOLDER_NAME;
+
   // First, handle wizard-specific variables that have different semantics
   // from the central template system. We do this BEFORE the central function
   // so they take precedence over central defaults.
   let prompt = wizardDocumentGenerationPrompt
     .replace(/\{\{PROJECT_NAME\}\}/gi, projectDisplay)
     .replace(/\{\{DIRECTORY_PATH\}\}/gi, directoryPath)
-    .replace(/\{\{AUTO_RUN_FOLDER_NAME\}\}/gi, AUTO_RUN_FOLDER_NAME)
+    .replace(/\{\{AUTO_RUN_FOLDER_NAME\}\}/gi, autoRunFolderPath)
     .replace(/\{\{CONVERSATION_SUMMARY\}\}/gi, conversationSummary);
 
   // Build template context for remaining variables (date/time, etc.)
@@ -550,7 +557,7 @@ class PhaseGenerator {
     wizardDebugLogger.startSession(config);
 
     callbacks?.onStart?.();
-    callbacks?.onProgress?.('Preparing to generate your action plan...');
+    callbacks?.onProgress?.('Preparing to generate your Playbook...');
 
     try {
       // Get the agent configuration
@@ -780,7 +787,7 @@ class PhaseGenerator {
           console.error('[PhaseGenerator] Buffer size:', this.outputBuffer.length);
           console.error('[PhaseGenerator] Buffer preview:', this.outputBuffer.slice(-500));
 
-          wizardDebugLogger.log('timeout', 'Generation timed out after 5 minutes of inactivity', {
+          wizardDebugLogger.log('timeout', 'Generation timed out after 20 minutes of inactivity', {
             elapsedMs: elapsed,
             timeSinceLastActivityMs: timeSinceLastActivity,
             totalChunks: dataChunks,
@@ -795,7 +802,7 @@ class PhaseGenerator {
           window.maestro.process.kill(sessionId).catch(() => {});
           resolve({
             success: false,
-            error: 'Generation timed out after 5 minutes of inactivity. Please try again.',
+            error: 'Generation timed out after 20 minutes of inactivity. Please try again.',
             rawOutput: this.outputBuffer,
           });
         }, GENERATION_TIMEOUT);
@@ -898,10 +905,12 @@ class PhaseGenerator {
         }
       );
 
-      // Set up file system watcher for Auto Run Docs folder
+      // Set up file system watcher for Auto Run Docs folder (including subfolder if specified)
       // This detects when the agent creates files and resets the timeout
-      const autoRunPath = `${config.directoryPath}/${AUTO_RUN_FOLDER_NAME}`;
-      wizardDebugLogger.log('info', 'Setting up file watcher', { autoRunPath });
+      const autoRunPath = config.subfolder
+        ? `${config.directoryPath}/${AUTO_RUN_FOLDER_NAME}/${config.subfolder}`
+        : `${config.directoryPath}/${AUTO_RUN_FOLDER_NAME}`;
+      wizardDebugLogger.log('info', 'Setting up file watcher', { autoRunPath, subfolder: config.subfolder });
 
       // Start watching the folder for file changes
       window.maestro.autorun.watchFolder(autoRunPath).then((result) => {
@@ -987,12 +996,28 @@ class PhaseGenerator {
 
       // Spawn the agent using the secure IPC channel
       console.log('[PhaseGenerator] Spawning agent...');
+
+      // Build args for document generation
+      // The agent can write files ONLY to the Auto Run folder (enforced via prompt)
+      // This allows documents to stream in via file watcher as they're created
+      const argsForSpawn = [...(agent.args || [])];
+      if (config.agentType === 'claude-code') {
+        if (!argsForSpawn.includes('--include-partial-messages')) {
+          argsForSpawn.push('--include-partial-messages');
+        }
+        // Allow Write tool so agent can create files directly in Auto Run folder
+        // The prompt strictly limits writes to the Auto Run folder only
+        if (!argsForSpawn.includes('--allowedTools')) {
+          argsForSpawn.push('--allowedTools', 'Read', 'Glob', 'Grep', 'LS', 'Write');
+        }
+      }
+
       wizardDebugLogger.log('spawn', 'Calling process.spawn', {
         sessionId,
         toolType: config.agentType,
         cwd: config.directoryPath,
         command: agent.command,
-        argsCount: agent.args?.length || 0,
+        argsCount: argsForSpawn.length,
         promptLength: prompt.length,
       });
       window.maestro.process
@@ -1001,7 +1026,7 @@ class PhaseGenerator {
           toolType: config.agentType,
           cwd: config.directoryPath,
           command: agent.command,
-          args: [...(agent.args || [])],
+          args: argsForSpawn,
           prompt,
         })
         .then(() => {
@@ -1097,13 +1122,19 @@ class PhaseGenerator {
    * Save generated documents to the Auto Run folder
    *
    * Creates the Auto Run Docs folder if it doesn't exist.
+   * @param directoryPath - Project directory path
+   * @param documents - Documents to save
+   * @param onFileCreated - Callback when each file is created
+   * @param subfolder - Optional subfolder within Auto Run Docs (e.g., "Initiation")
    */
   async saveDocuments(
     directoryPath: string,
     documents: GeneratedDocument[],
-    onFileCreated?: (file: CreatedFileInfo) => void
-  ): Promise<{ success: boolean; savedPaths: string[]; error?: string }> {
-    const autoRunPath = `${directoryPath}/${AUTO_RUN_FOLDER_NAME}`;
+    onFileCreated?: (file: CreatedFileInfo) => void,
+    subfolder?: string
+  ): Promise<{ success: boolean; savedPaths: string[]; error?: string; subfolderPath?: string }> {
+    const baseAutoRunPath = `${directoryPath}/${AUTO_RUN_FOLDER_NAME}`;
+    const autoRunPath = subfolder ? `${baseAutoRunPath}/${subfolder}` : baseAutoRunPath;
     const savedPaths: string[] = [];
 
     try {
@@ -1152,7 +1183,7 @@ class PhaseGenerator {
         }
       }
 
-      return { success: true, savedPaths };
+      return { success: true, savedPaths, subfolderPath: subfolder ? autoRunPath : undefined };
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : 'Failed to save documents';

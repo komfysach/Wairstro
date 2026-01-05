@@ -167,7 +167,7 @@ describe('BatchRunnerModal', () => {
       const dialog = screen.getByRole('dialog');
       expect(dialog).toBeInTheDocument();
       expect(dialog).toHaveAttribute('aria-modal', 'true');
-      expect(dialog).toHaveAttribute('aria-label', 'Batch Runner');
+      expect(dialog).toHaveAttribute('aria-label', 'Auto Run Configuration');
     });
 
     it('displays header with title and close button', async () => {
@@ -513,7 +513,7 @@ describe('BatchRunnerModal', () => {
     it('inserts tab character on Tab key', async () => {
       render(<BatchRunnerModal {...createDefaultProps()} />);
 
-      const textarea = screen.getByPlaceholderText('Enter the prompt for the batch agent...') as HTMLTextAreaElement;
+      const textarea = screen.getByPlaceholderText('Enter the system prompt for auto-run...') as HTMLTextAreaElement;
 
       // Clear and set a simple value (no space - "HelloWorld")
       fireEvent.change(textarea, { target: { value: 'HelloWorld' } });
@@ -532,14 +532,14 @@ describe('BatchRunnerModal', () => {
     it('displays default prompt in textarea', async () => {
       render(<BatchRunnerModal {...createDefaultProps()} />);
 
-      const textarea = screen.getByPlaceholderText('Enter the prompt for the batch agent...');
+      const textarea = screen.getByPlaceholderText('Enter the system prompt for auto-run...');
       expect(textarea).toHaveValue(DEFAULT_BATCH_PROMPT);
     });
 
     it('displays CUSTOMIZED badge when prompt is modified', async () => {
       render(<BatchRunnerModal {...createDefaultProps()} />);
 
-      const textarea = screen.getByPlaceholderText('Enter the prompt for the batch agent...');
+      const textarea = screen.getByPlaceholderText('Enter the system prompt for auto-run...');
       fireEvent.change(textarea, { target: { value: 'Custom prompt' } });
 
       expect(screen.getByText('CUSTOMIZED')).toBeInTheDocument();
@@ -549,7 +549,7 @@ describe('BatchRunnerModal', () => {
       const props = createDefaultProps();
       render(<BatchRunnerModal {...props} />);
 
-      const textarea = screen.getByPlaceholderText('Enter the prompt for the batch agent...');
+      const textarea = screen.getByPlaceholderText('Enter the system prompt for auto-run...');
       fireEvent.change(textarea, { target: { value: 'Custom prompt' } });
 
       const resetButton = screen.getByTitle('Reset to default prompt');
@@ -574,7 +574,7 @@ describe('BatchRunnerModal', () => {
       fireEvent.click(screen.getByTitle('Expand editor'));
       fireEvent.click(screen.getByRole('button', { name: 'Submit' }));
 
-      const textarea = screen.getByPlaceholderText('Enter the prompt for the batch agent...');
+      const textarea = screen.getByPlaceholderText('Enter the system prompt for auto-run...');
       expect(textarea).toHaveValue('Updated prompt from composer');
     });
   });
@@ -744,7 +744,7 @@ describe('BatchRunnerModal', () => {
       fireEvent.click(screen.getByText('Test Playbook'));
 
       // Modify prompt
-      const textarea = screen.getByPlaceholderText('Enter the prompt for the batch agent...');
+      const textarea = screen.getByPlaceholderText('Enter the system prompt for auto-run...');
       fireEvent.change(textarea, { target: { value: 'Modified prompt' } });
 
       await waitFor(() => {
@@ -920,7 +920,7 @@ describe('BatchRunnerModal', () => {
       const props = createDefaultProps();
       render(<BatchRunnerModal {...props} />);
 
-      const textarea = screen.getByPlaceholderText('Enter the prompt for the batch agent...');
+      const textarea = screen.getByPlaceholderText('Enter the system prompt for auto-run...');
       fireEvent.change(textarea, { target: { value: 'Custom prompt' } });
 
       fireEvent.click(screen.getByRole('button', { name: /Save/ }));
@@ -1044,7 +1044,7 @@ describe('BatchRunnerModal', () => {
       render(<BatchRunnerModal {...createDefaultProps()} />);
 
       await waitFor(() => {
-        const textarea = screen.getByPlaceholderText('Enter the prompt for the batch agent...');
+        const textarea = screen.getByPlaceholderText('Enter the system prompt for auto-run...');
         expect(document.activeElement).toBe(textarea);
       }, { timeout: 200 });
     });
@@ -1317,7 +1317,7 @@ describe('Playbook Update Functionality', () => {
     fireEvent.click(screen.getByText('Test Playbook'));
 
     // Modify the prompt
-    const textarea = screen.getByPlaceholderText('Enter the prompt for the batch agent...');
+    const textarea = screen.getByPlaceholderText('Enter the system prompt for auto-run...');
     fireEvent.change(textarea, { target: { value: 'Updated prompt' } });
 
     // Wait for Save Update button to appear
@@ -1362,7 +1362,7 @@ describe('Playbook Update Functionality', () => {
     fireEvent.click(screen.getByText('Test Playbook'));
 
     // Modify and save
-    const textarea = screen.getByPlaceholderText('Enter the prompt for the batch agent...');
+    const textarea = screen.getByPlaceholderText('Enter the system prompt for auto-run...');
     fireEvent.change(textarea, { target: { value: 'Updated prompt' } });
     await waitFor(() => screen.getByText('Save Update'));
     fireEvent.click(screen.getByText('Save Update'));
@@ -1396,7 +1396,7 @@ describe('Discard Changes Functionality', () => {
     fireEvent.click(screen.getByText('Test Playbook'));
 
     // Verify original prompt is loaded
-    const textarea = screen.getByPlaceholderText('Enter the prompt for the batch agent...');
+    const textarea = screen.getByPlaceholderText('Enter the system prompt for auto-run...');
     expect(textarea).toHaveValue('Original prompt');
 
     // Modify the prompt
@@ -1797,7 +1797,7 @@ describe('Save as New Playbook', () => {
     fireEvent.click(screen.getByText('Test Playbook'));
 
     // Modify the prompt
-    const textarea = screen.getByPlaceholderText('Enter the prompt for the batch agent...');
+    const textarea = screen.getByPlaceholderText('Enter the system prompt for auto-run...');
     fireEvent.change(textarea, { target: { value: 'Modified prompt' } });
 
     // Save as New button should appear
@@ -1825,7 +1825,7 @@ describe('Save as New Playbook', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Load Playbook' }));
     fireEvent.click(screen.getByText('Test Playbook'));
 
-    const textarea = screen.getByPlaceholderText('Enter the prompt for the batch agent...');
+    const textarea = screen.getByPlaceholderText('Enter the system prompt for auto-run...');
     fireEvent.change(textarea, { target: { value: 'Modified prompt' } });
 
     await waitFor(() => screen.getByText('Save as New'));

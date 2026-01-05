@@ -205,7 +205,14 @@ export function useMainKeyboardHandler(): UseMainKeyboardHandlerReturn {
         ctx.handleNavForward();
         trackShortcut('navForward');
       }
-      else if (ctx.isShortcut(e, 'toggleMode')) { e.preventDefault(); ctx.toggleInputMode(); trackShortcut('toggleMode'); }
+      else if (ctx.isShortcut(e, 'toggleMode')) {
+        // Disable mode toggle for wizard tabs - they have a unique input that doesn't support CLI switchover
+        const activeTab = ctx.activeSession?.aiTabs?.find((t: AITab) => t.id === ctx.activeSession?.activeTabId);
+        if (activeTab?.wizardState?.isActive) return;
+        e.preventDefault();
+        ctx.toggleInputMode();
+        trackShortcut('toggleMode');
+      }
       else if (ctx.isShortcut(e, 'quickAction')) {
         e.preventDefault();
         // Only open quick actions if there are agents
@@ -351,12 +358,15 @@ export function useMainKeyboardHandler(): UseMainKeyboardHandlerReturn {
         // Toggle markdown raw mode for AI message history
         // Skip when in AutoRun panel (it has its own Cmd+E handler for edit/preview toggle)
         // Skip when FilePreview is open (it handles its own Cmd+E)
+        // Skip when Auto Run is running (editing is locked)
         // Check both state-based detection AND DOM-based detection for robustness
         const isInAutoRunPanel = ctx.activeFocus === 'right' && ctx.activeRightTab === 'autorun';
         // Also check if the focused element is within an autorun panel (handles edge cases where activeFocus state may be stale)
         const activeElement = document.activeElement;
         const isInAutoRunDOM = activeElement?.closest('[data-tour="autorun-panel"]') !== null;
-        if (!isInAutoRunPanel && !isInAutoRunDOM && !ctx.previewFile) {
+        // Check if Auto Run is running and editing is locked (running without worktree)
+        const isAutoRunLocked = ctx.activeBatchRunState?.isRunning && !ctx.activeBatchRunState?.worktreeActive;
+        if (!isInAutoRunPanel && !isInAutoRunDOM && !ctx.previewFile && !isAutoRunLocked) {
           e.preventDefault();
           ctx.setMarkdownEditMode(!ctx.markdownEditMode);
           trackShortcut('toggleMarkdownMode');
@@ -410,13 +420,26 @@ export function useMainKeyboardHandler(): UseMainKeyboardHandlerReturn {
         }
         if (ctx.isTabShortcut(e, 'closeTab')) {
           e.preventDefault();
-          // Only close if there's more than one tab (closeTab returns null otherwise)
-          const result = ctx.closeTab(ctx.activeSession, ctx.activeSession.activeTabId, ctx.showUnreadOnly);
-          if (result) {
-            ctx.setSessions((prev: Session[]) => prev.map((s: Session) =>
-              s.id === ctx.activeSession!.id ? result.session : s
-            ));
-            trackShortcut('closeTab');
+          const activeTab = ctx.activeSession.aiTabs.find((t: AITab) => t.id === ctx.activeSession.activeTabId);
+
+          // Check if this is a wizard tab - show confirmation before closing
+          if (activeTab && ctx.hasActiveWizard && ctx.hasActiveWizard(activeTab)) {
+            ctx.setConfirmModalMessage('Close this wizard? Your progress will be lost and cannot be restored.');
+            ctx.setConfirmModalOnConfirm(() => () => {
+              ctx.performTabClose(ctx.activeSession.activeTabId);
+              trackShortcut('closeTab');
+            });
+            ctx.setConfirmModalOpen(true);
+          } else {
+            // Regular tab - use closeTab directly with skipHistory for wizard tabs
+            const isWizardTab = activeTab && ctx.hasActiveWizard && ctx.hasActiveWizard(activeTab);
+            const result = ctx.closeTab(ctx.activeSession, ctx.activeSession.activeTabId, ctx.showUnreadOnly, { skipHistory: isWizardTab });
+            if (result) {
+              ctx.setSessions((prev: Session[]) => prev.map((s: Session) =>
+                s.id === ctx.activeSession!.id ? result.session : s
+              ));
+              trackShortcut('closeTab');
+            }
           }
         }
         if (ctx.isTabShortcut(e, 'closeAllTabs')) {
@@ -506,6 +529,19 @@ export function useMainKeyboardHandler(): UseMainKeyboardHandlerReturn {
               ...s,
               aiTabs: s.aiTabs.map((tab: AITab) => {
                 if (tab.id !== s.activeTabId) return tab;
+                // Check if wizard is active on this tab - toggle wizard thinking instead
+                if (tab.wizardState?.isActive) {
+                  return {
+                    ...tab,
+                    wizardState: {
+                      ...tab.wizardState,
+                      showWizardThinking: !tab.wizardState.showWizardThinking,
+                      // Clear thinking content when turning off
+                      thinkingContent: !tab.wizardState.showWizardThinking ? '' : tab.wizardState.thinkingContent,
+                    }
+                  };
+                }
+                // Regular tab: toggle showThinking
                 // When turning OFF, also clear any existing thinking/tool logs
                 if (tab.showThinking) {
                   return { ...tab, showThinking: false, logs: tab.logs.filter(l => l.source !== 'thinking' && l.source !== 'tool') };

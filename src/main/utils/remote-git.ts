@@ -68,7 +68,7 @@ export async function execGitRemote(
   };
 
   // Build the SSH command
-  const sshCommand = buildSshCommand(sshRemote, remoteOptions);
+  const sshCommand = await buildSshCommand(sshRemote, remoteOptions);
 
   logger.debug(`Executing remote git command: ${args.join(' ')}`, LOG_CONTEXT, {
     host: sshRemote.host,
@@ -133,7 +133,7 @@ async function execRemoteShellCommand(
     env: sshRemote.remoteEnv,
   };
 
-  const sshCommand = buildSshCommand(sshRemote, remoteOptions);
+  const sshCommand = await buildSshCommand(sshRemote, remoteOptions);
   return execFileNoThrow(sshCommand.command, sshCommand.args);
 }
 

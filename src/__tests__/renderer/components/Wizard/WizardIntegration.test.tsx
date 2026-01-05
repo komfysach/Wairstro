@@ -104,6 +104,9 @@ vi.mock('lucide-react', () => ({
   Trash2: ({ className, style }: { className?: string; style?: React.CSSProperties }) => (
     <svg data-testid="trash-icon" className={className} style={style} />
   ),
+  Brain: ({ className, style }: { className?: string; style?: React.CSSProperties }) => (
+    <svg data-testid="brain-icon" className={className} style={style} />
+  ),
 }));
 
 // Mock react-markdown
@@ -431,7 +434,7 @@ describe('Wizard Integration Tests', () => {
 
       await waitFor(() => {
         expect(screen.getByText('Step 5 of 5')).toBeInTheDocument();
-        expect(screen.getByText('Review Your Action Plans')).toBeInTheDocument();
+        expect(screen.getByText('Review Your Playbooks')).toBeInTheDocument();
       });
     });
 
@@ -1284,7 +1287,7 @@ describe('Wizard Integration Tests', () => {
       renderWithProviders(<TestWrapper />);
 
       await waitFor(() => {
-        expect(screen.getByText('Review Your Action Plans')).toBeInTheDocument();
+        expect(screen.getByText('Review Your Playbooks')).toBeInTheDocument();
       });
     });
 

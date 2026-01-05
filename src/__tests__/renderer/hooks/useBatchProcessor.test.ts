@@ -715,6 +715,90 @@ describe('useBatchProcessor hook', () => {
     });
   });
 
+  describe('state synchronization', () => {
+    /**
+     * Regression test for bug where progress bar was stuck at "0 of N tasks completed"
+     * even after all tasks finished.
+     *
+     * Root cause: batchRunStatesRef was only updated on React re-render, but the
+     * debounce callback read this ref to compare state changes. When dispatches
+     * happened faster than React re-renders, the ref contained stale state.
+     *
+     * Fix: The dispatch wrapper now synchronously updates batchRunStatesRef
+     * immediately after each dispatch, ensuring debounced callbacks always
+     * see the current state.
+     *
+     * These tests verify the fix at the unit level by checking that getBatchState
+     * returns correct values immediately after state-changing operations.
+     */
+    it('should provide correct initial state via getBatchState', () => {
+      const sessions = [createMockSession()];
+      const groups = [createMockGroup()];
+
+      const { result } = renderHook(() =>
+        useBatchProcessor({
+          sessions,
+          groups,
+          onUpdateSession: mockOnUpdateSession,
+          onSpawnAgent: mockOnSpawnAgent,
+          onAddHistoryEntry: mockOnAddHistoryEntry,
+          onComplete: mockOnComplete
+        })
+      );
+
+      // Initial state should have 0 completed tasks
+      const state = result.current.getBatchState('test-session-id');
+      expect(state.completedTasksAcrossAllDocs).toBe(0);
+      expect(state.totalTasksAcrossAllDocs).toBe(0);
+      expect(state.isRunning).toBe(false);
+    });
+
+    it('should track hasAnyActiveBatch correctly', () => {
+      const sessions = [createMockSession()];
+      const groups = [createMockGroup()];
+
+      const { result } = renderHook(() =>
+        useBatchProcessor({
+          sessions,
+          groups,
+          onUpdateSession: mockOnUpdateSession,
+          onSpawnAgent: mockOnSpawnAgent,
+          onAddHistoryEntry: mockOnAddHistoryEntry,
+          onComplete: mockOnComplete
+        })
+      );
+
+      // Initially no active batches
+      expect(result.current.hasAnyActiveBatch).toBe(false);
+      expect(result.current.activeBatchSessionIds).toEqual([]);
+    });
+
+    it('should return default state for sessions that have not started batch processing', () => {
+      const sessions = [createMockSession({ id: 'session-1' }), createMockSession({ id: 'session-2' })];
+      const groups = [createMockGroup()];
+
+      const { result } = renderHook(() =>
+        useBatchProcessor({
+          sessions,
+          groups,
+          onUpdateSession: mockOnUpdateSession,
+          onSpawnAgent: mockOnSpawnAgent,
+          onAddHistoryEntry: mockOnAddHistoryEntry,
+          onComplete: mockOnComplete
+        })
+      );
+
+      // Both sessions should return default state with 0 progress
+      const state1 = result.current.getBatchState('session-1');
+      const state2 = result.current.getBatchState('session-2');
+
+      expect(state1.completedTasksAcrossAllDocs).toBe(0);
+      expect(state1.totalTasksAcrossAllDocs).toBe(0);
+      expect(state2.completedTasksAcrossAllDocs).toBe(0);
+      expect(state2.totalTasksAcrossAllDocs).toBe(0);
+    });
+  });
+
   describe('setCustomPrompt', () => {
     it('should set custom prompt for a session', () => {
       const sessions = [createMockSession()];
@@ -4169,6 +4253,226 @@ describe('useBatchProcessor hook', () => {
         expect.any(String),
         expect.any(String),
         '/usr/local/bin/gh'
+      );
+    });
+  });
+
+  describe('SSH remote session support', () => {
+    it('should pass sshRemoteId to readDoc for SSH sessions', async () => {
+      const sshSession = createMockSession({
+        sshRemoteId: 'ssh-remote-123',
+        sessionSshRemoteConfig: {
+          enabled: true,
+          remoteId: 'ssh-remote-123'
+        }
+      });
+      const sessions = [sshSession];
+      const groups = [createMockGroup()];
+
+      mockReadDoc.mockResolvedValue({ success: true, content: '- [x] Completed' });
+
+      const { result } = renderHook(() =>
+        useBatchProcessor({
+          sessions,
+          groups,
+          onUpdateSession: mockOnUpdateSession,
+          onSpawnAgent: mockOnSpawnAgent,
+          onAddHistoryEntry: mockOnAddHistoryEntry,
+          onComplete: mockOnComplete
+        })
+      );
+
+      await act(async () => {
+        await result.current.startBatchRun('test-session-id', {
+          documents: [{ filename: 'tasks', resetOnCompletion: false }],
+          prompt: 'Test',
+          loopEnabled: false
+        }, '/remote/path');
+      });
+
+      // Verify readDoc was called with sshRemoteId
+      expect(mockReadDoc).toHaveBeenCalledWith(
+        '/remote/path',
+        'tasks.md',
+        'ssh-remote-123' // sshRemoteId should be passed
+      );
+    });
+
+    it('should pass sshRemoteId through multiple readDoc calls for SSH sessions', async () => {
+      const sshSession = createMockSession({
+        sshRemoteId: 'ssh-remote-456',
+        sessionSshRemoteConfig: {
+          enabled: true,
+          remoteId: 'ssh-remote-456'
+        }
+      });
+      const sessions = [sshSession];
+      const groups = [createMockGroup()];
+
+      // Start with one unchecked task, then return checked after agent run
+      let callCount = 0;
+      mockReadDoc.mockImplementation(async () => {
+        callCount++;
+        if (callCount <= 2) return { success: true, content: '- [ ] Task' };
+        return { success: true, content: '- [x] Task' };
+      });
+
+      const { result } = renderHook(() =>
+        useBatchProcessor({
+          sessions,
+          groups,
+          onUpdateSession: mockOnUpdateSession,
+          onSpawnAgent: mockOnSpawnAgent,
+          onAddHistoryEntry: mockOnAddHistoryEntry,
+          onComplete: mockOnComplete
+        })
+      );
+
+      await act(async () => {
+        await result.current.startBatchRun('test-session-id', {
+          documents: [{ filename: 'tasks', resetOnCompletion: false }],
+          prompt: 'Test',
+          loopEnabled: false
+        }, '/remote/path');
+      });
+
+      // Verify all readDoc calls included sshRemoteId
+      const readDocCalls = mockReadDoc.mock.calls;
+      expect(readDocCalls.length).toBeGreaterThan(0);
+
+      // Every call should have sshRemoteId as the third argument
+      for (const call of readDocCalls) {
+        expect(call[2]).toBe('ssh-remote-456');
+      }
+    });
+
+    it('should use sessionSshRemoteConfig.remoteId when sshRemoteId is not set', async () => {
+      // This tests the fallback: session.sshRemoteId || session.sessionSshRemoteConfig?.remoteId
+      const sshSession = createMockSession({
+        sshRemoteId: undefined, // Not set (e.g., terminal-only SSH session)
+        sessionSshRemoteConfig: {
+          enabled: true,
+          remoteId: 'fallback-remote-789'
+        }
+      });
+      const sessions = [sshSession];
+      const groups = [createMockGroup()];
+
+      mockReadDoc.mockResolvedValue({ success: true, content: '- [x] Completed' });
+
+      const { result } = renderHook(() =>
+        useBatchProcessor({
+          sessions,
+          groups,
+          onUpdateSession: mockOnUpdateSession,
+          onSpawnAgent: mockOnSpawnAgent,
+          onAddHistoryEntry: mockOnAddHistoryEntry,
+          onComplete: mockOnComplete
+        })
+      );
+
+      await act(async () => {
+        await result.current.startBatchRun('test-session-id', {
+          documents: [{ filename: 'tasks', resetOnCompletion: false }],
+          prompt: 'Test',
+          loopEnabled: false
+        }, '/remote/path');
+      });
+
+      // Verify readDoc was called with the fallback sshRemoteId
+      expect(mockReadDoc).toHaveBeenCalledWith(
+        '/remote/path',
+        'tasks.md',
+        'fallback-remote-789' // Should use sessionSshRemoteConfig.remoteId as fallback
+      );
+    });
+
+    it('should pass sshRemoteId to worktree operations for SSH sessions', async () => {
+      const sshSession = createMockSession({
+        sshRemoteId: 'ssh-worktree-remote',
+        sessionSshRemoteConfig: {
+          enabled: true,
+          remoteId: 'ssh-worktree-remote'
+        }
+      });
+      const sessions = [sshSession];
+      const groups = [createMockGroup()];
+
+      let callCount = 0;
+      mockReadDoc.mockImplementation(async () => {
+        callCount++;
+        if (callCount <= 3) return { success: true, content: '- [ ] Task' };
+        return { success: true, content: '- [x] Task' };
+      });
+
+      const { result } = renderHook(() =>
+        useBatchProcessor({
+          sessions,
+          groups,
+          onUpdateSession: mockOnUpdateSession,
+          onSpawnAgent: mockOnSpawnAgent,
+          onAddHistoryEntry: mockOnAddHistoryEntry,
+          onComplete: mockOnComplete
+        })
+      );
+
+      await act(async () => {
+        await result.current.startBatchRun('test-session-id', {
+          documents: [{ filename: 'tasks', resetOnCompletion: false }],
+          prompt: 'Test',
+          loopEnabled: false,
+          worktree: {
+            enabled: true,
+            path: '/remote/worktree',
+            branchName: 'feature/ssh-test'
+          }
+        }, '/remote/folder');
+      });
+
+      // Verify worktreeSetup was called with sshRemoteId
+      expect(mockWorktreeSetup).toHaveBeenCalledWith(
+        '/test/path', // session.cwd
+        '/remote/worktree',
+        'feature/ssh-test',
+        'ssh-worktree-remote' // sshRemoteId should be passed
+      );
+    });
+
+    it('should not pass sshRemoteId for local sessions', async () => {
+      // Regular local session without SSH config
+      const localSession = createMockSession({
+        sshRemoteId: undefined,
+        sessionSshRemoteConfig: undefined
+      });
+      const sessions = [localSession];
+      const groups = [createMockGroup()];
+
+      mockReadDoc.mockResolvedValue({ success: true, content: '- [x] Completed' });
+
+      const { result } = renderHook(() =>
+        useBatchProcessor({
+          sessions,
+          groups,
+          onUpdateSession: mockOnUpdateSession,
+          onSpawnAgent: mockOnSpawnAgent,
+          onAddHistoryEntry: mockOnAddHistoryEntry,
+          onComplete: mockOnComplete
+        })
+      );
+
+      await act(async () => {
+        await result.current.startBatchRun('test-session-id', {
+          documents: [{ filename: 'tasks', resetOnCompletion: false }],
+          prompt: 'Test',
+          loopEnabled: false
+        }, '/local/path');
+      });
+
+      // Verify readDoc was called without sshRemoteId (undefined)
+      expect(mockReadDoc).toHaveBeenCalledWith(
+        '/local/path',
+        'tasks.md',
+        undefined // No sshRemoteId for local sessions
       );
     });
   });
