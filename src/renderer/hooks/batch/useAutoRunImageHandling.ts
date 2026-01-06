@@ -28,6 +28,8 @@ export interface UseAutoRunImageHandlingDeps {
   pushUndoState: () => void;
   /** Ref to last snapshotted content */
   lastUndoSnapshotRef: React.MutableRefObject<string>;
+  /** SSH remote ID for remote file operations */
+  sshRemoteId?: string;
 }
 
 /**
@@ -127,6 +129,7 @@ export function useAutoRunImageHandling({
   textareaRef,
   pushUndoState,
   lastUndoSnapshotRef,
+  sshRemoteId,
 }: UseAutoRunImageHandlingDeps): UseAutoRunImageHandlingReturn {
   // Attachment state
   const [attachmentsList, setAttachmentsList] = useState<string[]>([]);
@@ -159,7 +162,7 @@ export function useAutoRunImageHandling({
             // Load previews for existing images
             result.images.forEach((img: { filename: string; relativePath: string }) => {
               const absolutePath = `${folderPath}/${img.relativePath}`;
-              window.maestro.fs.readFile(absolutePath).then(dataUrl => {
+              window.maestro.fs.readFile(absolutePath, sshRemoteId).then(dataUrl => {
                 if (isStale) return;
                 if (dataUrl.startsWith('data:')) {
                   setAttachmentPreviews(prev => new Map(prev).set(img.relativePath, dataUrl));
@@ -187,7 +190,7 @@ export function useAutoRunImageHandling({
       setAttachmentsList([]);
       setAttachmentPreviews(new Map());
     }
-  }, [folderPath, selectedFile]);
+  }, [folderPath, selectedFile, sshRemoteId]);
 
   // Handle image paste
   const handlePaste = useCallback(async (e: React.ClipboardEvent) => {

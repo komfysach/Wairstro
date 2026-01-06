@@ -31,6 +31,7 @@ export interface GroomingProcessManager {
     command: string;
     args: string[];
     prompt?: string;
+    promptArgs?: (prompt: string) => string[];
     noPromptSeparator?: boolean;
   }): { pid: number; success?: boolean } | null;
   on(event: string, handler: (...args: unknown[]) => void): void;
@@ -285,6 +286,7 @@ export async function groomContext(
       command: agent.command,
       args: finalArgs,
       prompt: prompt, // Triggers batch mode (no PTY)
+      promptArgs: agent.promptArgs, // For agents using flag-based prompt (e.g., OpenCode -p)
       noPromptSeparator: agent.noPromptSeparator,
     });
 

@@ -1115,6 +1115,65 @@ describe('agent-detector', () => {
     });
   });
 
+  describe('OpenCode YOLO mode configuration', () => {
+    it('should use promptArgs with -p flag for YOLO mode (not batchModePrefix with run)', async () => {
+      // This test ensures we never regress to using 'run' subcommand which does NOT auto-approve permissions
+      // The -p flag is required for YOLO mode (auto-approve all permissions)
+      mockExecFileNoThrow.mockImplementation(async (cmd, args) => {
+        if (args[0] === 'opencode') {
+          return { stdout: '/usr/bin/opencode\n', stderr: '', exitCode: 0 };
+        }
+        return { stdout: '', stderr: '', exitCode: 1 };
+      });
+
+      const agents = await detector.detectAgents();
+      const opencode = agents.find(a => a.id === 'opencode');
+
+      expect(opencode).toBeDefined();
+
+      // CRITICAL: OpenCode must NOT use batchModePrefix with 'run' - it doesn't auto-approve permissions
+      expect(opencode?.batchModePrefix).toBeUndefined();
+
+      // CRITICAL: OpenCode MUST use promptArgs with -p flag for YOLO mode
+      expect(opencode?.promptArgs).toBeDefined();
+      expect(typeof opencode?.promptArgs).toBe('function');
+
+      // Verify promptArgs generates correct -p flag
+      const promptArgsResult = opencode?.promptArgs?.('test prompt');
+      expect(promptArgsResult).toEqual(['-p', 'test prompt']);
+    });
+
+    it('should NOT have noPromptSeparator since promptArgs handles prompt formatting', async () => {
+      mockExecFileNoThrow.mockImplementation(async (cmd, args) => {
+        if (args[0] === 'opencode') {
+          return { stdout: '/usr/bin/opencode\n', stderr: '', exitCode: 0 };
+        }
+        return { stdout: '', stderr: '', exitCode: 1 };
+      });
+
+      const agents = await detector.detectAgents();
+      const opencode = agents.find(a => a.id === 'opencode');
+
+      // When using promptArgs, noPromptSeparator should be undefined or not needed
+      // since the prompt is passed via the -p flag, not as a positional argument
+      expect(opencode?.noPromptSeparator).toBeUndefined();
+    });
+
+    it('should have correct jsonOutputArgs for JSON streaming', async () => {
+      mockExecFileNoThrow.mockImplementation(async (cmd, args) => {
+        if (args[0] === 'opencode') {
+          return { stdout: '/usr/bin/opencode\n', stderr: '', exitCode: 0 };
+        }
+        return { stdout: '', stderr: '', exitCode: 1 };
+      });
+
+      const agents = await detector.detectAgents();
+      const opencode = agents.find(a => a.id === 'opencode');
+
+      expect(opencode?.jsonOutputArgs).toEqual(['--format', 'json']);
+    });
+  });
+
   describe('clearModelCache', () => {
     beforeEach(async () => {
       mockExecFileNoThrow.mockImplementation(async (cmd, args) => {

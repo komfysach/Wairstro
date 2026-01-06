@@ -636,7 +636,7 @@ export function DocumentGraphView({
     const fullPath = `${rootPath}/${selectedNode.filePath}`;
 
     // Load file stats (created/modified dates)
-    window.maestro.fs.stat(fullPath)
+    window.maestro.fs.stat(fullPath, sshRemoteId)
       .then(stats => {
         setSelectedNodeStats({
           createdAt: stats.createdAt ? new Date(stats.createdAt) : null,
@@ -648,7 +648,7 @@ export function DocumentGraphView({
       });
 
     // Load file content to count tasks
-    window.maestro.fs.readFile(fullPath)
+    window.maestro.fs.readFile(fullPath, sshRemoteId)
       .then(content => {
         const tasks = countMarkdownTasks(content);
         setSelectedNodeTasks(tasks.total > 0 ? tasks : null);
@@ -656,7 +656,7 @@ export function DocumentGraphView({
       .catch(() => {
         setSelectedNodeTasks(null);
       });
-  }, [selectedNode, rootPath]);
+  }, [selectedNode, rootPath, sshRemoteId]);
 
   /**
    * Handle node double-click - expand to show outgoing links (fan out)

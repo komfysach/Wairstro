@@ -63,6 +63,7 @@ interface ProcessConfig {
   shellEnvVars?: Record<string, string>; // Environment variables for shell sessions
   images?: string[]; // Base64 data URLs for images (passed via stream-json input or file args)
   imageArgs?: (imagePath: string) => string[]; // Function to build image CLI args (e.g., ['-i', path] for Codex)
+  promptArgs?: (prompt: string) => string[]; // Function to build prompt args (e.g., ['-p', prompt] for OpenCode)
   contextWindow?: number; // Configured context window size (0 or undefined = not configured, hide UI)
   customEnvVars?: Record<string, string>; // Custom environment variables from user configuration
   noPromptSeparator?: boolean; // If true, don't add '--' before the prompt (e.g., OpenCode doesn't support it)
@@ -311,13 +312,14 @@ export class ProcessManager extends EventEmitter {
    * Spawn a new process for a session
    */
   spawn(config: ProcessConfig): { pid: number; success: boolean } {
-    const { sessionId, toolType, cwd, command, args, requiresPty, prompt, shell, shellArgs, shellEnvVars, images, imageArgs, contextWindow, customEnvVars, noPromptSeparator } = config;
+    const { sessionId, toolType, cwd, command, args, requiresPty, prompt, shell, shellArgs, shellEnvVars, images, imageArgs, promptArgs, contextWindow, customEnvVars, noPromptSeparator } = config;
 
     // Detect Windows early for logging decisions throughout the function
     const isWindows = process.platform === 'win32';
 
     // For batch mode with images, use stream-json mode and send message via stdin
     // For batch mode without images, append prompt to args with -- separator (unless noPromptSeparator is true)
+    // For agents with promptArgs (like OpenCode -p), use the promptArgs function to build prompt CLI args
     const hasImages = images && images.length > 0;
     const capabilities = getAgentCapabilities(toolType);
     let finalArgs: string[];
@@ -339,8 +341,10 @@ export class ProcessManager extends EventEmitter {
           finalArgs = [...finalArgs, ...imageArgs(tempPath)];
         }
       }
-      // Add the prompt at the end (with or without -- separator)
-      if (noPromptSeparator) {
+      // Add the prompt using promptArgs if available, otherwise as positional arg
+      if (promptArgs) {
+        finalArgs = [...finalArgs, ...promptArgs(prompt)];
+      } else if (noPromptSeparator) {
         finalArgs = [...finalArgs, prompt];
       } else {
         finalArgs = [...finalArgs, '--', prompt];
@@ -352,9 +356,11 @@ export class ProcessManager extends EventEmitter {
       });
     } else if (prompt) {
       // Regular batch mode - prompt as CLI arg
-      // The -- ensures prompt is treated as positional arg, not a flag (even if it starts with --)
-      // Some agents (e.g., OpenCode) don't support the -- separator
-      if (noPromptSeparator) {
+      // If agent has promptArgs (e.g., OpenCode -p), use that to build the prompt CLI args
+      // Otherwise, use the -- separator to treat prompt as positional arg (unless noPromptSeparator)
+      if (promptArgs) {
+        finalArgs = [...args, ...promptArgs(prompt)];
+      } else if (noPromptSeparator) {
         finalArgs = [...args, prompt];
       } else {
         finalArgs = [...args, '--', prompt];

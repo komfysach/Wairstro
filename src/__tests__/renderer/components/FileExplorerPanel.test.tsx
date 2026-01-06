@@ -1518,8 +1518,8 @@ describe('FileExplorerPanel', () => {
         fireEvent.click(deleteButton);
       });
 
-      // Modal now uses standardized "Confirm Action" title
-      expect(screen.getByText('Confirm Action')).toBeInTheDocument();
+      // Modal now uses "Delete File" title
+      expect(screen.getByText('Delete File')).toBeInTheDocument();
       // Check that the modal shows the file name in the confirmation message
       expect(screen.getByText(/cannot be undone/)).toBeInTheDocument();
     });
@@ -1561,8 +1561,8 @@ describe('FileExplorerPanel', () => {
         fireEvent.click(deleteButton);
       });
 
-      // Modal now uses standardized "Confirm Action" title
-      expect(screen.getByText('Confirm Action')).toBeInTheDocument();
+      // Modal now uses "Delete Folder" title
+      expect(screen.getByText('Delete Folder')).toBeInTheDocument();
       expect(screen.getByText(/5 files/)).toBeInTheDocument();
       expect(screen.getByText(/2 subfolders/)).toBeInTheDocument();
     });

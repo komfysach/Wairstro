@@ -1,5 +1,6 @@
 import { ipcMain, BrowserWindow } from 'electron';
 import Store from 'electron-store';
+import * as os from 'os';
 import { ProcessManager } from '../../process-manager';
 import { AgentDetector } from '../../agent-detector';
 import { logger } from '../../utils/logger';
@@ -251,10 +252,12 @@ export function registerProcessHandlers(deps: ProcessHandlerDependencies): void 
 
           // For SSH execution, we need to include the prompt in the args here
           // because ProcessManager.spawn() won't add it (we pass prompt: undefined for SSH)
-          // The prompt must be added with the '--' separator (unless noPromptSeparator is true)
+          // Use promptArgs if available (e.g., OpenCode -p), otherwise use positional arg
           let sshArgs = finalArgs;
           if (config.prompt) {
-            if (agent?.noPromptSeparator) {
+            if (agent?.promptArgs) {
+              sshArgs = [...finalArgs, ...agent.promptArgs(config.prompt)];
+            } else if (agent?.noPromptSeparator) {
               sshArgs = [...finalArgs, config.prompt];
             } else {
               sshArgs = [...finalArgs, '--', config.prompt];
@@ -293,6 +296,10 @@ export function registerProcessHandlers(deps: ProcessHandlerDependencies): void 
         ...config,
         command: commandToSpawn,
         args: argsToSpawn,
+        // When using SSH, use user's home directory as local cwd
+        // The remote working directory is embedded in the SSH command itself
+        // This fixes ENOENT errors when session.cwd is a remote-only path
+        cwd: sshRemoteUsed ? os.homedir() : config.cwd,
         // When using SSH, disable PTY (SSH provides its own terminal handling)
         // and env vars are passed via the remote command string
         requiresPty: sshRemoteUsed ? false : agent?.requiresPty,
@@ -306,7 +313,8 @@ export function registerProcessHandlers(deps: ProcessHandlerDependencies): void 
         // When using SSH, env vars are passed in the remote command string, not locally
         customEnvVars: sshRemoteUsed ? undefined : effectiveCustomEnvVars,
         imageArgs: agent?.imageArgs,     // Function to build image CLI args (for Codex, OpenCode)
-        noPromptSeparator: agent?.noPromptSeparator, // OpenCode doesn't support '--' before prompt
+        promptArgs: agent?.promptArgs,   // Function to build prompt args (e.g., ['-p', prompt] for OpenCode)
+        noPromptSeparator: agent?.noPromptSeparator, // Some agents don't support '--' before prompt
         // Stats tracking: use cwd as projectPath if not explicitly provided
         projectPath: config.cwd,
         // SSH remote context (for SSH-specific error messages)

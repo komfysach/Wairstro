@@ -35,6 +35,7 @@ export interface IProcessManager {
     prompt?: string;
     customEnvVars?: Record<string, string>;
     contextWindow?: number;
+    promptArgs?: (prompt: string) => string[];
     noPromptSeparator?: boolean;
   }): { pid: number; success: boolean };
 

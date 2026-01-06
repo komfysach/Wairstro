@@ -465,7 +465,7 @@ const PROVIDERS: ProviderConfig[] = [
     checkCommand: 'opencode --version',
     /**
      * Mirrors agent-detector.ts OpenCode definition:
-     *   batchModePrefix: ['run']
+     *   promptArgs: (prompt) => ['-p', prompt]  // -p flag enables YOLO mode (auto-approve)
      *   jsonOutputArgs: ['--format', 'json']
      *
      * And process-manager.ts spawn() logic for images:
@@ -474,14 +474,12 @@ const PROVIDERS: ProviderConfig[] = [
      */
     buildInitialArgs: (prompt: string, options?: { images?: string[] }) => {
       // OpenCode arg order from process.ts IPC handler:
-      // 1. batchModePrefix: ['run']
-      // 2. base args: [] (empty for OpenCode)
-      // 3. jsonOutputArgs: ['--format', 'json']
-      // 4. Optional: --model provider/model (from OPENCODE_MODEL env var)
-      // 5. prompt via '--' separator (process-manager.ts)
+      // 1. base args: [] (empty for OpenCode)
+      // 2. jsonOutputArgs: ['--format', 'json']
+      // 3. Optional: --model provider/model (from OPENCODE_MODEL env var)
+      // 4. promptArgs: ['-p', prompt] (YOLO mode with auto-approve)
 
       const args = [
-        'run',
         '--format', 'json',
       ];
 
@@ -503,12 +501,11 @@ const PROVIDERS: ProviderConfig[] = [
         throw new Error('OpenCode should not support stream-json input - capability misconfigured');
       }
 
-      // Regular batch mode - prompt as CLI arg
-      return [...args, '--', prompt];
+      // OpenCode uses -p flag for prompt (enables YOLO mode with auto-approve)
+      return [...args, '-p', prompt];
     },
     buildResumeArgs: (sessionId: string, prompt: string) => {
       const args = [
-        'run',
         '--format', 'json',
       ];
 
@@ -518,7 +515,8 @@ const PROVIDERS: ProviderConfig[] = [
         args.push('--model', model);
       }
 
-      args.push('--session', sessionId, '--', prompt);
+      // -p flag for YOLO mode, --session for resume
+      args.push('--session', sessionId, '-p', prompt);
       return args;
     },
     parseSessionId: (output: string) => {

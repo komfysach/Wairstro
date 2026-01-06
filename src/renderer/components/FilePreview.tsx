@@ -604,7 +604,7 @@ export const FilePreview = forwardRef<FilePreviewHandle, FilePreviewProps>(funct
   // Fetch file stats when file changes
   useEffect(() => {
     if (file?.path) {
-      window.maestro.fs.stat(file.path)
+      window.maestro.fs.stat(file.path, sshRemoteId)
         .then(stats => setFileStats({
           size: stats.size,
           createdAt: stats.createdAt,
@@ -615,7 +615,7 @@ export const FilePreview = forwardRef<FilePreviewHandle, FilePreviewProps>(funct
           setFileStats(null);
         });
     }
-  }, [file?.path]);
+  }, [file?.path, sshRemoteId]);
 
   // Count tokens when file content changes (skip for images and binary files)
   useEffect(() => {
@@ -741,7 +741,10 @@ export const FilePreview = forwardRef<FilePreviewHandle, FilePreviewProps>(funct
     }
   }, [searchOpen, hasChanges, onClose]);
 
-  // Register layer on mount
+  // Register layer on mount - only register once, use updateLayerHandler for handler changes
+  // Note: handleEscapeRequest is intentionally NOT in the dependency array to prevent
+  // infinite re-registration loops when its dependencies (hasChanges, searchOpen) change.
+  // The subsequent useEffect with updateLayerHandler handles keeping the handler current.
   useEffect(() => {
     layerIdRef.current = registerLayer({
       type: 'overlay',
@@ -759,7 +762,8 @@ export const FilePreview = forwardRef<FilePreviewHandle, FilePreviewProps>(funct
         unregisterLayer(layerIdRef.current);
       }
     };
-  }, [registerLayer, unregisterLayer, handleEscapeRequest]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [registerLayer, unregisterLayer]);
 
   // Update handler when dependencies change
   useEffect(() => {

@@ -10570,11 +10570,15 @@ You are taking over this conversation. Based on the context above, provide a bri
         ghCliAvailable={ghCliAvailable}
         onPublishGist={() => setGistPublishModalOpen(true)}
         onOpenInGraph={() => {
-          if (previewFile && activeSession?.fullPath) {
+          if (previewFile && activeSession) {
+            // Use the same rootPath that DocumentGraphView will use
+            const graphRootPath = activeSession.projectRoot || activeSession.cwd || '';
             // Compute relative path from the preview file
-            const relativePath = previewFile.path.startsWith(activeSession.fullPath)
-              ? previewFile.path.slice(activeSession.fullPath.length + 1)
-              : previewFile.name;
+            const relativePath = previewFile.path.startsWith(graphRootPath + '/')
+              ? previewFile.path.slice(graphRootPath.length + 1)
+              : previewFile.path.startsWith(graphRootPath)
+                ? previewFile.path.slice(graphRootPath.length + 1)
+                : previewFile.name;
             setGraphFocusFilePath(relativePath);
             setLastGraphFocusFilePath(relativePath); // Track for "Last Document Graph" in command palette
             setIsGraphViewOpen(true);

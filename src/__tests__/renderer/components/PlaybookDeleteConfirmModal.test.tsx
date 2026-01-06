@@ -18,6 +18,9 @@ vi.mock('lucide-react', () => ({
   AlertTriangle: ({ className, style }: { className?: string; style?: React.CSSProperties }) => (
     <svg data-testid="alert-triangle-icon" className={className} style={style} />
   ),
+  Trash2: ({ className, style }: { className?: string; style?: React.CSSProperties }) => (
+    <svg data-testid="trash2-icon" className={className} style={style} />
+  ),
 }));
 
 // Create a mock theme for testing
@@ -77,7 +80,22 @@ describe('PlaybookDeleteConfirmModal', () => {
         </TestWrapper>
       );
 
-      expect(screen.getByText('Confirm Action')).toBeInTheDocument();
+      expect(screen.getByText('Delete Playbook')).toBeInTheDocument();
+    });
+
+    it('renders trash icon in header', () => {
+      render(
+        <TestWrapper>
+          <PlaybookDeleteConfirmModal
+            theme={mockTheme}
+            playbookName="My Test Playbook"
+            onConfirm={mockOnConfirm}
+            onCancel={mockOnCancel}
+          />
+        </TestWrapper>
+      );
+
+      expect(screen.getByTestId('trash2-icon')).toBeInTheDocument();
     });
 
     it('displays the playbook name in the message', () => {
@@ -154,7 +172,7 @@ describe('PlaybookDeleteConfirmModal', () => {
 
       const dialog = screen.getByRole('dialog');
       expect(dialog).toHaveAttribute('aria-modal', 'true');
-      expect(dialog).toHaveAttribute('aria-label', 'Confirm Action');
+      expect(dialog).toHaveAttribute('aria-label', 'Delete Playbook');
     });
   });
 
@@ -291,7 +309,7 @@ describe('PlaybookDeleteConfirmModal', () => {
         </TestWrapper>
       );
 
-      const title = screen.getByText('Confirm Action');
+      const title = screen.getByText('Delete Playbook');
       expect(title).toHaveStyle({
         color: mockTheme.colors.textMain,
       });
@@ -474,7 +492,7 @@ describe('PlaybookDeleteConfirmModal', () => {
       );
 
       // Should still render the modal
-      expect(screen.getByText('Confirm Action')).toBeInTheDocument();
+      expect(screen.getByText('Delete Playbook')).toBeInTheDocument();
     });
   });
 });

@@ -612,6 +612,7 @@ const AutoRunInner = forwardRef<AutoRunHandle, AutoRunProps>(function AutoRunInn
     textareaRef,
     pushUndoState,
     lastUndoSnapshotRef,
+    sshRemoteId,
   });
 
   // Switch mode with scroll position synchronization

@@ -171,7 +171,7 @@ const AGENTS: AgentConfig[] = [
     checkCommand: 'opencode --version',
     /**
      * Mirrors agent-detector.ts OpenCode definition:
-     *   batchModePrefix: ['run']
+     *   promptArgs: (prompt) => ['-p', prompt]  // -p flag enables YOLO mode (auto-approve)
      *   jsonOutputArgs: ['--format', 'json']
      *
      * And process-manager.ts spawn() logic for images:
@@ -179,7 +179,6 @@ const AGENTS: AgentConfig[] = [
      */
     buildArgs: (prompt: string, options?: { images?: string[] }) => {
       const args = [
-        'run',
         '--format', 'json',
       ];
 
@@ -193,8 +192,8 @@ const AGENTS: AgentConfig[] = [
         throw new Error('OpenCode should not support stream-json input - capability misconfigured');
       }
 
-      // Regular batch mode - prompt as CLI arg
-      return [...args, '--', prompt];
+      // OpenCode uses -p flag for prompt (enables YOLO mode with auto-approve)
+      return [...args, '-p', prompt];
     },
     parseResponse: (output: string) => {
       const responses: string[] = [];

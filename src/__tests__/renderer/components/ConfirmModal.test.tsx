@@ -20,6 +20,9 @@ import type { Theme } from '../../../renderer/types';
 vi.mock('lucide-react', () => ({
   X: () => <svg data-testid="x-icon" />,
   AlertTriangle: () => <svg data-testid="alert-triangle-icon" />,
+  Trash2: ({ className, style }: { className?: string; style?: React.CSSProperties }) => (
+    <svg data-testid="trash2-icon" className={className} style={style} />
+  ),
 }));
 
 // Create a test theme
@@ -83,8 +86,21 @@ describe('ConfirmModal', () => {
         />
       );
 
-      expect(screen.getByText('Confirm Action')).toBeInTheDocument();
+      expect(screen.getByText('Confirm Delete')).toBeInTheDocument();
       expect(screen.getByTestId('x-icon')).toBeInTheDocument();
+    });
+
+    it('renders trash icon in header', () => {
+      renderWithLayerStack(
+        <ConfirmModal
+          theme={testTheme}
+          message="Test"
+          onConfirm={vi.fn()}
+          onClose={vi.fn()}
+        />
+      );
+
+      expect(screen.getByTestId('trash2-icon')).toBeInTheDocument();
     });
 
     it('has correct ARIA attributes', () => {
@@ -99,7 +115,7 @@ describe('ConfirmModal', () => {
 
       const dialog = screen.getByRole('dialog');
       expect(dialog).toHaveAttribute('aria-modal', 'true');
-      expect(dialog).toHaveAttribute('aria-label', 'Confirm Action');
+      expect(dialog).toHaveAttribute('aria-label', 'Confirm Delete');
     });
   });
 
@@ -277,7 +293,7 @@ describe('ConfirmModal', () => {
         />
       );
 
-      expect(screen.getByRole('heading', { name: 'Confirm Action' })).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'Confirm Delete' })).toBeInTheDocument();
     });
   });
 });

@@ -347,6 +347,70 @@ describe('process IPC handlers', () => {
         })
       );
     });
+
+    it('should pass promptArgs to spawn for agents that use flag-based prompts (like OpenCode -p)', async () => {
+      // This test ensures promptArgs is passed through to ProcessManager.spawn
+      // OpenCode uses promptArgs: (prompt) => ['-p', prompt] for YOLO mode
+      const mockPromptArgs = (prompt: string) => ['-p', prompt];
+      const mockAgent = {
+        id: 'opencode',
+        requiresPty: false,
+        promptArgs: mockPromptArgs,
+      };
+
+      mockAgentDetector.getAgent.mockResolvedValue(mockAgent);
+      mockProcessManager.spawn.mockReturnValue({ pid: 2001, success: true });
+
+      const handler = handlers.get('process:spawn');
+      await handler!({} as any, {
+        sessionId: 'session-opencode',
+        toolType: 'opencode',
+        cwd: '/test/project',
+        command: 'opencode',
+        args: ['--format', 'json'],
+        prompt: 'test prompt for opencode',
+      });
+
+      // Verify promptArgs function is passed to spawn
+      expect(mockProcessManager.spawn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sessionId: 'session-opencode',
+          toolType: 'opencode',
+          promptArgs: mockPromptArgs,
+        })
+      );
+    });
+
+    it('should NOT pass promptArgs for agents that use positional prompts (like Claude)', async () => {
+      // Claude uses positional args with -- separator, not promptArgs
+      const mockAgent = {
+        id: 'claude-code',
+        requiresPty: false,
+        // Note: no promptArgs defined
+      };
+
+      mockAgentDetector.getAgent.mockResolvedValue(mockAgent);
+      mockProcessManager.spawn.mockReturnValue({ pid: 2002, success: true });
+
+      const handler = handlers.get('process:spawn');
+      await handler!({} as any, {
+        sessionId: 'session-claude',
+        toolType: 'claude-code',
+        cwd: '/test/project',
+        command: 'claude',
+        args: ['--print', '--verbose'],
+        prompt: 'test prompt for claude',
+      });
+
+      // Verify promptArgs is undefined for Claude
+      expect(mockProcessManager.spawn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sessionId: 'session-claude',
+          toolType: 'claude-code',
+          promptArgs: undefined,
+        })
+      );
+    });
   });
 
   describe('process:write', () => {
@@ -977,6 +1041,48 @@ describe('process IPC handlers', () => {
       const spawnCall = mockProcessManager.spawn.mock.calls[0][0];
       const remoteCommandArg = spawnCall.args[spawnCall.args.length - 1];
       expect(remoteCommandArg).toContain('/home/devuser/projects');
+    });
+
+    it('should use local home directory as cwd when spawning SSH (fixes ENOENT for remote-only paths)', async () => {
+      // This test verifies the fix for: spawn /usr/bin/ssh ENOENT
+      // The bug occurred because when session.cwd is a remote path (e.g., /home/user/project),
+      // that path doesn't exist locally, causing Node.js spawn() to fail with ENOENT.
+      // The fix uses os.homedir() as the local cwd when SSH is active.
+      const mockAgent = {
+        id: 'claude-code',
+        requiresPty: false,
+      };
+
+      mockAgentDetector.getAgent.mockResolvedValue(mockAgent);
+      mockSettingsStore.get.mockImplementation((key, defaultValue) => {
+        if (key === 'sshRemotes') return [mockSshRemote];
+        return defaultValue;
+      });
+      mockProcessManager.spawn.mockReturnValue({ pid: 12345, success: true });
+
+      const handler = handlers.get('process:spawn');
+      await handler!({} as any, {
+        sessionId: 'session-1',
+        toolType: 'claude-code',
+        cwd: '/home/remoteuser/remote-project', // Remote path that doesn't exist locally
+        command: 'claude',
+        args: ['--print'],
+        sessionSshRemoteConfig: {
+          enabled: true,
+          remoteId: 'remote-1',
+        },
+      });
+
+      // When using SSH, the local cwd should be user's home directory (via os.homedir())
+      // NOT the remote path which would cause ENOENT
+      const spawnCall = mockProcessManager.spawn.mock.calls[0][0];
+      expect(spawnCall.command).toBe('ssh');
+      // The cwd should be the local home directory, not the remote path
+      // We can't easily test the exact value of os.homedir() in a mock,
+      // but we verify it's NOT the remote path
+      expect(spawnCall.cwd).not.toBe('/home/remoteuser/remote-project');
+      // The remote path should be embedded in the SSH command args instead
+      expect(spawnCall.args.join(' ')).toContain('claude');
     });
   });
 });

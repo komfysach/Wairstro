@@ -764,8 +764,7 @@ describe('HistoryDetailModal', () => {
 
       fireEvent.click(screen.getByTitle('Delete this history entry'));
 
-      // Modal now uses standardized "Confirm Action" title
-      expect(screen.getByText('Confirm Action')).toBeInTheDocument();
+      expect(screen.getByText('Delete History Entry')).toBeInTheDocument();
       expect(screen.getByText(/Are you sure you want to delete/)).toBeInTheDocument();
     });
 
@@ -810,6 +809,10 @@ describe('HistoryDetailModal', () => {
       );
 
       fireEvent.click(screen.getByTitle('Delete this history entry'));
+
+      // Verify delete confirmation is shown
+      expect(screen.getByText('Delete History Entry')).toBeInTheDocument();
+
       fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
 
       expect(mockOnDelete).not.toHaveBeenCalled();
@@ -846,6 +849,9 @@ describe('HistoryDetailModal', () => {
       );
 
       fireEvent.click(screen.getByTitle('Delete this history entry'));
+
+      // Verify delete confirmation is shown
+      expect(screen.getByText('Delete History Entry')).toBeInTheDocument();
 
       // Find the delete confirmation modal backdrop and click it
       const backdrops = document.querySelectorAll('.bg-black\\/60');
@@ -1307,8 +1313,8 @@ describe('HistoryDetailModal', () => {
       const modalContent = container.querySelector('.w-\\[400px\\]');
       if (modalContent) {
         fireEvent.click(modalContent);
-        // Modal should still be open - title is now "Confirm Action"
-        expect(screen.getByText('Confirm Action')).toBeInTheDocument();
+        // Modal should still be open
+        expect(screen.getByText('Delete History Entry')).toBeInTheDocument();
       }
     });
   });

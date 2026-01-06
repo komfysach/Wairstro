@@ -1120,6 +1120,7 @@ export const MainPanel = React.memo(forwardRef<MainPanelHandle, MainPanelProps>(
                 ghCliAvailable={props.ghCliAvailable}
                 onPublishGist={props.onPublishGist}
                 onOpenInGraph={props.onOpenInGraph}
+                sshRemoteId={activeSession?.sshRemoteId || activeSession?.sessionSshRemoteConfig?.remoteId || undefined}
               />
             </div>
           ) : (

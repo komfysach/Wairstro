@@ -1229,6 +1229,7 @@ async function parseFileWithSsh(rootPath: string, relativePath: string, sshRemot
     // Get file stats
     const stat = await window.maestro.fs.stat(fullPath, sshRemoteId);
     if (!stat) {
+      console.warn(`[DocumentGraph] parseFileWithSsh: stat returned null for ${fullPath}`);
       return null;
     }
     const fileSize = stat.size ?? 0;
@@ -1246,6 +1247,7 @@ async function parseFileWithSsh(rootPath: string, relativePath: string, sshRemot
     // Read file content
     const content = await window.maestro.fs.readFile(fullPath, sshRemoteId);
     if (content === null || content === undefined) {
+      console.warn(`[DocumentGraph] parseFileWithSsh: readFile returned null for ${fullPath}`);
       return null;
     }
 
