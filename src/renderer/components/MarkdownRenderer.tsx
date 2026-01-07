@@ -288,16 +288,42 @@ export const MarkdownRenderer = memo(({ content, theme, onCopy, className = '', 
             );
           },
           table: ({ node: _node, style, ...props }: any) => (
-            <div className="overflow-x-auto scrollbar-thin">
+            <div className="overflow-x-auto scrollbar-thin" style={{ maxWidth: '100%' }}>
               <table
                 {...props}
                 style={{
                   minWidth: '100%',
-                  width: 'max-content',
+                  borderCollapse: 'collapse',
                   ...(style || {}),
                 }}
               />
             </div>
+          ),
+          th: ({ node: _node, style, ...props }: any) => (
+            <th
+              {...props}
+              style={{
+                padding: '8px 12px',
+                textAlign: 'left',
+                borderBottom: `1px solid ${theme.colors.border}`,
+                whiteSpace: 'nowrap',
+                ...(style || {}),
+              }}
+            />
+          ),
+          td: ({ node: _node, style, ...props }: any) => (
+            <td
+              {...props}
+              style={{
+                padding: '8px 12px',
+                borderBottom: `1px solid ${theme.colors.border}`,
+                wordWrap: 'break-word',
+                overflowWrap: 'break-word',
+                whiteSpace: 'normal',
+                verticalAlign: 'top',
+                ...(style || {}),
+              }}
+            />
           ),
         }}
       >
