@@ -1226,6 +1226,11 @@ export const FilePreview = forwardRef<FilePreviewHandle, FilePreviewProps>(funct
       e.preventDefault();
       e.stopPropagation();
       onOpenFuzzySearch();
+    } else if (e.key === 'c' && (e.metaKey || e.ctrlKey) && isImage) {
+      // Cmd+C: Copy image to clipboard when viewing an image
+      e.preventDefault();
+      e.stopPropagation();
+      copyContentToClipboard();
     }
   };
 
@@ -1308,7 +1313,7 @@ export const FilePreview = forwardRef<FilePreviewHandle, FilePreviewProps>(funct
               onClick={copyContentToClipboard}
               className="p-2 rounded hover:bg-white/10 transition-colors"
               style={{ color: theme.colors.textDim }}
-              title={isImage ? "Copy image to clipboard" : "Copy content to clipboard"}
+              title={isImage ? "Copy image to clipboard (⌘C)" : "Copy content to clipboard"}
             >
               <Clipboard className="w-4 h-4" />
             </button>

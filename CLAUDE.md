@@ -117,6 +117,8 @@ src/
 | Add agent session storage | `src/main/storage/`, `src/main/agent-session-storage.ts` |
 | Add agent error patterns | `src/main/parsers/error-patterns.ts` |
 | Add playbook feature | `src/cli/services/playbooks.ts` |
+| Add marketplace playbook | `src/main/ipc/handlers/marketplace.ts` (import from GitHub) |
+| Playbook import/export | `src/main/ipc/handlers/playbooks.ts` (ZIP handling with assets) |
 | Modify wizard flow | `src/renderer/components/Wizard/` (see Onboarding Wizard section) |
 | Add tour step | `src/renderer/components/Wizard/tour/tourSteps.ts` |
 | Modify file linking | `src/renderer/utils/remarkFileLinks.ts` (remark plugin for `[[wiki]]` and path links) |
@@ -258,6 +260,28 @@ window.maestro.autorun.saveDocument(folderPath, filename, content);
 ```
 
 **Worktree Support:** Auto Run can operate in a git worktree, allowing users to continue interactive editing in the main repo while Auto Run processes tasks in the background. When `batchRunState.worktreeActive` is true, read-only mode is disabled and a git branch icon appears in the UI. See `useBatchProcessor.ts` for worktree setup logic.
+
+**Playbook Assets:** Playbooks can include non-markdown assets (config files, YAML, Dockerfiles, scripts) in an `assets/` subfolder. When installing playbooks from the marketplace or importing from ZIP files, Maestro copies the entire folder structure including assets. See the [Maestro-Playbooks repository](https://github.com/pedramamini/Maestro-Playbooks) for the convention documentation.
+
+```
+playbook-folder/
+├── 01_TASK.md
+├── 02_TASK.md
+├── README.md
+└── assets/
+    ├── config.yaml
+    ├── Dockerfile
+    └── setup.sh
+```
+
+Documents can reference assets using `{{AUTORUN_FOLDER}}/assets/filename`. The manifest lists assets explicitly:
+```json
+{
+  "id": "example-playbook",
+  "documents": [...],
+  "assets": ["config.yaml", "Dockerfile", "setup.sh"]
+}
+```
 
 ### 9. Tab Hover Overlay Menu
 

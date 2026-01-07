@@ -448,8 +448,52 @@ describe('LightboxModal', () => {
       );
 
       // Click copy button
-      const copyButton = screen.getByTitle('Copy image to clipboard');
+      const copyButton = screen.getByTitle('Copy image to clipboard (⌘C)');
       fireEvent.click(copyButton);
+
+      await waitFor(() => {
+        expect(global.fetch).toHaveBeenCalledWith(mockImage);
+        expect(mockClipboardWrite).toHaveBeenCalled();
+      });
+    });
+
+    it('copies image to clipboard when Cmd+C pressed', async () => {
+      const onClose = vi.fn();
+      const onNavigate = vi.fn();
+
+      renderWithLayerStack(
+        <LightboxModal
+          image={mockImage}
+          stagedImages={mockImages}
+          onClose={onClose}
+          onNavigate={onNavigate}
+        />
+      );
+
+      const dialog = screen.getByRole('dialog');
+      fireEvent.keyDown(dialog, { key: 'c', metaKey: true });
+
+      await waitFor(() => {
+        expect(global.fetch).toHaveBeenCalledWith(mockImage);
+        expect(mockClipboardWrite).toHaveBeenCalled();
+      });
+    });
+
+    it('copies image to clipboard when Ctrl+C pressed', async () => {
+      const onClose = vi.fn();
+      const onNavigate = vi.fn();
+
+      renderWithLayerStack(
+        <LightboxModal
+          image={mockImage}
+          stagedImages={mockImages}
+          onClose={onClose}
+          onNavigate={onNavigate}
+        />
+      );
+
+      const dialog = screen.getByRole('dialog');
+      fireEvent.keyDown(dialog, { key: 'c', ctrlKey: true });
 
       await waitFor(() => {
         expect(global.fetch).toHaveBeenCalledWith(mockImage);
@@ -473,7 +517,7 @@ describe('LightboxModal', () => {
       // Initially shows copy icon
       expect(screen.getByTestId('copy-icon')).toBeInTheDocument();
 
-      const copyButton = screen.getByTitle('Copy image to clipboard');
+      const copyButton = screen.getByTitle('Copy image to clipboard (⌘C)');
       fireEvent.click(copyButton);
 
       await waitFor(() => {
@@ -496,7 +540,7 @@ describe('LightboxModal', () => {
         />
       );
 
-      const copyButton = screen.getByTitle('Copy image to clipboard');
+      const copyButton = screen.getByTitle('Copy image to clipboard (⌘C)');
 
       // Trigger copy and immediately resolve the promise chain
       await act(async () => {
@@ -531,7 +575,7 @@ describe('LightboxModal', () => {
         />
       );
 
-      const copyButton = screen.getByTitle('Copy image to clipboard');
+      const copyButton = screen.getByTitle('Copy image to clipboard (⌘C)');
       fireEvent.click(copyButton);
 
       expect(onClose).not.toHaveBeenCalled();
@@ -553,7 +597,7 @@ describe('LightboxModal', () => {
         />
       );
 
-      const copyButton = screen.getByTitle('Copy image to clipboard');
+      const copyButton = screen.getByTitle('Copy image to clipboard (⌘C)');
       fireEvent.click(copyButton);
 
       await waitFor(() => {
@@ -775,7 +819,7 @@ describe('LightboxModal', () => {
         />
       );
 
-      const copyButton = screen.getByTitle('Copy image to clipboard');
+      const copyButton = screen.getByTitle('Copy image to clipboard (⌘C)');
       expect(copyButton).toHaveClass('bg-white/10');
       expect(copyButton).toHaveClass('hover:bg-white/20');
       expect(copyButton).toHaveClass('rounded-full');

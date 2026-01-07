@@ -186,7 +186,7 @@ describe('AutoRunLightbox', () => {
       const props = createDefaultProps();
       renderWithProviders(<AutoRunLightbox {...props} />);
 
-      expect(screen.getByTitle('Copy image to clipboard')).toBeInTheDocument();
+      expect(screen.getByTitle('Copy image to clipboard (⌘C)')).toBeInTheDocument();
       expect(screen.getByTestId('copy-icon')).toBeInTheDocument();
     });
 
@@ -637,7 +637,33 @@ describe('AutoRunLightbox', () => {
       const props = createDefaultProps();
       renderWithProviders(<AutoRunLightbox {...props} />);
 
-      fireEvent.click(screen.getByTitle('Copy image to clipboard'));
+      fireEvent.click(screen.getByTitle('Copy image to clipboard (⌘C)'));
+
+      await waitFor(() => {
+        expect(global.fetch).toHaveBeenCalledWith('data:image/png;base64,mock-data-image1.png');
+        expect(mockClipboardWrite).toHaveBeenCalled();
+      });
+    });
+
+    it('should copy image to clipboard when Cmd+C is pressed', async () => {
+      const props = createDefaultProps();
+      renderWithProviders(<AutoRunLightbox {...props} />);
+
+      const backdrop = document.querySelector('.fixed.inset-0.z-\\[9999\\]');
+      fireEvent.keyDown(backdrop!, { key: 'c', metaKey: true });
+
+      await waitFor(() => {
+        expect(global.fetch).toHaveBeenCalledWith('data:image/png;base64,mock-data-image1.png');
+        expect(mockClipboardWrite).toHaveBeenCalled();
+      });
+    });
+
+    it('should copy image to clipboard when Ctrl+C is pressed', async () => {
+      const props = createDefaultProps();
+      renderWithProviders(<AutoRunLightbox {...props} />);
+
+      const backdrop = document.querySelector('.fixed.inset-0.z-\\[9999\\]');
+      fireEvent.keyDown(backdrop!, { key: 'c', ctrlKey: true });
 
       await waitFor(() => {
         expect(global.fetch).toHaveBeenCalledWith('data:image/png;base64,mock-data-image1.png');
@@ -652,7 +678,7 @@ describe('AutoRunLightbox', () => {
       // Initially shows copy icon
       expect(screen.getByTestId('copy-icon')).toBeInTheDocument();
 
-      fireEvent.click(screen.getByTitle('Copy image to clipboard'));
+      fireEvent.click(screen.getByTitle('Copy image to clipboard (⌘C)'));
 
       await waitFor(() => {
         expect(screen.getByTestId('check-icon')).toBeInTheDocument();
@@ -666,7 +692,7 @@ describe('AutoRunLightbox', () => {
       const props = createDefaultProps();
       renderWithProviders(<AutoRunLightbox {...props} />);
 
-      const copyButton = screen.getByTitle('Copy image to clipboard');
+      const copyButton = screen.getByTitle('Copy image to clipboard (⌘C)');
 
       // Trigger copy and immediately resolve the promise chain
       await act(async () => {
@@ -693,7 +719,7 @@ describe('AutoRunLightbox', () => {
       const props = createDefaultProps({ onClose });
       renderWithProviders(<AutoRunLightbox {...props} />);
 
-      fireEvent.click(screen.getByTitle('Copy image to clipboard'));
+      fireEvent.click(screen.getByTitle('Copy image to clipboard (⌘C)'));
 
       // onClose should NOT be called because stopPropagation prevents backdrop click
       expect(onClose).not.toHaveBeenCalled();
@@ -706,7 +732,7 @@ describe('AutoRunLightbox', () => {
       const props = createDefaultProps();
       renderWithProviders(<AutoRunLightbox {...props} />);
 
-      fireEvent.click(screen.getByTitle('Copy image to clipboard'));
+      fireEvent.click(screen.getByTitle('Copy image to clipboard (⌘C)'));
 
       await waitFor(() => {
         expect(consoleSpy).toHaveBeenCalledWith(
@@ -727,7 +753,7 @@ describe('AutoRunLightbox', () => {
       });
       renderWithProviders(<AutoRunLightbox {...props} />);
 
-      fireEvent.click(screen.getByTitle('Copy image to clipboard'));
+      fireEvent.click(screen.getByTitle('Copy image to clipboard (⌘C)'));
 
       await waitFor(() => {
         expect(global.fetch).toHaveBeenCalledWith('https://example.com/image.png');
@@ -1095,7 +1121,7 @@ describe('AutoRunLightbox', () => {
 
       expect(screen.getByTitle('Previous image (←)')).toBeInTheDocument();
       expect(screen.getByTitle('Next image (→)')).toBeInTheDocument();
-      expect(screen.getByTitle('Copy image to clipboard')).toBeInTheDocument();
+      expect(screen.getByTitle('Copy image to clipboard (⌘C)')).toBeInTheDocument();
       expect(screen.getByTitle('Delete image (Delete key)')).toBeInTheDocument();
       expect(screen.getByTitle('Close (ESC)')).toBeInTheDocument();
     });

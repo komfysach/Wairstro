@@ -193,8 +193,11 @@ export const AutoRunLightbox = memo(({
       if (!lightboxExternalUrl && onDelete) {
         promptDelete();
       }
+    } else if (e.key === 'c' && (e.metaKey || e.ctrlKey)) {
+      e.preventDefault();
+      copyToClipboard();
     }
-  }, [goToPrevImage, goToNextImage, lightboxExternalUrl, onDelete, promptDelete]);
+  }, [goToPrevImage, goToNextImage, lightboxExternalUrl, onDelete, promptDelete, copyToClipboard]);
 
   // Don't render if no image is selected
   const imageUrl = lightboxExternalUrl || (lightboxFilename ? attachmentPreviews.get(lightboxFilename) : undefined);
@@ -245,7 +248,7 @@ export const AutoRunLightbox = memo(({
         <button
           onClick={(e) => { e.stopPropagation(); copyToClipboard(); }}
           className="bg-white/10 hover:bg-white/20 text-white rounded-full p-3 backdrop-blur-sm transition-colors flex items-center gap-2"
-          title="Copy image to clipboard"
+          title="Copy image to clipboard (⌘C)"
         >
           {copied ? <Check className="w-5 h-5" /> : <Copy className="w-5 h-5" />}
           {copied && <span className="text-sm">Copied!</span>}

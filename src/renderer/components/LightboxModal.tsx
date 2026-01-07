@@ -160,6 +160,10 @@ export function LightboxModal({ image, stagedImages, onClose, onNavigate, onDele
           e.preventDefault();
           promptDelete();
         }
+        else if (e.key === 'c' && (e.metaKey || e.ctrlKey)) {
+          e.preventDefault();
+          copyImageToClipboard();
+        }
       }}
       tabIndex={-1}
       role="dialog"
@@ -182,7 +186,7 @@ export function LightboxModal({ image, stagedImages, onClose, onNavigate, onDele
         <button
           onClick={(e) => { e.stopPropagation(); copyImageToClipboard(); }}
           className="bg-white/10 hover:bg-white/20 text-white rounded-full p-3 backdrop-blur-sm transition-colors flex items-center gap-2"
-          title="Copy image to clipboard"
+          title="Copy image to clipboard (⌘C)"
         >
           {copied ? <Check className="w-5 h-5" /> : <Copy className="w-5 h-5" />}
           {copied && <span className="text-sm">Copied!</span>}
