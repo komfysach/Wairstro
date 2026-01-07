@@ -15,39 +15,38 @@ Maestro can update itself automatically! This feature was introduced in **v0.8.7
 
 ## v0.14.x - Doc Graphs, SSH Agents, Inline Wizard
 
-**Latest: v0.14.1** | Released January 6, 2026
+**Latest: v0.14.3** | Released January 1, 1
 
-This point release brings enhancements to the new agent Wizard as well as a new "inline" or in-tab wizard that can be triggered via `/wizard`. Additionally:
+Changes in this point release include:
 
-- The tab menu has a new "Publish as GitHub Gist" option  📝
-- The tab menu has options to move the tab to the first or last position 🔀
-- Improved context compaction with multi-pass consolidation 📚
-- Addressed some keyboard shortcut and pathing issues specific to Windows 🪟
-- Added caching layer to Document Graph view 💨
-- Addressed a bug in sending context from one agent to another 🤝
-- Bugfix in custom path detection for new agents 🐛
-- You can now edit any text file from within Maestro 📄
-- Files and folders can be renamed/deleted from the file tree 📁
-- Proper leaderboard sync for folks who use multiple instances of Maestro 🏆
-- Addressed regression where OpenCode was not launching in YOLO mode 🐜
+-
 
-The other major contributions to 0.14.x remain:
+The major contributions to 0.14.x remain:
 
 🗄️ Document Graphs. Launch from file preview or from the FIle tree panel. Explore relationships between Markdown documents that contain links between documents and to URLs.
 
 📶 SSH support for agents. Manage a remote agent with feature parity over SSH. Includes support for Git and File tree panels. Manage agents on remote systems or in containers. This even works for Group Chat, which is rad as hell.
 
-### Other Changes in 0.14.x
+🧙‍♂️ Added an in-tab wizard for generating Auto Run Playbooks via `/wizard` or a new button in the Auto Run panel.
+
+# Smaller Changes in 014.x
+
 - Improved User Dashboard, available from hamburger menu, command palette or hotkey 🎛️
-- Leaderboard tracking now works across multiple systems 🏆
+- Leaderboard tracking now works across multiple systems and syncs level from cloud 🏆
 - Agent duplication. Pro tip: Consider a group of unused "Template" agents ✌️
 - New setting to prevent system from going to sleep while agents are active 🛏️
-- Added debug package to the wizard process, if you have issues there, please share the logs! 🧙‍♂️
+- The tab menu has a new "Publish as GitHub Gist" option  📝
+- The tab menu has options to move the tab to the first or last position 🔀
+- [Maestro-Playbooks](https://github.com/pedramamini/Maestro-Playbooks) can now contain non-markdown assets 📙
+- Improved default shell detection 🐚
 
-Thanks for the contributions: @t1mmen @aejfager @Crumbgrabber @whglaser @b3nw @deandebeer @shadown @breki
+
+Thanks for the contributions: @t1mmen @aejfager @Crumbgrabber @whglaser @b3nw @deandebeer @shadown @breki @charles-dyfis-net
 
 ### Previous Releases in this Series
 
+- **v0.14.2** (January 7, 2026) - Doc Graphs, SSH Agents, Inline Wizard
+- **v0.14.1** (January 6, 2026) - Doc Graphs, SSH Agents, Inline Wizard
 - **v0.14.0** (January 2, 2026) - Document Graphs and Agents over SSH
 
 ---
