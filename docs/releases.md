@@ -15,11 +15,21 @@ Maestro can update itself automatically! This feature was introduced in **v0.8.7
 
 ## v0.14.x - Doc Graphs, SSH Agents, Inline Wizard
 
-**Latest: v0.14.3** | Released January 1, 1
+**Latest: v0.14.3** | Released January 9, 2026
 
 Changes in this point release include:
 
--
+- Added logic to prevent overlapping TTS notifications 💬
+- Bug fixes in history panel rendering 🐜
+- Improved markdown rendering of large tables ✨
+- Addressed #161 where local path was overriding remote path for SSH agents 📁
+- Fixed "Jump to Bottom" shortcut ⌨️
+- Added "Toggle Bookmark" shortcut (CTRL/CMD+SHIFT+B) ⌨️
+- Fixed leaderboard updating issue 🏆
+- Changes in the file tree are now reflected immediately 🌴
+- Fixed Windows auto-update issue 🪟
+- Added unique installation ID generated for better crash tracking 🆔
+- Gist publishing now shows previous URLs with copy button 📋
 
 The major contributions to 0.14.x remain:
 
