@@ -390,7 +390,7 @@ function MaestroConsoleInner() {
 
   // Load SSH configs once on mount
   useEffect(() => {
-    window.maestro.sshRemote.getConfigs()
+    window.maestro?.sshRemote?.getConfigs()
       .then((result) => {
         if (result.success && result.configs) {
           setSshRemoteConfigs(result.configs.map((c: { id: string; name: string }) => ({ id: c.id, name: c.name })));
@@ -2301,16 +2301,27 @@ function MaestroConsoleInner() {
         return;
       }
 
-      // Parse sessionId to get actual session ID (strip -ai-tabId or -ai suffix)
+      // Synopsis processes run in the background - don't show their errors in the main session UI
+      // They have their own error handling in the promise rejection
+      if (sessionId.match(/-synopsis-\d+$/)) {
+        console.log('[onAgentError] Ignoring synopsis process error:', {
+          rawSessionId: sessionId,
+          errorType: error.type,
+          message: error.message,
+        });
+        return;
+      }
+
+      // Parse sessionId to get actual session ID (strip suffixes)
       let actualSessionId: string;
       let tabIdFromSession: string | undefined;
       const aiTabMatch = sessionId.match(/^(.+)-ai(?:-(.+))?$/);
       if (aiTabMatch) {
         actualSessionId = aiTabMatch[1];
         tabIdFromSession = aiTabMatch[2];
-      } else if (sessionId.endsWith('-batch')) {
-        // Batch process errors - strip -batch suffix
-        actualSessionId = sessionId.replace(/-batch.*$/, '');
+      } else if (sessionId.match(/-batch-\d+$/)) {
+        // Batch process errors - strip -batch-{timestamp} suffix
+        actualSessionId = sessionId.replace(/-batch-\d+$/, '');
       } else {
         actualSessionId = sessionId;
       }
@@ -2323,16 +2334,21 @@ function MaestroConsoleInner() {
         recoverable: error.recoverable,
       });
 
-      // Create an error log entry to show in the chat
+      // session_not_found is informational, not a blocking error.
+      // Claude Code handles this gracefully by starting a fresh conversation,
+      // so we just show an info message without blocking user input or showing a modal.
+      const isSessionNotFound = agentError.type === 'session_not_found';
+
+      // Create a log entry - use 'system' source for informational messages, 'error' for actual errors
       const errorLogEntry: LogEntry = {
         id: generateId(),
         timestamp: agentError.timestamp,
-        source: 'error',
+        source: isSessionNotFound ? 'system' : 'error',
         text: agentError.message,
-        agentError, // Include full error for "View Details" functionality
+        agentError: isSessionNotFound ? undefined : agentError, // Only include for actual errors
       };
 
-      // Update session with error state and add error log entry to the originating tab
+      // Update session with error state and add log entry to the originating tab
       setSessions(prev => prev.map(s => {
         if (s.id !== actualSessionId) return s;
 
@@ -2343,10 +2359,22 @@ function MaestroConsoleInner() {
         const updatedAiTabs = targetTab
           ? s.aiTabs.map(tab =>
               tab.id === targetTab.id
-                ? { ...tab, logs: [...tab.logs, errorLogEntry], agentError }
+                ? {
+                    ...tab,
+                    logs: [...tab.logs, errorLogEntry],
+                    agentError: isSessionNotFound ? undefined : agentError,
+                  }
                 : tab
             )
           : s.aiTabs;
+
+        // For session_not_found, don't block operations or set error state
+        if (isSessionNotFound) {
+          return {
+            ...s,
+            aiTabs: updatedAiTabs,
+          };
+        }
 
         return {
           ...s,
@@ -2422,8 +2450,10 @@ function MaestroConsoleInner() {
         }
       }
 
-      // Show the error modal for this session
-      setAgentErrorModalSessionId(actualSessionId);
+      // Show the error modal for this session (skip for informational session_not_found)
+      if (!isSessionNotFound) {
+        setAgentErrorModalSessionId(actualSessionId);
+      }
     });
 
     // Handle thinking/streaming content chunks from AI agents
