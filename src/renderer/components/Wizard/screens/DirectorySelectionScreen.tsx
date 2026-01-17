@@ -239,11 +239,10 @@ export function DirectorySelectionScreen({ theme }: DirectorySelectionScreenProp
 					return;
 				}
 
-				// Directory exists, now check if it's a git repo
-      			// For SSH remotes, pass the path as remoteCwd so git can operate in the correct directory
-				const isRepo = await window.maestro.git.isRepo(path, sshRemoteId, sshRemoteId ? path : undefined);
-				setIsGitRepo(isRepo);
-				setDirectoryError(null);
+      // Directory exists, now check if it's a git repo
+      const isRepo = await window.maestro.git.isRepo(path, sshRemoteId);
+      setIsGitRepo(isRepo);
+      setDirectoryError(null);
 
 				// Check for existing Auto Run Docs folder (unless we're skipping because user already made a choice)
 				if (!skipExistingDocsCheck && !state.existingDocsChoice) {
