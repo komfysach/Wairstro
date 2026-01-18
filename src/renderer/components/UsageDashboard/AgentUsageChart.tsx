@@ -1,12 +1,13 @@
 /**
  * AgentUsageChart
  *
- * Line chart showing agent usage over time with dual metrics.
- * Displays both session count and total time on the same chart.
+ * Line chart showing provider usage over time with one line per provider.
+ * Displays query counts and duration for each provider (claude-code, codex, opencode).
  *
  * Features:
- * - Dual Y-axes: sessions (left) and time (right)
- * - Color-coded lines for each metric
+ * - One line per provider
+ * - Dual Y-axes: queries (left) and time (right)
+ * - Provider-specific colors
  * - Hover tooltips with exact values
  * - Responsive SVG rendering
  * - Theme-aware styling
@@ -16,14 +17,28 @@ import React, { useState, useMemo, useCallback } from 'react';
 import { format, parseISO } from 'date-fns';
 import type { Theme } from '../../types';
 import type { StatsTimeRange, StatsAggregation } from '../../hooks/useStats';
-import { COLORBLIND_LINE_COLORS } from '../../constants/colorblindPalettes';
+import { COLORBLIND_AGENT_PALETTE, COLORBLIND_LINE_COLORS } from '../../constants/colorblindPalettes';
 
-// Data point for the chart
-interface DataPoint {
+// Provider colors (matching AgentComparisonChart)
+const PROVIDER_COLORS: Record<string, string> = {
+  'claude-code': '#a78bfa', // violet
+  'codex': '#34d399', // emerald
+  'opencode': '#60a5fa', // blue
+};
+
+// Data point for a single provider on a single day
+interface ProviderDayData {
   date: string;
   formattedDate: string;
-  sessions: number;
-  duration: number; // Total duration in ms
+  count: number;
+  duration: number;
+}
+
+// All providers' data for a single day
+interface DayData {
+  date: string;
+  formattedDate: string;
+  providers: Record<string, { count: number; duration: number }>;
 }
 
 interface AgentUsageChartProps {
@@ -98,120 +113,142 @@ function formatXAxisDate(dateStr: string, timeRange: StatsTimeRange): string {
   }
 }
 
+/**
+ * Get provider color, with colorblind mode support
+ */
+function getProviderColor(provider: string, index: number, colorBlindMode: boolean): string {
+  if (colorBlindMode) {
+    return COLORBLIND_AGENT_PALETTE[index % COLORBLIND_AGENT_PALETTE.length];
+  }
+  return PROVIDER_COLORS[provider] || COLORBLIND_LINE_COLORS.primary;
+}
+
 export function AgentUsageChart({ data, timeRange, theme, colorBlindMode = false }: AgentUsageChartProps) {
-  const [hoveredPoint, setHoveredPoint] = useState<{ point: DataPoint; index: number } | null>(null);
+  const [hoveredDay, setHoveredDay] = useState<{ dayIndex: number; provider?: string } | null>(null);
   const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
+  const [metricMode, setMetricMode] = useState<'count' | 'duration'>('count');
 
   // Chart dimensions
   const chartWidth = 600;
   const chartHeight = 220;
-  const padding = { top: 20, right: 60, bottom: 40, left: 50 };
+  const padding = { top: 20, right: 50, bottom: 40, left: 50 };
   const innerWidth = chartWidth - padding.left - padding.right;
   const innerHeight = chartHeight - padding.top - padding.bottom;
 
-  // Colors for the two metrics
-  const sessionColor = useMemo(() => {
-    return colorBlindMode ? COLORBLIND_LINE_COLORS.primary : theme.colors.accent;
-  }, [colorBlindMode, theme.colors.accent]);
+  // Get list of providers and their data
+  const { providers, chartData, allDates } = useMemo(() => {
+    const byAgentByDay = data.byAgentByDay || {};
+    const providerList = Object.keys(byAgentByDay).sort();
 
-  const durationColor = useMemo(() => {
-    return colorBlindMode ? COLORBLIND_LINE_COLORS.secondary : '#10b981'; // emerald
-  }, [colorBlindMode]);
+    // Collect all unique dates
+    const dateSet = new Set<string>();
+    for (const provider of providerList) {
+      for (const day of byAgentByDay[provider]) {
+        dateSet.add(day.date);
+      }
+    }
+    const sortedDates = Array.from(dateSet).sort();
 
-  // Combine byDay data with sessionsByDay to get both metrics per day
-  const chartData = useMemo((): DataPoint[] => {
-    if (data.byDay.length === 0) return [];
+    // Build per-provider arrays aligned to all dates
+    const providerData: Record<string, ProviderDayData[]> = {};
+    for (const provider of providerList) {
+      const dayMap = new Map<string, { count: number; duration: number }>();
+      for (const day of byAgentByDay[provider]) {
+        dayMap.set(day.date, { count: day.count, duration: day.duration });
+      }
 
-    // Create a map of sessions by date
-    const sessionsByDateMap = new Map<string, number>();
-    for (const day of data.sessionsByDay || []) {
-      sessionsByDateMap.set(day.date, day.count);
+      providerData[provider] = sortedDates.map(date => ({
+        date,
+        formattedDate: format(parseISO(date), 'EEEE, MMM d, yyyy'),
+        count: dayMap.get(date)?.count || 0,
+        duration: dayMap.get(date)?.duration || 0,
+      }));
     }
 
-    return data.byDay.map((day) => ({
-      date: day.date,
-      formattedDate: format(parseISO(day.date), 'EEEE, MMM d, yyyy'),
-      sessions: sessionsByDateMap.get(day.date) || 0,
-      duration: day.duration,
-    }));
-  }, [data.byDay, data.sessionsByDay]);
+    // Build combined day data for tooltips
+    const combinedData: DayData[] = sortedDates.map(date => {
+      const providers: Record<string, { count: number; duration: number }> = {};
+      for (const provider of providerList) {
+        const dayData = providerData[provider].find(d => d.date === date);
+        if (dayData) {
+          providers[provider] = { count: dayData.count, duration: dayData.duration };
+        }
+      }
+      return {
+        date,
+        formattedDate: format(parseISO(date), 'EEEE, MMM d, yyyy'),
+        providers,
+      };
+    });
 
-  // Calculate scales for both Y-axes
-  const { xScale, yScaleSessions, yScaleDuration, yTicksSessions, yTicksDuration } = useMemo(() => {
-    if (chartData.length === 0) {
+    return {
+      providers: providerList,
+      chartData: providerData,
+      allDates: combinedData,
+    };
+  }, [data.byAgentByDay]);
+
+  // Calculate scales
+  const { xScale, yScale, yTicks } = useMemo(() => {
+    if (allDates.length === 0) {
       return {
         xScale: (_: number) => padding.left,
-        yScaleSessions: (_: number) => chartHeight - padding.bottom,
-        yScaleDuration: (_: number) => chartHeight - padding.bottom,
-        yTicksSessions: [0],
-        yTicksDuration: [0],
+        yScale: (_: number) => chartHeight - padding.bottom,
+        yTicks: [0],
       };
     }
 
-    const maxSessions = Math.max(...chartData.map((d) => d.sessions), 1);
-    const maxDuration = Math.max(...chartData.map((d) => d.duration), 1);
+    // Find max value across all providers
+    let maxValue = 1;
+    for (const provider of providers) {
+      const providerMax = Math.max(
+        ...chartData[provider].map(d => metricMode === 'count' ? d.count : d.duration)
+      );
+      maxValue = Math.max(maxValue, providerMax);
+    }
 
-    // Add 10% padding to max values
-    const sessionMax = Math.ceil(maxSessions * 1.1);
-    const durationMax = maxDuration * 1.1;
+    // Add 10% padding
+    const yMax = metricMode === 'count' ? Math.ceil(maxValue * 1.1) : maxValue * 1.1;
 
-    // X scale - linear across data points
+    // X scale
     const xScaleFn = (index: number) =>
-      padding.left + (index / Math.max(chartData.length - 1, 1)) * innerWidth;
+      padding.left + (index / Math.max(allDates.length - 1, 1)) * innerWidth;
 
-    // Y scale for sessions (left axis) - inverted for SVG coordinates
-    const yScaleSessionsFn = (value: number) =>
-      chartHeight - padding.bottom - (value / sessionMax) * innerHeight;
+    // Y scale
+    const yScaleFn = (value: number) =>
+      chartHeight - padding.bottom - (value / yMax) * innerHeight;
 
-    // Y scale for duration (right axis)
-    const yScaleDurationFn = (value: number) =>
-      chartHeight - padding.bottom - (value / durationMax) * innerHeight;
-
-    // Generate nice Y-axis ticks
+    // Y ticks
     const tickCount = 5;
-    const yTicksSessionsArr = Array.from({ length: tickCount }, (_, i) =>
-      Math.round((sessionMax / (tickCount - 1)) * i)
-    );
-    const yTicksDurationArr = Array.from({ length: tickCount }, (_, i) =>
-      (durationMax / (tickCount - 1)) * i
-    );
+    const yTicksArr = metricMode === 'count'
+      ? Array.from({ length: tickCount }, (_, i) => Math.round((yMax / (tickCount - 1)) * i))
+      : Array.from({ length: tickCount }, (_, i) => (yMax / (tickCount - 1)) * i);
 
-    return {
-      xScale: xScaleFn,
-      yScaleSessions: yScaleSessionsFn,
-      yScaleDuration: yScaleDurationFn,
-      yTicksSessions: yTicksSessionsArr,
-      yTicksDuration: yTicksDurationArr,
-    };
-  }, [chartData, chartHeight, innerWidth, innerHeight, padding]);
+    return { xScale: xScaleFn, yScale: yScaleFn, yTicks: yTicksArr };
+  }, [allDates, providers, chartData, metricMode, chartHeight, innerWidth, innerHeight, padding]);
 
-  // Generate line paths for both metrics
-  const sessionsPath = useMemo(() => {
-    if (chartData.length === 0) return '';
-    return chartData
-      .map((point, idx) => {
-        const x = xScale(idx);
-        const y = yScaleSessions(point.sessions);
-        return `${idx === 0 ? 'M' : 'L'} ${x} ${y}`;
-      })
-      .join(' ');
-  }, [chartData, xScale, yScaleSessions]);
+  // Generate line paths for each provider
+  const linePaths = useMemo(() => {
+    const paths: Record<string, string> = {};
+    for (const provider of providers) {
+      const providerDays = chartData[provider];
+      if (providerDays.length === 0) continue;
 
-  const durationPath = useMemo(() => {
-    if (chartData.length === 0) return '';
-    return chartData
-      .map((point, idx) => {
-        const x = xScale(idx);
-        const y = yScaleDuration(point.duration);
-        return `${idx === 0 ? 'M' : 'L'} ${x} ${y}`;
-      })
-      .join(' ');
-  }, [chartData, xScale, yScaleDuration]);
+      paths[provider] = providerDays
+        .map((day, idx) => {
+          const x = xScale(idx);
+          const y = yScale(metricMode === 'count' ? day.count : day.duration);
+          return `${idx === 0 ? 'M' : 'L'} ${x} ${y}`;
+        })
+        .join(' ');
+    }
+    return paths;
+  }, [providers, chartData, xScale, yScale, metricMode]);
 
-  // Handle mouse events for tooltip
+  // Handle mouse events
   const handleMouseEnter = useCallback(
-    (point: DataPoint, index: number, event: React.MouseEvent<SVGCircleElement>) => {
-      setHoveredPoint({ point, index });
+    (dayIndex: number, provider: string, event: React.MouseEvent<SVGCircleElement>) => {
+      setHoveredDay({ dayIndex, provider });
       const rect = event.currentTarget.getBoundingClientRect();
       setTooltipPos({
         x: rect.left + rect.width / 2,
@@ -222,65 +259,18 @@ export function AgentUsageChart({ data, timeRange, theme, colorBlindMode = false
   );
 
   const handleMouseLeave = useCallback(() => {
-    setHoveredPoint(null);
+    setHoveredDay(null);
     setTooltipPos(null);
   }, []);
-
-  // Generate unique IDs for gradients
-  const gradientIdSessions = useMemo(() => `sessions-gradient-${Math.random().toString(36).slice(2, 9)}`, []);
-  const gradientIdDuration = useMemo(() => `duration-gradient-${Math.random().toString(36).slice(2, 9)}`, []);
-
-  // Parse colors for gradients
-  const sessionRgb = useMemo(() => {
-    const color = sessionColor;
-    if (color.startsWith('#')) {
-      const hex = color.slice(1);
-      return {
-        r: parseInt(hex.slice(0, 2), 16),
-        g: parseInt(hex.slice(2, 4), 16),
-        b: parseInt(hex.slice(4, 6), 16),
-      };
-    }
-    return { r: 100, g: 149, b: 237 };
-  }, [sessionColor]);
-
-  const durationRgb = useMemo(() => {
-    const color = durationColor;
-    if (color.startsWith('#')) {
-      const hex = color.slice(1);
-      return {
-        r: parseInt(hex.slice(0, 2), 16),
-        g: parseInt(hex.slice(2, 4), 16),
-        b: parseInt(hex.slice(4, 6), 16),
-      };
-    }
-    return { r: 16, g: 185, b: 129 };
-  }, [durationColor]);
-
-  // Area paths for gradient fills
-  const sessionsAreaPath = useMemo(() => {
-    if (chartData.length === 0) return '';
-    const pathStart = chartData
-      .map((point, idx) => {
-        const x = xScale(idx);
-        const y = yScaleSessions(point.sessions);
-        return `${idx === 0 ? 'M' : 'L'} ${x} ${y}`;
-      })
-      .join(' ');
-    const lastX = xScale(chartData.length - 1);
-    const firstX = xScale(0);
-    const baseline = chartHeight - padding.bottom;
-    return `${pathStart} L ${lastX} ${baseline} L ${firstX} ${baseline} Z`;
-  }, [chartData, xScale, yScaleSessions, chartHeight, padding.bottom]);
 
   return (
     <div
       className="p-4 rounded-lg"
       style={{ backgroundColor: theme.colors.bgMain }}
       role="figure"
-      aria-label={`Agent usage chart showing sessions and time over time. ${chartData.length} data points displayed.`}
+      aria-label={`Provider usage chart showing ${metricMode === 'count' ? 'query counts' : 'duration'} over time. ${providers.length} providers displayed.`}
     >
-      {/* Header */}
+      {/* Header with title and metric toggle */}
       <div className="flex items-center justify-between mb-4">
         <h3
           className="text-sm font-medium"
@@ -288,11 +278,41 @@ export function AgentUsageChart({ data, timeRange, theme, colorBlindMode = false
         >
           Agent Usage Over Time
         </h3>
+        <div className="flex items-center gap-2">
+          <span className="text-xs" style={{ color: theme.colors.textDim }}>
+            Show:
+          </span>
+          <div
+            className="flex rounded overflow-hidden border"
+            style={{ borderColor: theme.colors.border }}
+          >
+            <button
+              onClick={() => setMetricMode('count')}
+              className="px-2 py-1 text-xs transition-colors"
+              style={{
+                backgroundColor: metricMode === 'count' ? theme.colors.accent : 'transparent',
+                color: metricMode === 'count' ? theme.colors.bgMain : theme.colors.textDim,
+              }}
+            >
+              Queries
+            </button>
+            <button
+              onClick={() => setMetricMode('duration')}
+              className="px-2 py-1 text-xs transition-colors"
+              style={{
+                backgroundColor: metricMode === 'duration' ? theme.colors.accent : 'transparent',
+                color: metricMode === 'duration' ? theme.colors.bgMain : theme.colors.textDim,
+              }}
+            >
+              Time
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Chart container */}
       <div className="relative">
-        {chartData.length === 0 ? (
+        {allDates.length === 0 || providers.length === 0 ? (
           <div
             className="flex items-center justify-center"
             style={{ height: chartHeight, color: theme.colors.textDim }}
@@ -305,71 +325,44 @@ export function AgentUsageChart({ data, timeRange, theme, colorBlindMode = false
             viewBox={`0 0 ${chartWidth} ${chartHeight}`}
             preserveAspectRatio="xMidYMid meet"
             role="img"
-            aria-label={`Dual-axis chart showing sessions and time usage over time`}
+            aria-label={`Line chart showing ${metricMode === 'count' ? 'query counts' : 'duration'} per provider over time`}
           >
-            {/* Gradient definitions */}
-            <defs>
-              <linearGradient id={gradientIdSessions} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor={`rgba(${sessionRgb.r}, ${sessionRgb.g}, ${sessionRgb.b}, 0.2)`} />
-                <stop offset="100%" stopColor={`rgba(${sessionRgb.r}, ${sessionRgb.g}, ${sessionRgb.b}, 0)`} />
-              </linearGradient>
-              <linearGradient id={gradientIdDuration} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor={`rgba(${durationRgb.r}, ${durationRgb.g}, ${durationRgb.b}, 0.2)`} />
-                <stop offset="100%" stopColor={`rgba(${durationRgb.r}, ${durationRgb.g}, ${durationRgb.b}, 0)`} />
-              </linearGradient>
-            </defs>
-
-            {/* Grid lines (horizontal) */}
-            {yTicksSessions.map((tick, idx) => (
+            {/* Grid lines */}
+            {yTicks.map((tick, idx) => (
               <line
                 key={`grid-${idx}`}
                 x1={padding.left}
-                y1={yScaleSessions(tick)}
+                y1={yScale(tick)}
                 x2={chartWidth - padding.right}
-                y2={yScaleSessions(tick)}
+                y2={yScale(tick)}
                 stroke={theme.colors.border}
                 strokeOpacity={0.3}
                 strokeDasharray="4,4"
               />
             ))}
 
-            {/* Left Y-axis labels (Sessions) */}
-            {yTicksSessions.map((tick, idx) => (
+            {/* Y-axis labels */}
+            {yTicks.map((tick, idx) => (
               <text
-                key={`y-left-${idx}`}
+                key={`y-${idx}`}
                 x={padding.left - 8}
-                y={yScaleSessions(tick)}
+                y={yScale(tick)}
                 textAnchor="end"
                 dominantBaseline="middle"
                 fontSize={10}
-                fill={sessionColor}
+                fill={theme.colors.textDim}
               >
-                {tick}
-              </text>
-            ))}
-
-            {/* Right Y-axis labels (Duration) */}
-            {yTicksDuration.map((tick, idx) => (
-              <text
-                key={`y-right-${idx}`}
-                x={chartWidth - padding.right + 8}
-                y={yScaleDuration(tick)}
-                textAnchor="start"
-                dominantBaseline="middle"
-                fontSize={10}
-                fill={durationColor}
-              >
-                {formatYAxisDuration(tick)}
+                {metricMode === 'count' ? tick : formatYAxisDuration(tick)}
               </text>
             ))}
 
             {/* X-axis labels */}
-            {chartData.map((point, idx) => {
-              const labelInterval = chartData.length > 14
-                ? Math.ceil(chartData.length / 7)
-                : chartData.length > 7 ? 2 : 1;
+            {allDates.map((day, idx) => {
+              const labelInterval = allDates.length > 14
+                ? Math.ceil(allDates.length / 7)
+                : allDates.length > 7 ? 2 : 1;
 
-              if (idx % labelInterval !== 0 && idx !== chartData.length - 1) {
+              if (idx % labelInterval !== 0 && idx !== allDates.length - 1) {
                 return null;
               }
 
@@ -382,119 +375,73 @@ export function AgentUsageChart({ data, timeRange, theme, colorBlindMode = false
                   fontSize={10}
                   fill={theme.colors.textDim}
                 >
-                  {formatXAxisDate(point.date, timeRange)}
+                  {formatXAxisDate(day.date, timeRange)}
                 </text>
               );
             })}
 
-            {/* Sessions area fill */}
-            <path
-              d={sessionsAreaPath}
-              fill={`url(#${gradientIdSessions})`}
-              style={{ transition: 'd 0.5s cubic-bezier(0.4, 0, 0.2, 1)' }}
-            />
-
-            {/* Sessions line */}
-            <path
-              d={sessionsPath}
-              fill="none"
-              stroke={sessionColor}
-              strokeWidth={2}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              style={{ transition: 'd 0.5s cubic-bezier(0.4, 0, 0.2, 1)' }}
-            />
-
-            {/* Duration line */}
-            <path
-              d={durationPath}
-              fill="none"
-              stroke={durationColor}
-              strokeWidth={2}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeDasharray="6,3"
-              style={{ transition: 'd 0.5s cubic-bezier(0.4, 0, 0.2, 1)' }}
-            />
-
-            {/* Data points for sessions */}
-            {chartData.map((point, idx) => {
-              const x = xScale(idx);
-              const y = yScaleSessions(point.sessions);
-              const isHovered = hoveredPoint?.index === idx;
-
+            {/* Lines for each provider */}
+            {providers.map((provider, providerIdx) => {
+              const color = getProviderColor(provider, providerIdx, colorBlindMode);
               return (
-                <circle
-                  key={`session-point-${idx}`}
-                  cx={x}
-                  cy={y}
-                  r={isHovered ? 6 : 4}
-                  fill={isHovered ? sessionColor : theme.colors.bgMain}
-                  stroke={sessionColor}
+                <path
+                  key={`line-${provider}`}
+                  d={linePaths[provider]}
+                  fill="none"
+                  stroke={color}
                   strokeWidth={2}
-                  style={{
-                    cursor: 'pointer',
-                    transition: 'cx 0.5s, cy 0.5s, r 0.15s ease',
-                  }}
-                  onMouseEnter={(e) => handleMouseEnter(point, idx, e)}
-                  onMouseLeave={handleMouseLeave}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  style={{ transition: 'd 0.5s cubic-bezier(0.4, 0, 0.2, 1)' }}
                 />
               );
             })}
 
-            {/* Data points for duration */}
-            {chartData.map((point, idx) => {
-              const x = xScale(idx);
-              const y = yScaleDuration(point.duration);
-              const isHovered = hoveredPoint?.index === idx;
+            {/* Data points for each provider */}
+            {providers.map((provider, providerIdx) => {
+              const color = getProviderColor(provider, providerIdx, colorBlindMode);
+              return chartData[provider].map((day, dayIdx) => {
+                const x = xScale(dayIdx);
+                const y = yScale(metricMode === 'count' ? day.count : day.duration);
+                const isHovered = hoveredDay?.dayIndex === dayIdx && hoveredDay?.provider === provider;
 
-              return (
-                <circle
-                  key={`duration-point-${idx}`}
-                  cx={x}
-                  cy={y}
-                  r={isHovered ? 5 : 3}
-                  fill={isHovered ? durationColor : theme.colors.bgMain}
-                  stroke={durationColor}
-                  strokeWidth={2}
-                  style={{
-                    cursor: 'pointer',
-                    transition: 'cx 0.5s, cy 0.5s, r 0.15s ease',
-                  }}
-                  onMouseEnter={(e) => handleMouseEnter(point, idx, e)}
-                  onMouseLeave={handleMouseLeave}
-                />
-              );
+                return (
+                  <circle
+                    key={`point-${provider}-${dayIdx}`}
+                    cx={x}
+                    cy={y}
+                    r={isHovered ? 6 : 4}
+                    fill={isHovered ? color : theme.colors.bgMain}
+                    stroke={color}
+                    strokeWidth={2}
+                    style={{
+                      cursor: 'pointer',
+                      transition: 'r 0.15s ease',
+                    }}
+                    onMouseEnter={(e) => handleMouseEnter(dayIdx, provider, e)}
+                    onMouseLeave={handleMouseLeave}
+                  />
+                );
+              });
             })}
 
-            {/* Y-axis labels */}
+            {/* Y-axis title */}
             <text
               x={12}
               y={chartHeight / 2}
               textAnchor="middle"
               dominantBaseline="middle"
               fontSize={11}
-              fill={sessionColor}
+              fill={theme.colors.textDim}
               transform={`rotate(-90, 12, ${chartHeight / 2})`}
             >
-              Sessions
-            </text>
-            <text
-              x={chartWidth - 10}
-              y={chartHeight / 2}
-              textAnchor="middle"
-              dominantBaseline="middle"
-              fontSize={11}
-              fill={durationColor}
-              transform={`rotate(90, ${chartWidth - 10}, ${chartHeight / 2})`}
-            >
-              Time
+              {metricMode === 'count' ? 'Queries' : 'Time'}
             </text>
           </svg>
         )}
 
         {/* Tooltip */}
-        {hoveredPoint && tooltipPos && (
+        {hoveredDay && tooltipPos && allDates[hoveredDay.dayIndex] && (
           <div
             className="fixed z-50 px-3 py-2 rounded text-xs whitespace-nowrap pointer-events-none shadow-lg"
             style={{
@@ -506,16 +453,24 @@ export function AgentUsageChart({ data, timeRange, theme, colorBlindMode = false
               border: `1px solid ${theme.colors.border}`,
             }}
           >
-            <div className="font-medium mb-1">{hoveredPoint.point.formattedDate}</div>
+            <div className="font-medium mb-1">{allDates[hoveredDay.dayIndex].formattedDate}</div>
             <div style={{ color: theme.colors.textDim }}>
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: sessionColor }} />
-                Sessions: <span style={{ color: theme.colors.textMain }}>{hoveredPoint.point.sessions}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: durationColor }} />
-                Time: <span style={{ color: theme.colors.textMain }}>{formatDuration(hoveredPoint.point.duration)}</span>
-              </div>
+              {providers.map((provider, idx) => {
+                const dayData = allDates[hoveredDay.dayIndex].providers[provider];
+                if (!dayData || (dayData.count === 0 && dayData.duration === 0)) return null;
+                const color = getProviderColor(provider, idx, colorBlindMode);
+                return (
+                  <div key={provider} className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
+                    <span>{provider}:</span>
+                    <span style={{ color: theme.colors.textMain }}>
+                      {metricMode === 'count'
+                        ? `${dayData.count} ${dayData.count === 1 ? 'query' : 'queries'}`
+                        : formatDuration(dayData.duration)}
+                    </span>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
@@ -523,23 +478,18 @@ export function AgentUsageChart({ data, timeRange, theme, colorBlindMode = false
 
       {/* Legend */}
       <div
-        className="flex items-center justify-center gap-6 mt-3 pt-3 border-t"
+        className="flex items-center justify-center gap-4 mt-3 pt-3 border-t flex-wrap"
         style={{ borderColor: theme.colors.border }}
       >
-        <div className="flex items-center gap-2">
-          <div className="w-4 h-0.5 rounded" style={{ backgroundColor: sessionColor }} />
-          <span className="text-xs" style={{ color: theme.colors.textDim }}>Sessions</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div
-            className="w-4 h-0.5 rounded"
-            style={{
-              backgroundColor: durationColor,
-              backgroundImage: `repeating-linear-gradient(90deg, ${durationColor} 0, ${durationColor} 4px, transparent 4px, transparent 6px)`,
-            }}
-          />
-          <span className="text-xs" style={{ color: theme.colors.textDim }}>Time</span>
-        </div>
+        {providers.map((provider, idx) => {
+          const color = getProviderColor(provider, idx, colorBlindMode);
+          return (
+            <div key={provider} className="flex items-center gap-1.5">
+              <div className="w-3 h-0.5 rounded" style={{ backgroundColor: color }} />
+              <span className="text-xs" style={{ color: theme.colors.textDim }}>{provider}</span>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

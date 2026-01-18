@@ -93,6 +93,8 @@ export interface StatsAggregation {
   sessionsByDay: Array<{ date: string; count: number }>;
   /** Average session duration in ms (for closed sessions) */
   avgSessionDuration: number;
+  /** Queries and duration by agent per day (for provider usage chart) */
+  byAgentByDay: Record<string, Array<{ date: string; count: number; duration: number }>>;
 }
 
 /**

@@ -208,6 +208,7 @@ const createSampleData = () => ({
     { date: '2024-01-18', count: 7 },
   ],
   avgSessionDuration: 144000,
+  byAgentByDay: {},
 });
 
 describe('UsageDashboard Responsive Layout', () => {
@@ -334,9 +335,9 @@ describe('UsageDashboard Responsive Layout', () => {
       simulateContainerResize(1000);
 
       await waitFor(() => {
-        // In wide mode, summary cards should have 5 columns
+        // In wide mode, summary cards should have 3 columns (2 rows × 3 cols layout)
         const summaryCards = screen.getByTestId('summary-cards');
-        expect(summaryCards).toHaveStyle({ gridTemplateColumns: 'repeat(5, minmax(0, 1fr))' });
+        expect(summaryCards).toHaveStyle({ gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' });
       });
     });
   });
@@ -380,7 +381,7 @@ describe('UsageDashboard Responsive Layout', () => {
       });
     });
 
-    it('displays 5 columns in wide mode (>=900px)', async () => {
+    it('displays 3 columns in wide mode (>=900px) for 2×3 layout', async () => {
       mockOffsetWidth = 1200;
 
       render(
@@ -395,7 +396,7 @@ describe('UsageDashboard Responsive Layout', () => {
 
       await waitFor(() => {
         const summaryCards = screen.getByTestId('summary-cards');
-        expect(summaryCards).toHaveStyle({ gridTemplateColumns: 'repeat(5, minmax(0, 1fr))' });
+        expect(summaryCards).toHaveStyle({ gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' });
       });
     });
 
@@ -513,8 +514,8 @@ describe('UsageDashboard Responsive Layout', () => {
 
       await waitFor(() => {
         const summaryCards = screen.getByTestId('summary-cards');
-        // 900px is >= 900, so wide (5 columns)
-        expect(summaryCards).toHaveStyle({ gridTemplateColumns: 'repeat(5, minmax(0, 1fr))' });
+        // 900px is >= 900, so wide layout uses 3 columns (2×3 grid)
+        expect(summaryCards).toHaveStyle({ gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' });
       });
     });
 
@@ -576,7 +577,7 @@ describe('UsageDashboard Responsive Layout', () => {
 
       await waitFor(() => {
         const summaryCards = screen.getByTestId('summary-cards');
-        expect(summaryCards).toHaveStyle({ gridTemplateColumns: 'repeat(5, minmax(0, 1fr))' });
+        expect(summaryCards).toHaveStyle({ gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' });
       });
 
       // Resize to narrow
@@ -614,7 +615,7 @@ describe('UsageDashboard Responsive Layout', () => {
 
       await waitFor(() => {
         const summaryCards = screen.getByTestId('summary-cards');
-        expect(summaryCards).toHaveStyle({ gridTemplateColumns: 'repeat(5, minmax(0, 1fr))' });
+        expect(summaryCards).toHaveStyle({ gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' });
       });
     });
 
@@ -939,10 +940,10 @@ describe('UsageDashboard Responsive Layout', () => {
 
       simulateContainerResize(2000);
 
-      // Should still use wide layout (5 columns for summary)
+      // Should still use wide layout (3 columns for 2×3 summary grid)
       await waitFor(() => {
         const summaryCards = screen.getByTestId('summary-cards');
-        expect(summaryCards).toHaveStyle({ gridTemplateColumns: 'repeat(5, minmax(0, 1fr))' });
+        expect(summaryCards).toHaveStyle({ gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' });
       });
     });
   });

@@ -143,6 +143,7 @@ const createSampleData = () => ({
     { date: '2024-01-18', count: 7 },
   ],
   avgSessionDuration: 144000,
+  byAgentByDay: {},
 });
 
 describe('UsageDashboardModal', () => {

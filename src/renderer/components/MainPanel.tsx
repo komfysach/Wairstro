@@ -403,12 +403,12 @@ export const MainPanel = React.memo(forwardRef<MainPanelHandle, MainPanelProps>(
     return configured > 0 ? configured : reported;
   }, [configuredContextWindow, activeTab?.usageStats?.contextWindow]);
 
-  // Compute context usage percentage from active tab's usage stats
-  // Uses agent-specific calculation (Codex includes output tokens, Claude doesn't)
-  const activeTabContextUsage = useMemo(() => {
+  // Compute context tokens using agent-specific calculation
+  // Claude: input + cacheCreation (excludes cacheRead which is cumulative)
+  // Codex: input + output (combined limit)
+  const activeTabContextTokens = useMemo(() => {
     if (!activeTab?.usageStats) return 0;
-    if (!activeTabContextWindow || activeTabContextWindow === 0) return 0;
-    const contextTokens = calculateContextTokens(
+    return calculateContextTokens(
       {
         inputTokens: activeTab.usageStats.inputTokens,
         outputTokens: activeTab.usageStats.outputTokens,
@@ -417,8 +417,14 @@ export const MainPanel = React.memo(forwardRef<MainPanelHandle, MainPanelProps>(
       },
       activeSession?.toolType
     );
-    return Math.min(Math.round((contextTokens / activeTabContextWindow) * 100), 100);
-  }, [activeTab?.usageStats, activeTabContextWindow, activeSession?.toolType]);
+  }, [activeTab?.usageStats, activeSession?.toolType]);
+
+  // Compute context usage percentage from context tokens and window size
+  const activeTabContextUsage = useMemo(() => {
+    if (!activeTabContextWindow || activeTabContextWindow === 0) return 0;
+    if (activeTabContextTokens === 0) return 0;
+    return Math.min(Math.round((activeTabContextTokens / activeTabContextWindow) * 100), 100);
+  }, [activeTabContextTokens, activeTabContextWindow]);
 
   // PERF: Track panel width for responsive widget hiding with threshold-based updates
   // Only update state when width crosses a meaningful threshold (20px) to prevent
@@ -963,10 +969,7 @@ export const MainPanel = React.memo(forwardRef<MainPanelHandle, MainPanelProps>(
                             <div className="flex justify-between items-center">
                               <span className="text-xs font-bold" style={{ color: theme.colors.textDim }}>Context Tokens</span>
                               <span className="text-xs font-mono font-bold" style={{ color: theme.colors.accent }}>
-                                {(
-                                  (activeTab?.usageStats?.inputTokens ?? 0) +
-                                  (activeTab?.usageStats?.outputTokens ?? 0)
-                                ).toLocaleString()}
+                                {activeTabContextTokens.toLocaleString()}
                               </span>
                             </div>
                             <div className="flex justify-between items-center mt-1">

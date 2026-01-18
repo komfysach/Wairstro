@@ -6925,7 +6925,7 @@ describe('Database VACUUM functionality', () => {
 
         db.getAggregatedStats('year');
 
-        // Verify exactly 6 queries were prepared for aggregation
+        // Verify exactly 8 queries were prepared for aggregation
         const aggregationQueries = preparedQueries.filter(
           (sql) =>
             sql.includes('query_events') &&
@@ -6934,7 +6934,7 @@ describe('Database VACUUM functionality', () => {
             !sql.includes('ALTER')
         );
 
-        expect(aggregationQueries.length).toBe(6);
+        expect(aggregationQueries.length).toBe(8);
 
         // Query 1: Total count and sum
         expect(aggregationQueries[0]).toContain('COUNT(*)');
@@ -6952,8 +6952,15 @@ describe('Database VACUUM functionality', () => {
         // Query 5: Group by date
         expect(aggregationQueries[4]).toContain('GROUP BY date');
 
-        // Query 6: Group by hour (for peak hours chart)
-        expect(aggregationQueries[5]).toContain('GROUP BY hour');
+        // Query 6: Group by agent and date (for provider usage chart)
+        expect(aggregationQueries[5]).toContain('GROUP BY agent_type');
+        expect(aggregationQueries[5]).toContain('date');
+
+        // Query 7: Group by hour (for peak hours chart)
+        expect(aggregationQueries[6]).toContain('GROUP BY hour');
+
+        // Query 8: Count distinct sessions
+        expect(aggregationQueries[7]).toContain('COUNT(DISTINCT session_id)');
       });
 
       it('should use indexed column (start_time) in WHERE clause for all aggregation queries', async () => {
@@ -6977,14 +6984,14 @@ describe('Database VACUUM functionality', () => {
 
         db.getAggregatedStats('year');
 
-        // All 6 aggregation queries should filter by start_time (indexed column)
+        // All 8 aggregation queries should filter by start_time (indexed column)
         const aggregationQueries = preparedQueries.filter(
           (sql) =>
             sql.includes('query_events') &&
             sql.includes('WHERE start_time')
         );
 
-        expect(aggregationQueries.length).toBe(6);
+        expect(aggregationQueries.length).toBe(8);
       });
 
       it('should compute time range correctly for year filter (365 days)', async () => {
@@ -8056,7 +8063,7 @@ describe('Database VACUUM functionality', () => {
             !sql.includes('ALTER')
         );
 
-        expect(aggregationQueries.length).toBe(6);
+        expect(aggregationQueries.length).toBe(8);
 
         // All should filter by start_time (enables index usage)
         for (const query of aggregationQueries) {

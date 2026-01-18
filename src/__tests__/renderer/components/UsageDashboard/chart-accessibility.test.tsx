@@ -68,6 +68,7 @@ const mockStatsData: StatsAggregation = {
     { date: '2025-01-22', count: 8 },
   ],
   avgSessionDuration: 288000,
+  byAgentByDay: {},
 };
 
 describe('Chart Accessibility - AgentComparisonChart', () => {
@@ -397,6 +398,7 @@ describe('Chart Accessibility - General ARIA Patterns', () => {
       sessionsByAgent: {},
       sessionsByDay: [],
       avgSessionDuration: 0,
+      byAgentByDay: {},
     };
 
     render(<AgentComparisonChart data={emptyData} theme={mockTheme} />);

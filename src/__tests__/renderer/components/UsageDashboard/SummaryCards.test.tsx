@@ -40,6 +40,7 @@ const mockData: StatsAggregation = {
   sessionsByAgent: { 'claude-code': 15, 'aider': 10 },
   sessionsByDay: [],
   avgSessionDuration: 288000,
+  byAgentByDay: {},
 };
 
 // Empty data for edge case testing
@@ -56,6 +57,7 @@ const emptyData: StatsAggregation = {
   sessionsByAgent: {},
   sessionsByDay: [],
   avgSessionDuration: 0,
+  byAgentByDay: {},
 };
 
 // Data with large numbers
@@ -75,6 +77,7 @@ const largeNumbersData: StatsAggregation = {
   sessionsByAgent: { 'claude-code': 30000, 'openai-codex': 20000 },
   sessionsByDay: [],
   avgSessionDuration: 7200000,
+  byAgentByDay: {},
 };
 
 // Single agent data
@@ -93,6 +96,7 @@ const singleAgentData: StatsAggregation = {
   sessionsByAgent: { 'terminal': 5 },
   sessionsByDay: [],
   avgSessionDuration: 360000,
+  byAgentByDay: {},
 };
 
 // Only auto queries
@@ -111,6 +115,7 @@ const onlyAutoData: StatsAggregation = {
   sessionsByAgent: { 'claude-code': 10 },
   sessionsByDay: [],
   avgSessionDuration: 360000,
+  byAgentByDay: {},
 };
 
 describe('SummaryCards', () => {
@@ -326,13 +331,13 @@ describe('SummaryCards', () => {
   });
 
   describe('Grid Layout', () => {
-    it('uses 6-column grid layout by default', () => {
+    it('uses 3-column grid layout by default (2 rows × 3 cols)', () => {
       render(<SummaryCards data={mockData} theme={theme} />);
 
       const container = screen.getByTestId('summary-cards');
       expect(container).toHaveClass('grid');
       expect(container).toHaveStyle({
-        gridTemplateColumns: 'repeat(6, minmax(0, 1fr))',
+        gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
       });
     });
 
@@ -372,7 +377,7 @@ describe('SummaryCards', () => {
       expect(screen.getByText('100h 0m')).toBeInTheDocument();
     });
 
-    it('handles long agent names with truncation', () => {
+    it('handles long agent names without truncation', () => {
       const dataWithLongName: StatsAggregation = {
         ...mockData,
         byAgent: {
@@ -381,8 +386,9 @@ describe('SummaryCards', () => {
       };
       render(<SummaryCards data={dataWithLongName} theme={theme} />);
 
+      // Long agent names should now wrap to next line instead of truncating
       const agentValue = screen.getByText('very-long-agent-name-that-might-overflow');
-      expect(agentValue).toHaveClass('truncate');
+      expect(agentValue).toBeInTheDocument();
     });
   });
 

@@ -154,7 +154,18 @@ function parseDataUrl(
 	};
 }
 
-function normalizeCodexUsage(
+/**
+ * Normalize cumulative usage stats to per-turn deltas.
+ *
+ * Some agents (Codex, Claude Code) report cumulative session totals in each usage event.
+ * This function detects cumulative reporting by checking if values monotonically increase,
+ * and converts them to per-turn deltas for accurate context percentage calculation.
+ *
+ * The first usage event is passed through unchanged (used as baseline).
+ * Subsequent events are converted to deltas if cumulative reporting is detected.
+ * If values ever decrease (non-monotonic), we assume per-turn reporting and pass through.
+ */
+function normalizeCumulativeUsage(
 	managedProcess: ManagedProcess,
 	usageStats: {
 		inputTokens: number;
@@ -1124,10 +1135,14 @@ export class ProcessManager extends EventEmitter {
 														0,
 													reasoningTokens: usage.reasoningTokens
 												};
-												const normalizedUsageStats =
-													managedProcess.toolType === 'codex'
-														? normalizeCodexUsage(managedProcess, usageStats)
-														: usageStats;
+												// Normalize cumulative usage to per-turn deltas for agents that report cumulative totals
+											// Both Codex and Claude Code report cumulative session totals in each usage event
+											const normalizedUsageStats =
+												managedProcess.toolType === 'codex' ||
+												managedProcess.toolType === 'claude-code' ||
+												managedProcess.toolType === 'claude'
+													? normalizeCumulativeUsage(managedProcess, usageStats)
+													: usageStats;
 												this.emit('usage', sessionId, normalizedUsageStats);
 											}
 

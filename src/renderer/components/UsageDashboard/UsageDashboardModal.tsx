@@ -63,6 +63,8 @@ interface StatsAggregation {
   sessionsByAgent: Record<string, number>;
   sessionsByDay: Array<{ date: string; count: number }>;
   avgSessionDuration: number;
+  // Per-agent per-day breakdown for provider usage chart
+  byAgentByDay: Record<string, Array<{ date: string; count: number; duration: number }>>;
 }
 
 // View mode options for the dashboard
@@ -300,8 +302,8 @@ export function UsageDashboardModal({
       isWide,
       // Chart grid: 1 col on narrow, 2 cols on medium/wide
       chartGridCols: isNarrow ? 1 : 2,
-      // Summary cards: 2 cols on narrow, 3 on medium, 5 on wide
-      summaryCardsCols: isNarrow ? 2 : isMedium ? 3 : 5,
+      // Summary cards: 2 cols on narrow, 3 on medium/wide (2 rows × 3 cols)
+      summaryCardsCols: isNarrow ? 2 : 3,
       // AutoRun stats: 2 cols on narrow, 3 on medium, 6 on wide
       autoRunStatsCols: isNarrow ? 2 : isMedium ? 3 : 6,
     };

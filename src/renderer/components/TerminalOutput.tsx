@@ -424,9 +424,11 @@ const LogItemComponent = memo(({
         {/* Special rendering for tool execution events (shown alongside thinking) */}
         {log.source === 'tool' && (() => {
           // Extract tool input details for display
+          // Use type checks to ensure we only render strings (prevents React error #31)
           const toolInput = log.metadata?.toolState?.input as Record<string, unknown> | undefined;
+          const safeStr = (v: unknown): string | null => typeof v === 'string' ? v : null;
           const toolDetail = toolInput
-            ? (toolInput.command as string) || (toolInput.pattern as string) || (toolInput.file_path as string) || (toolInput.query as string) || null
+            ? safeStr(toolInput.command) || safeStr(toolInput.pattern) || safeStr(toolInput.file_path) || safeStr(toolInput.query) || null
             : null;
 
           return (

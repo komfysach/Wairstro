@@ -197,21 +197,32 @@ function TypingIndicator({
 }
 
 /**
- * Extract a descriptive detail string from tool input
- * Looks for common properties like command, pattern, file_path, query
+ * Safely convert a value to a string for rendering.
+ * Returns the string if it's already a string, otherwise null.
+ * This prevents objects from being passed to React as children.
+ */
+function safeString(value: unknown): string | null {
+  return typeof value === 'string' ? value : null;
+}
+
+/**
+ * Extract a descriptive detail string from tool input.
+ * Looks for common properties like command, pattern, file_path, query.
+ * Only returns actual strings - objects are safely ignored to prevent React errors.
  */
 function getToolDetail(input: unknown): string | null {
   if (!input || typeof input !== 'object') return null;
   const inputObj = input as Record<string, unknown>;
   // Check common tool input properties in order of preference
-  const detail =
-    (inputObj.command as string) ||
-    (inputObj.pattern as string) ||
-    (inputObj.file_path as string) ||
-    (inputObj.query as string) ||
-    (inputObj.path as string) ||
-    null;
-  return detail;
+  // Use safeString to ensure we only return actual strings, not objects
+  return (
+    safeString(inputObj.command) ||
+    safeString(inputObj.pattern) ||
+    safeString(inputObj.file_path) ||
+    safeString(inputObj.query) ||
+    safeString(inputObj.path) ||
+    null
+  );
 }
 
 /**

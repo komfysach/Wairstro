@@ -1416,6 +1416,38 @@ export class StatsDB {
     }>;
     perfMetrics.end(byDayStart, 'getAggregatedStats:byDay', { range, dayCount: byDayRows.length });
 
+    // By agent by day (for provider usage chart)
+    const byAgentByDayStart = perfMetrics.start();
+    const byAgentByDayStmt = this.db.prepare(`
+      SELECT agent_type,
+             date(start_time / 1000, 'unixepoch', 'localtime') as date,
+             COUNT(*) as count,
+             SUM(duration) as duration
+      FROM query_events
+      WHERE start_time >= ?
+      GROUP BY agent_type, date(start_time / 1000, 'unixepoch', 'localtime')
+      ORDER BY agent_type, date ASC
+    `);
+    const byAgentByDayRows = byAgentByDayStmt.all(startTime) as Array<{
+      agent_type: string;
+      date: string;
+      count: number;
+      duration: number;
+    }>;
+    // Group by agent type
+    const byAgentByDay: Record<string, Array<{ date: string; count: number; duration: number }>> = {};
+    for (const row of byAgentByDayRows) {
+      if (!byAgentByDay[row.agent_type]) {
+        byAgentByDay[row.agent_type] = [];
+      }
+      byAgentByDay[row.agent_type].push({
+        date: row.date,
+        count: row.count,
+        duration: row.duration,
+      });
+    }
+    perfMetrics.end(byAgentByDayStart, 'getAggregatedStats:byAgentByDay', { range });
+
     // By hour (for peak hours chart)
     const byHourStart = perfMetrics.start();
     const byHourStmt = this.db.prepare(`
@@ -1434,16 +1466,24 @@ export class StatsDB {
     }>;
     perfMetrics.end(byHourStart, 'getAggregatedStats:byHour', { range });
 
-    // Session lifecycle stats
+    // Session stats (counting unique session IDs from query_events, which includes tab GUIDs)
     const sessionsStart = perfMetrics.start();
 
-    // Total sessions and average duration
+    // Total unique sessions with queries (counts tabs that have had at least one query)
     const sessionTotalsStmt = this.db.prepare(`
-      SELECT COUNT(*) as count, COALESCE(AVG(duration), 0) as avg_duration
-      FROM session_lifecycle
-      WHERE created_at >= ?
+      SELECT COUNT(DISTINCT session_id) as count
+      FROM query_events
+      WHERE start_time >= ?
     `);
-    const sessionTotals = sessionTotalsStmt.get(startTime) as { count: number; avg_duration: number };
+    const sessionTotals = sessionTotalsStmt.get(startTime) as { count: number };
+
+    // Average session duration from lifecycle table (for sessions that have been closed)
+    const avgSessionDurationStmt = this.db.prepare(`
+      SELECT COALESCE(AVG(duration), 0) as avg_duration
+      FROM session_lifecycle
+      WHERE created_at >= ? AND duration IS NOT NULL
+    `);
+    const avgSessionDurationResult = avgSessionDurationStmt.get(startTime) as { avg_duration: number };
 
     // Sessions by agent type
     const sessionsByAgentStmt = this.db.prepare(`
@@ -1503,7 +1543,8 @@ export class StatsDB {
       totalSessions: sessionTotals.count,
       sessionsByAgent,
       sessionsByDay: sessionsByDayRows,
-      avgSessionDuration: Math.round(sessionTotals.avg_duration),
+      avgSessionDuration: Math.round(avgSessionDurationResult.avg_duration),
+      byAgentByDay,
     };
   }
 

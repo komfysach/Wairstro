@@ -156,6 +156,7 @@ beforeEach(() => {
       { date: '2024-01-02', count: 10 },
     ],
     avgSessionDuration: 180000,
+    byAgentByDay: {},
   });
   mockStats.getDatabaseSize.mockResolvedValue(1024 * 1024); // 1 MB
 });
@@ -294,6 +295,7 @@ describe('Usage Dashboard State Transition Animations', () => {
       sessionsByAgent: { 'claude-code': 15 },
       sessionsByDay: [],
       avgSessionDuration: 240000,
+      byAgentByDay: {},
     };
 
     it('applies dashboard-card-enter class to metric cards', () => {

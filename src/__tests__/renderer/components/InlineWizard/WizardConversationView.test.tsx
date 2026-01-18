@@ -976,5 +976,84 @@ describe('WizardConversationView', () => {
       expect(screen.getByTestId('wizard-streaming-response')).toBeInTheDocument();
       expect(screen.queryByTestId('wizard-thinking-display')).not.toBeInTheDocument();
     });
+
+    it('renders tool executions with string details', () => {
+      render(
+        <WizardConversationView
+          theme={mockTheme}
+          conversationHistory={[]}
+          isLoading={true}
+          showThinking={true}
+          thinkingContent="Working..."
+          toolExecutions={[
+            {
+              toolName: 'Glob',
+              state: { status: 'complete', input: { pattern: '**/*.ts' } },
+              timestamp: Date.now(),
+            },
+          ]}
+        />
+      );
+
+      expect(screen.getByText('Glob')).toBeInTheDocument();
+      expect(screen.getByText('**/*.ts')).toBeInTheDocument();
+    });
+
+    it('safely handles tool executions where input properties are objects (not strings)', () => {
+      // This test verifies the fix for React error #31 where objects like
+      // {type: "glob", enable_fuzzy_matching: true} were being rendered as React children
+      render(
+        <WizardConversationView
+          theme={mockTheme}
+          conversationHistory={[]}
+          isLoading={true}
+          showThinking={true}
+          thinkingContent="Working..."
+          toolExecutions={[
+            {
+              toolName: 'Glob',
+              state: {
+                status: 'running',
+                input: {
+                  // All properties are objects, not strings - this should not crash
+                  pattern: { type: 'glob', enable_fuzzy_matching: true },
+                  command: { nested: 'object' },
+                  file_path: 123, // number, not string
+                  query: null,
+                  path: undefined,
+                },
+              },
+              timestamp: Date.now(),
+            },
+          ]}
+        />
+      );
+
+      // Should render without crashing, tool name should appear
+      expect(screen.getByText('Glob')).toBeInTheDocument();
+      // The detail text should NOT be rendered since none of the properties are strings
+      expect(screen.queryByText(/enable_fuzzy_matching/)).not.toBeInTheDocument();
+    });
+
+    it('renders tool execution with no input at all', () => {
+      render(
+        <WizardConversationView
+          theme={mockTheme}
+          conversationHistory={[]}
+          isLoading={true}
+          showThinking={true}
+          thinkingContent="Working..."
+          toolExecutions={[
+            {
+              toolName: 'Read',
+              state: { status: 'complete' }, // no input property
+              timestamp: Date.now(),
+            },
+          ]}
+        />
+      );
+
+      expect(screen.getByText('Read')).toBeInTheDocument();
+    });
   });
 });

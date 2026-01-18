@@ -34,7 +34,7 @@ interface SummaryCardsProps {
   data: StatsAggregation;
   /** Current theme for styling */
   theme: Theme;
-  /** Number of columns for responsive layout (default: 6) */
+  /** Number of columns for responsive layout (default: 3 for 2 rows × 3 cols) */
   columns?: number;
 }
 
@@ -114,7 +114,7 @@ function MetricCard({ icon, label, value, theme, animationIndex = 0 }: MetricCar
           {label}
         </div>
         <div
-          className="text-2xl font-bold truncate"
+          className="text-2xl font-bold"
           style={{ color: theme.colors.textMain }}
           title={value}
         >
@@ -125,7 +125,7 @@ function MetricCard({ icon, label, value, theme, animationIndex = 0 }: MetricCar
   );
 }
 
-export function SummaryCards({ data, theme, columns = 6 }: SummaryCardsProps) {
+export function SummaryCards({ data, theme, columns = 3 }: SummaryCardsProps) {
   // Calculate derived metrics
   const { mostActiveAgent, interactiveRatio } = useMemo(() => {
     // Find most active agent by query count
