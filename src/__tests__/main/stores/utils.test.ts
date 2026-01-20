@@ -128,7 +128,23 @@ describe('stores/utils', () => {
 			const result = getCustomSyncPath(mockStore);
 
 			expect(result).toBeUndefined();
-			expect(consoleSpy).toHaveBeenCalled();
+			expect(consoleSpy).toHaveBeenCalledWith(
+				`Custom sync path contains traversal sequences: ${traversalPath}`
+			);
+		});
+
+		it('should allow paths with ".." in directory names (not traversal)', () => {
+			const validPath = '/Users/test/my..project/data';
+			const mockStore = {
+				get: vi.fn().mockReturnValue(validPath),
+			} as unknown as Store<BootstrapSettings>;
+
+			vi.mocked(fsSync.existsSync).mockReturnValue(true);
+
+			const result = getCustomSyncPath(mockStore);
+
+			// Should be allowed - ".." is part of directory name, not a traversal
+			expect(result).toBe(validPath);
 		});
 
 		it('should reject paths in sensitive system directories', () => {
@@ -159,6 +175,22 @@ describe('stores/utils', () => {
 
 			expect(result).toBeUndefined();
 			expect(consoleSpy).toHaveBeenCalledWith(`Custom sync path is too short: ${shortPath}`);
+		});
+
+		it('should reject paths containing null bytes', () => {
+			const nullBytePath = '/Users/test/data\0/maestro';
+			const mockStore = {
+				get: vi.fn().mockReturnValue(nullBytePath),
+			} as unknown as Store<BootstrapSettings>;
+
+			const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+			const result = getCustomSyncPath(mockStore);
+
+			expect(result).toBeUndefined();
+			expect(consoleSpy).toHaveBeenCalledWith(
+				`Custom sync path contains null bytes: ${nullBytePath}`
+			);
 		});
 	});
 

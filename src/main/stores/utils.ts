@@ -33,15 +33,22 @@ function isValidSyncPath(customPath: string): boolean {
 		return false;
 	}
 
-	// Normalize the path to resolve any .. or . segments
-	const normalizedPath = path.normalize(customPath);
-
-	// Check for path traversal attempts (normalized path should match original intent)
-	// If the normalized path is significantly different, it might indicate traversal
-	if (normalizedPath.includes('..')) {
-		console.error(`Custom sync path contains invalid traversal sequences: ${customPath}`);
+	// Check for null bytes (security issue on Unix systems)
+	if (customPath.includes('\0')) {
+		console.error(`Custom sync path contains null bytes: ${customPath}`);
 		return false;
 	}
+
+	// Check for path traversal BEFORE normalization
+	// Split by separator and check for literal ".." segments
+	const segments = customPath.split(/[/\\]/);
+	if (segments.includes('..')) {
+		console.error(`Custom sync path contains traversal sequences: ${customPath}`);
+		return false;
+	}
+
+	// Normalize the path to resolve any . segments and redundant separators
+	const normalizedPath = path.normalize(customPath);
 
 	// Reject paths that are too short (likely system directories)
 	// Minimum reasonable path: /a/b (5 chars on Unix) or C:\a (4 chars on Windows)
@@ -51,20 +58,61 @@ function isValidSyncPath(customPath: string): boolean {
 		return false;
 	}
 
+	// Check for Windows reserved names (CON, PRN, AUX, NUL, COM1-9, LPT1-9)
+	if (process.platform === 'win32') {
+		const reservedNames = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i;
+		const pathSegments = normalizedPath.split(/[/\\]/);
+		for (const segment of pathSegments) {
+			// Check the base name without extension
+			const baseName = segment.split('.')[0];
+			if (reservedNames.test(baseName)) {
+				console.error(`Custom sync path contains Windows reserved name: ${customPath}`);
+				return false;
+			}
+		}
+	}
+
 	// Reject known sensitive system directories
+	// For Windows, check common sensitive paths across all drive letters
 	const sensitiveRoots =
 		process.platform === 'win32'
-			? ['C:\\Windows', 'C:\\Program Files', 'C:\\System']
+			? [
+					'\\Windows',
+					'\\Program Files',
+					'\\Program Files (x86)',
+					'\\System',
+					'\\System32',
+					'\\SysWOW64',
+				]
 			: ['/bin', '/sbin', '/usr/bin', '/usr/sbin', '/etc', '/var', '/tmp', '/dev', '/proc', '/sys'];
 
 	const lowerPath = normalizedPath.toLowerCase();
-	for (const sensitive of sensitiveRoots) {
-		if (
-			lowerPath === sensitive.toLowerCase() ||
-			lowerPath.startsWith(sensitive.toLowerCase() + path.sep)
-		) {
-			console.error(`Custom sync path cannot be in sensitive system directory: ${customPath}`);
-			return false;
+
+	if (process.platform === 'win32') {
+		// For Windows, check if any sensitive root appears after the drive letter
+		// e.g., C:\Windows, D:\Windows, etc.
+		for (const sensitive of sensitiveRoots) {
+			const sensitiveLower = sensitive.toLowerCase();
+			// Match pattern like "X:\Windows" or "X:\Windows\..."
+			const drivePattern = /^[a-z]:/i;
+			if (drivePattern.test(lowerPath)) {
+				const pathWithoutDrive = lowerPath.slice(2); // Remove "C:" prefix
+				if (
+					pathWithoutDrive === sensitiveLower ||
+					pathWithoutDrive.startsWith(sensitiveLower + '\\')
+				) {
+					console.error(`Custom sync path cannot be in sensitive system directory: ${customPath}`);
+					return false;
+				}
+			}
+		}
+	} else {
+		// Unix path checking
+		for (const sensitive of sensitiveRoots) {
+			if (lowerPath === sensitive || lowerPath.startsWith(sensitive + '/')) {
+				console.error(`Custom sync path cannot be in sensitive system directory: ${customPath}`);
+				return false;
+			}
 		}
 	}
 
