@@ -276,16 +276,15 @@ export async function buildSshCommand(
 	});
 
 	// Wrap the command to execute via the user's login shell.
-	// $SHELL -ilc ensures the user's full PATH (including homebrew, nvm, etc.) is available.
-	// -i forces interactive mode (critical for .bashrc to not bail out)
+	// $SHELL -lc ensures the user's full PATH (including homebrew, nvm, etc.) is available.
 	// -l loads login profile for PATH
 	// -c executes the command
 	// Using $SHELL respects the user's configured shell (bash, zsh, etc.)
 	//
-	// WHY -i IS CRITICAL:
-	// On Ubuntu (and many Linux distros), .bashrc has a guard at the top:
-	//   case $- in *i*) ;; *) return;; esac
-	// By explicitly sourcing it, we bypass this guard.
+	// WHY PROFILE SOURCING IS NEEDED:
+	// On many systems, login shells don't automatically source interactive config files.
+	// We explicitly source profile and rc files to ensure PATH and environment are set up
+	// properly for finding agent binaries like 'claude', 'codex', etc.
 	//
 	// CRITICAL: When Node.js spawn() passes this to SSH without shell:true, SSH runs
 	// the command through the remote's default shell. The key is escaping:
@@ -297,15 +296,15 @@ export async function buildSshCommand(
 	// Example transformation for spawn():
 	//   Input:  cd '/path' && MYVAR='value' claude --print
 	//   After escaping: cd '/path' && MYVAR='value' claude --print (no $ to escape here)
-	//   Wrapped: bash -lc "source ~/.bashrc 2>/dev/null; cd '/path' && MYVAR='value' claude --print"
+	//   Wrapped: $SHELL -lc "source ~/.bashrc 2>/dev/null; cd '/path' && MYVAR='value' claude --print"
 	//   SSH receives this as one argument, passes to remote shell
 	//   The login shell runs with full PATH from /etc/profile, ~/.bash_profile, AND ~/.bashrc
 	const escapedCommand = shellEscapeForDoubleQuotes(remoteCommand);
-	// Source login/profile files first so PATH modifications made in
-	// ~/.bash_profile or ~/.profile are available for non-interactive
-	// remote commands, then source ~/.bashrc to cover interactive
-	// additions that might also be present.
-	const wrappedCommand = `bash -lc "source ~/.bash_profile 2>/dev/null || source ~/.profile 2>/dev/null; source ~/.bashrc 2>/dev/null; ${escapedCommand}"`;
+	// Source common profile files that work across different shells (bash, zsh, etc.)
+	// This ensures PATH is available for finding agent binaries
+	const profileSourcing =
+		'source ~/.bashrc 2>/dev/null || source ~/.zshrc 2>/dev/null || source ~/.profile 2>/dev/null || source ~/.bash_profile 2>/dev/null || true';
+	const wrappedCommand = `$SHELL -lc "${profileSourcing}; ${escapedCommand}"`;
 	args.push(wrappedCommand);
 
 	// Debug logging to trace the exact command being built
