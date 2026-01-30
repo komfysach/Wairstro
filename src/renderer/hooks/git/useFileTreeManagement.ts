@@ -417,6 +417,56 @@ export function useFileTreeManagement(
 	}, []);
 
 	/**
+	 * Migration: Fetch stats for sessions that have a file tree but no stats.
+	 * This handles sessions restored from before the stats feature was added (Dec 2025).
+	 * Only fetches stats - doesn't re-fetch the file tree since it's already loaded.
+	 */
+	useEffect(() => {
+		const session = sessions.find((s) => s.id === activeSessionId);
+		if (!session) return;
+
+		// Only migrate if: has file tree, no stats, no error, not loading
+		const needsStatsMigration =
+			session.fileTree &&
+			session.fileTree.length > 0 &&
+			session.fileTreeStats === undefined &&
+			!session.fileTreeError &&
+			!session.fileTreeLoading;
+
+		if (!needsStatsMigration) return;
+
+		const sshContext = getSshContext(session);
+		const treeRoot = session.projectRoot || session.cwd;
+
+		// Fetch stats only (don't re-fetch tree)
+		window.maestro.fs
+			.directorySize(treeRoot, sshContext?.sshRemoteId)
+			.then((stats) => {
+				setSessions((prev) =>
+					prev.map((s) =>
+						s.id === activeSessionId
+							? {
+									...s,
+									fileTreeStats: {
+										fileCount: stats.fileCount,
+										folderCount: stats.folderCount,
+										totalSize: stats.totalSize,
+									},
+								}
+							: s
+					)
+				);
+			})
+			.catch((error) => {
+				// Stats fetch failed - log but don't set error state (tree is still valid)
+				logger.warn('Stats migration failed', 'FileTreeManagement', {
+					error: error?.message || 'Unknown error',
+					sessionId: activeSessionId,
+				});
+			});
+	}, [activeSessionId, sessions, setSessions]);
+
+	/**
 	 * Filter file tree based on search query.
 	 * Uses fuzzy matching on file/folder names.
 	 */
