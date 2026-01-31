@@ -37,7 +37,7 @@
  * ║     (COMBINED_CONTEXT_AGENTS set determines which agents use this)            ║
  * ║                                                                               ║
  * ║ KNOWN ISSUES (as of 2026-01-31):                                              ║
- * ║   - Claude Code reports PER-TURN values, not cumulative context state         ║
+ * ║   - Claude Code usage can be cumulative; normalized to per-turn in StdoutHandler ║
  * ║   - Values fluctuate based on which model (Haiku vs Sonnet) handles turn      ║
  * ║   - This causes UI to show inconsistent context % across turns                ║
  * ║   - Compaction check may fail when UI shows high but stored value is low      ║

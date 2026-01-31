@@ -152,7 +152,7 @@ import {
 import { shouldOpenExternally, flattenTree } from './utils/fileExplorer';
 import type { FileNode } from './types/fileTree';
 import { substituteTemplateVariables } from './utils/templateVariables';
-import { validateNewSession } from './utils/sessionValidation';
+import { validateNewSession, getProviderDisplayName } from './utils/sessionValidation';
 import { estimateContextUsage, calculateContextTokens } from './utils/contextUsage';
 import { formatLogsForClipboard } from './utils/contextExtractor';
 import { isLikelyConcatenatedToolNames, getSlashCommandDescription } from './constants/app';
@@ -2754,8 +2754,8 @@ function MaestroConsoleInner() {
 				baseSessionId = sessionId;
 			}
 
-			// Calculate context window usage percentage from CURRENT (per-turn) reported tokens.
-			// Claude Code reports per-turn context values (verified via direct CLI testing).
+			// Calculate context window usage percentage from CURRENT (per-turn) tokens.
+			// Claude Code usage is normalized to per-turn values in StdoutHandler before reaching here.
 			//
 			// SYNC: Uses calculateContextTokens() from shared/contextUsage.ts
 			// This MUST match the calculation used in:
@@ -2797,6 +2797,8 @@ function MaestroConsoleInner() {
 				});
 				// Keep existing context percentage (don't update)
 				contextPercentage = sessionForUsage?.contextUsage ?? 0;
+				// Skip usage updates to avoid polluting UI with cumulative totals
+				return;
 			} else if (usageStats.contextWindow > 0) {
 				contextPercentage = Math.min(
 					Math.round((currentContextTokens / usageStats.contextWindow) * 100),
@@ -10466,11 +10468,13 @@ You are taking over this conversation. Based on the context above, provide a bri
 
 	// Image Handlers
 	const showImageAttachBlockedNotice = useCallback(() => {
-		const message =
-			'Images are only available in the initial message to Claude. Please start a new session if you want to include an image.';
+		const agentName = activeSession?.toolType
+			? getProviderDisplayName(activeSession.toolType)
+			: 'the agent';
+		const message = `Images are only available in the initial message to ${agentName}. Please start a new session if you want to include an image.`;
 		setSuccessFlashNotification(message);
 		setTimeout(() => setSuccessFlashNotification(null), 4000);
-	}, [setSuccessFlashNotification]);
+	}, [setSuccessFlashNotification, activeSession?.toolType]);
 
 	const handlePaste = (e: React.ClipboardEvent) => {
 		// Allow image pasting in group chat or direct AI mode
