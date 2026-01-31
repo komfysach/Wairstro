@@ -152,49 +152,55 @@ export class ChildProcessSpawner {
 			// Handle Windows shell requirements
 			const spawnCommand = command;
 			let spawnArgs = finalArgs;
-			let useShell = false;
+			// Respect explicit request from caller, but also be defensive: if caller
+			// did not set runInShell and we're on Windows with a bare .exe basename,
+			// enable shell so PATH resolution occurs. This avoids ENOENT when callers
+			// rewrite the command to basename (or pass a basename) but forget to set
+			// the runInShell flag.
+			let useShell = !!config.runInShell;
 
-			if (isWindows) {
-				const lowerCommand = command.toLowerCase();
-				// Use shell for batch files
-				if (lowerCommand.endsWith('.cmd') || lowerCommand.endsWith('.bat')) {
-					useShell = true;
-					logger.debug(
-						'[ProcessManager] Using shell=true for Windows batch file',
-						'ProcessManager',
-						{ command }
-					);
-				} else if (!lowerCommand.endsWith('.exe') && !lowerCommand.endsWith('.com')) {
-					// Check if the command has any extension at all
-					const hasExtension = path.extname(command).length > 0;
-					if (!hasExtension) {
-						useShell = true;
-						logger.debug(
-							'[ProcessManager] Using shell=true for Windows command without extension',
-							'ProcessManager',
-							{ command }
-						);
-					}
-				}
+			// Auto-enable shell for Windows when command is a bare .exe (no path)
+			const commandHasPath = /\\|\//.test(spawnCommand);
+			const commandExt = path.extname(spawnCommand).toLowerCase();
+			if (isWindows && !useShell && !commandHasPath && commandExt === '.exe') {
+				useShell = true;
+				logger.info(
+					'[ProcessManager] Auto-enabling shell for Windows to allow PATH resolution of basename exe',
+					'ProcessManager',
+					{ command: spawnCommand }
+				);
+			}
 
+			if (isWindows && useShell) {
+				logger.debug(
+					'[ProcessManager] Forcing shell=true for agent spawn on Windows (runInShell or auto)',
+					'ProcessManager',
+					{ command: spawnCommand }
+				);
 				// Escape arguments for cmd.exe when using shell
-				if (useShell) {
-					spawnArgs = finalArgs.map((arg) => {
-						const needsQuoting = /[ &|<>^%!()"\n\r#?*]/.test(arg) || arg.length > 100;
-						if (needsQuoting) {
-							const escaped = arg.replace(/"/g, '""').replace(/\^/g, '^^');
-							return `"${escaped}"`;
-						}
-						return arg;
-					});
-					logger.info('[ProcessManager] Escaped args for Windows shell', 'ProcessManager', {
-						originalArgsCount: finalArgs.length,
-						escapedArgsCount: spawnArgs.length,
-						escapedPromptArgLength: spawnArgs[spawnArgs.length - 1]?.length,
-						escapedPromptArgPreview: spawnArgs[spawnArgs.length - 1]?.substring(0, 200),
-						argsModified: finalArgs.some((arg, i) => arg !== spawnArgs[i]),
-					});
-				}
+				spawnArgs = finalArgs.map((arg) => {
+					const needsQuoting = /[ &|<>^%!()"\n\r#?*]/.test(arg) || arg.length > 100;
+					if (needsQuoting) {
+						const escaped = arg.replace(/"/g, '""').replace(/\^/g, '^^');
+						return `"${escaped}"`;
+					}
+					return arg;
+				});
+				logger.info('[ProcessManager] Escaped args for Windows shell', 'ProcessManager', {
+					originalArgsCount: finalArgs.length,
+					escapedArgsCount: spawnArgs.length,
+					escapedPromptArgLength: spawnArgs[spawnArgs.length - 1]?.length,
+					escapedPromptArgPreview: spawnArgs[spawnArgs.length - 1]?.substring(0, 200),
+					argsModified: finalArgs.some((arg, i) => arg !== spawnArgs[i]),
+				});
+			}
+
+			// Determine shell option to pass to child_process.spawn.
+			// If the caller provided a specific shell path, prefer that (string).
+			// Otherwise pass a boolean indicating whether to use the default shell.
+			let spawnShell: boolean | string = !!useShell;
+			if (useShell && typeof config.shell === 'string' && config.shell.trim()) {
+				spawnShell = config.shell.trim();
 			}
 
 			// Log spawn details
@@ -202,7 +208,8 @@ export class ChildProcessSpawner {
 			spawnLogFn('[ProcessManager] About to spawn with shell option', 'ProcessManager', {
 				sessionId,
 				spawnCommand,
-				useShell,
+				// show the actual shell value passed to spawn (boolean or shell path)
+				spawnShell: typeof spawnShell === 'string' ? spawnShell : !!spawnShell,
 				isWindows,
 				argsCount: spawnArgs.length,
 				promptArgLength: prompt ? spawnArgs[spawnArgs.length - 1]?.length : undefined,
@@ -212,7 +219,7 @@ export class ChildProcessSpawner {
 			const childProcess = spawn(spawnCommand, spawnArgs, {
 				cwd,
 				env,
-				shell: useShell,
+				shell: spawnShell,
 				stdio: ['pipe', 'pipe', 'pipe'],
 			});
 
@@ -227,13 +234,14 @@ export class ChildProcessSpawner {
 			});
 
 			const isBatchMode = !!prompt;
-			// Detect JSON streaming mode from args
+			// Detect JSON streaming mode from args or config flag
 			const argsContain = (pattern: string) => finalArgs.some((arg) => arg.includes(pattern));
 			const isStreamJsonMode =
 				argsContain('stream-json') ||
 				argsContain('--json') ||
 				(argsContain('--format') && argsContain('json')) ||
-				(hasImages && !!prompt);
+				(hasImages && !!prompt) ||
+				!!config.sendPromptViaStdin;
 
 			// Get the output parser for this agent type
 			const outputParser = getOutputParser(toolType) || undefined;
@@ -377,27 +385,15 @@ export class ChildProcessSpawner {
 			});
 
 			// Handle stdin for batch mode and stream-json
-			if (isStreamJsonMode && prompt && images) {
-				// Stream-json mode with images: send the message via stdin
-				const streamJsonMessage = buildStreamJsonMessage(prompt, images);
-				logger.debug('[ProcessManager] Sending stream-json message with images', 'ProcessManager', {
+			if (isStreamJsonMode && prompt) {
+				// Stream-json mode: send the message via stdin
+				const streamJsonMessage = buildStreamJsonMessage(prompt, images || []);
+				logger.debug('[ProcessManager] Sending stream-json message via stdin', 'ProcessManager', {
 					sessionId,
 					messageLength: streamJsonMessage.length,
-					imageCount: images.length,
+					imageCount: (images || []).length,
+					hasImages: !!(images && images.length > 0),
 				});
-				childProcess.stdin?.write(streamJsonMessage + '\n');
-				childProcess.stdin?.end();
-			} else if (isStreamJsonMode && prompt) {
-				// Stream-json mode with prompt but no images: send JSON via stdin
-				const streamJsonMessage = buildStreamJsonMessage(prompt, []);
-				logger.debug(
-					'[ProcessManager] Sending stream-json prompt via stdin (no images)',
-					'ProcessManager',
-					{
-						sessionId,
-						promptLength: prompt.length,
-					}
-				);
 				childProcess.stdin?.write(streamJsonMessage + '\n');
 				childProcess.stdin?.end();
 			} else if (isBatchMode) {

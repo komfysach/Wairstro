@@ -253,43 +253,60 @@ export function registerProcessHandlers(deps: ProcessHandlerDependencies): void 
 				// Command Resolution: Apply session-level custom path override if set
 				// This allows users to override the detected agent path per-session
 				//
-				// WINDOWS FIX: On Windows, prefer the resolved agent path with .exe extension
-				// to avoid using shell:true in ProcessManager. When shell:true is used,
-				// stdin piping through cmd.exe is unreliable - data written to stdin may not
-				// be forwarded to the child process. This breaks stream-json input mode.
-				// By using the full path with .exe extension, ProcessManager will spawn
-				// the process directly without cmd.exe wrapper, ensuring stdin works correctly.
+				// NEW: Always use shell execution for agent processes on Windows (except SSH),
+				// so PATH and other environment variables are available. This ensures cross-platform
+				// compatibility and correct agent behavior.
 				// ========================================================================
 				let commandToSpawn = config.sessionCustomPath || config.command;
 				let argsToSpawn = finalArgs;
+				let useShell = false;
+				let sshRemoteUsed: SshRemoteConfig | null = null;
+				let customEnvVarsToPass: Record<string, string> | undefined = effectiveCustomEnvVars;
 
 				if (config.sessionCustomPath) {
 					logger.debug(`Using session-level custom path for ${config.toolType}`, LOG_CONTEXT, {
 						customPath: config.sessionCustomPath,
 						originalCommand: config.command,
 					});
-				} else if (isWindows && agent?.path && !config.sessionSshRemoteConfig?.enabled) {
-					// On Windows LOCAL execution, use the full resolved agent path if it ends with .exe or .com
-					// This avoids ProcessManager setting shell:true for extensionless commands,
-					// which breaks stdin piping (needed for stream-json input mode)
-					// NOTE: Skip this for SSH sessions - SSH uses the remote agent path, not local
-					const pathExt = require('path').extname(agent.path).toLowerCase();
-					if (pathExt === '.exe' || pathExt === '.com') {
-						commandToSpawn = agent.path;
-						logger.debug(`Using full agent path on Windows to avoid shell wrapper`, LOG_CONTEXT, {
-							originalCommand: config.command,
-							resolvedPath: agent.path,
-							reason: 'stdin-reliability',
+				}
+
+				// On Windows (except SSH), always use shell execution for agents
+				if (isWindows && !config.sessionSshRemoteConfig?.enabled) {
+					useShell = true;
+					// Merge process.env with custom env vars, to ensure PATH is present
+					// Only keep string values (filter out undefined)
+					customEnvVarsToPass = Object.fromEntries(
+						Object.entries({
+							...process.env,
+							...(customEnvVarsToPass || {}),
+						}).filter(([_, v]) => typeof v === 'string')
+					) as Record<string, string>;
+
+					// Determine an explicit shell to use when forcing shell execution on Windows.
+					// Prefer a user-configured custom shell path, otherwise fall back to COMSPEC/cmd.exe.
+					const customShellPath = settingsStore.get('customShellPath', '') as string;
+					if (customShellPath && customShellPath.trim()) {
+						shellToUse = customShellPath.trim();
+						logger.debug('Using custom shell path for forced agent shell on Windows', LOG_CONTEXT, {
+							customShellPath: shellToUse,
 						});
+					} else if (!shellToUse) {
+						// Use COMSPEC if available, otherwise default to cmd.exe
+						shellToUse = process.env.ComSpec || 'cmd.exe';
 					}
+
+					logger.info(`Forcing shell execution for agent on Windows for PATH access`, LOG_CONTEXT, {
+						agentId: agent?.id,
+						command: commandToSpawn,
+						args: argsToSpawn,
+						shell: shellToUse,
+					});
 				}
 
 				// ========================================================================
 				// SSH Remote Execution: Detect and wrap command for remote execution
 				// Terminal sessions are always local (they need PTY for shell interaction)
 				// ========================================================================
-				let sshRemoteUsed: SshRemoteConfig | null = null;
-
 				// Only consider SSH remote for non-terminal AI agent sessions
 				// SSH is session-level ONLY - no agent-level or global defaults
 				// Log SSH evaluation on Windows for debugging
@@ -302,6 +319,7 @@ export function registerProcessHandlers(deps: ProcessHandlerDependencies): void 
 						willUseSsh: config.toolType !== 'terminal' && config.sessionSshRemoteConfig?.enabled,
 					});
 				}
+				let shouldSendPromptViaStdin = false;
 				if (config.toolType !== 'terminal' && config.sessionSshRemoteConfig?.enabled) {
 					// Session-level SSH config provided - resolve and use it
 					logger.info(`Using session-level SSH config`, LOG_CONTEXT, {
@@ -327,10 +345,15 @@ export function registerProcessHandlers(deps: ProcessHandlerDependencies): void 
 						// IMPORTANT: For large prompts (>4000 chars), don't embed in command line to avoid
 						// Windows command line length limits (~8191 chars). SSH wrapping adds significant overhead.
 						// Instead, add --input-format stream-json and let ProcessManager send via stdin.
+						//
+						// Also, when --input-format stream-json is already present, the prompt must be sent via stdin,
+						// not on the command line, to avoid shell interpretation issues.
 						const isLargePrompt = config.prompt && config.prompt.length > 4000;
+						const hasStreamJsonInput =
+							finalArgs.includes('--input-format') && finalArgs.includes('stream-json');
 						let sshArgs = finalArgs;
-						if (config.prompt && !isLargePrompt) {
-							// Small prompt - embed in command line as usual
+						if (config.prompt && !isLargePrompt && !hasStreamJsonInput) {
+							// Small prompt - embed in command line as usual (only if not using stream-json input)
 							if (agent?.promptArgs) {
 								sshArgs = [...finalArgs, ...agent.promptArgs(config.prompt)];
 							} else if (agent?.noPromptSeparator) {
@@ -338,14 +361,19 @@ export function registerProcessHandlers(deps: ProcessHandlerDependencies): void 
 							} else {
 								sshArgs = [...finalArgs, '--', config.prompt];
 							}
-						} else if (config.prompt && isLargePrompt) {
-							// Large prompt - use stdin mode
-							// Add --input-format stream-json flag so agent reads from stdin
-							sshArgs = [...finalArgs, '--input-format', 'stream-json'];
-							logger.info(`Using stdin for large prompt in SSH remote execution`, LOG_CONTEXT, {
+						} else if (config.prompt && (isLargePrompt || hasStreamJsonInput)) {
+							// Large prompt or stream-json input - ensure --input-format stream-json is present
+							if (!hasStreamJsonInput) {
+								sshArgs = [...finalArgs, '--input-format', 'stream-json'];
+							}
+							shouldSendPromptViaStdin = true;
+							logger.info(`Using stdin for prompt in SSH remote execution`, LOG_CONTEXT, {
 								sessionId: config.sessionId,
-								promptLength: config.prompt.length,
-								reason: 'avoid-command-line-length-limit',
+								promptLength: config.prompt?.length,
+								reason: isLargePrompt
+									? 'avoid-command-line-length-limit'
+									: 'stream-json-input-mode',
+								hasStreamJsonInput,
 							});
 						}
 
@@ -408,22 +436,25 @@ export function registerProcessHandlers(deps: ProcessHandlerDependencies): void 
 					// and env vars are passed via the remote command string
 					requiresPty: sshRemoteUsed ? false : agent?.requiresPty,
 					// When using SSH with small prompts, the prompt was already added to sshArgs above
-					// For large prompts, pass it to ProcessManager so it can send via stdin
+					// For large prompts or stream-json input, pass it to ProcessManager so it can send via stdin
 					prompt:
-						sshRemoteUsed && config.prompt && config.prompt.length > 4000
+						sshRemoteUsed && config.prompt && shouldSendPromptViaStdin
 							? config.prompt
 							: sshRemoteUsed
 								? undefined
 								: config.prompt,
 					shell: shellToUse,
+					runInShell: useShell,
 					shellArgs: shellArgsStr, // Shell-specific CLI args (for terminal sessions)
 					shellEnvVars: shellEnvVars, // Shell-specific env vars (for terminal sessions)
 					contextWindow, // Pass configured context window to process manager
 					// When using SSH, env vars are passed in the remote command string, not locally
-					customEnvVars: sshRemoteUsed ? undefined : effectiveCustomEnvVars,
+					customEnvVars: customEnvVarsToPass,
 					imageArgs: agent?.imageArgs, // Function to build image CLI args (for Codex, OpenCode)
 					promptArgs: agent?.promptArgs, // Function to build prompt args (e.g., ['-p', prompt] for OpenCode)
 					noPromptSeparator: agent?.noPromptSeparator, // Some agents don't support '--' before prompt
+					// For SSH with stream-json input, send prompt via stdin instead of command line
+					sendPromptViaStdin: shouldSendPromptViaStdin ? true : undefined,
 					// Stats tracking: use cwd as projectPath if not explicitly provided
 					projectPath: config.cwd,
 					// SSH remote context (for SSH-specific error messages)
