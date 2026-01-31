@@ -1402,12 +1402,9 @@ export const SettingsModal = memo(function SettingsModal(props: SettingsModalPro
 										Show AI thinking/reasoning content for new tabs
 									</div>
 									<div className="text-sm opacity-60 mb-3" style={{ color: theme.colors.textDim }}>
-										{props.defaultShowThinking === 'off' &&
-											'Thinking is hidden - only final responses are shown'}
-										{props.defaultShowThinking === 'on' &&
-											'Thinking streams in real-time but clears when the response completes'}
-										{props.defaultShowThinking === 'sticky' &&
-											'Thinking streams in real-time and remains visible after the response completes'}
+										{props.defaultShowThinking === 'off' && 'Thinking hidden, only final responses shown'}
+										{props.defaultShowThinking === 'on' && 'Thinking streams live, clears on completion'}
+										{props.defaultShowThinking === 'sticky' && 'Thinking streams live and stays visible'}
 									</div>
 									<ToggleButtonGroup
 										options={[
