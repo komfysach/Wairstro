@@ -565,9 +565,10 @@ Based on capabilities, these UI features are automatically enabled/disabled:
 | Agent | Resume | Read-Only | JSON | Images | Sessions | Cost | Status |
 |-------|--------|-----------|------|--------|----------|------|--------|
 | Claude Code | ✅ `--resume` | ✅ `--permission-mode plan` | ✅ | ✅ | ✅ `~/.claude/` | ✅ | ✅ Complete |
-| OpenCode | ✅ `--session` | ✅ `--agent plan` | ✅ | ✅ | Stub | ❌ (local) | 🔄 Stub Ready |
+| Codex | ✅ `exec resume` | ✅ `--sandbox read-only` | ✅ | ✅ | ✅ `~/.codex/` | ❌ (tokens only) | ✅ Complete |
+| OpenCode | ✅ `--session` | ✅ `--agent plan` | ✅ | ✅ | ✅ `~/.local/share/opencode/` | ✅ | ✅ Complete |
+| Factory Droid | ✅ `-s, --session-id` | ✅ (default mode) | ✅ | ✅ | ✅ `~/.factory/` | ❌ (tokens only) | ✅ Complete |
 | Gemini CLI | TBD | TBD | TBD | TBD | TBD | ✅ | 📋 Planned |
-| Codex | TBD | TBD | TBD | TBD | TBD | ✅ | 📋 Planned |
 
 For detailed implementation guide, see [AGENT_SUPPORT.md](AGENT_SUPPORT.md).
 
