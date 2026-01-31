@@ -231,7 +231,11 @@ describe('useAutoRunImageHandling', () => {
 				expect(result.current.attachmentsList).toHaveLength(2);
 			});
 
-			expect(window.maestro.autorun.listImages).toHaveBeenCalledWith('/test/autorun', 'Phase 1', undefined);
+		expect(window.maestro.autorun.listImages).toHaveBeenCalledWith(
+				'/test/autorun',
+				'Phase 1',
+				undefined
+			);
 			expect(result.current.attachmentsList).toContain('images/Phase 1-123.png');
 			expect(result.current.attachmentsList).toContain('images/Phase 1-456.jpg');
 		});

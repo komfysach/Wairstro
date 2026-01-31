@@ -339,6 +339,7 @@ export const SettingsModal = memo(function SettingsModal(props: SettingsModalPro
 
 	// Stats data management state
 	const [statsDbSize, setStatsDbSize] = useState<number | null>(null);
+	const [statsEarliestDate, setStatsEarliestDate] = useState<string | null>(null);
 	const [statsClearing, setStatsClearing] = useState(false);
 	const [statsClearResult, setStatsClearResult] = useState<{
 		success: boolean;
@@ -379,7 +380,7 @@ export const SettingsModal = memo(function SettingsModal(props: SettingsModalPro
 					setSyncError('Failed to load storage settings');
 				});
 
-			// Load stats database size
+			// Load stats database size and earliest timestamp
 			window.maestro.stats
 				.getDatabaseSize()
 				.then((size) => {
@@ -387,6 +388,21 @@ export const SettingsModal = memo(function SettingsModal(props: SettingsModalPro
 				})
 				.catch((err) => {
 					console.error('Failed to load stats database size:', err);
+				});
+
+			window.maestro.stats
+				.getEarliestTimestamp()
+				.then((timestamp) => {
+					if (timestamp) {
+						const date = new Date(timestamp);
+						const formatted = date.toISOString().split('T')[0]; // YYYY-MM-DD
+						setStatsEarliestDate(formatted);
+					} else {
+						setStatsEarliestDate(null);
+					}
+				})
+				.catch((err) => {
+					console.error('Failed to load earliest stats timestamp:', err);
 				});
 
 			// Reset stats clear state
@@ -1894,6 +1910,9 @@ export const SettingsModal = memo(function SettingsModal(props: SettingsModalPro
 											{statsDbSize !== null
 												? (statsDbSize / 1024 / 1024).toFixed(2) + ' MB'
 												: 'Loading...'}
+											{statsEarliestDate && (
+												<span style={{ color: theme.colors.textDim }}> (since {statsEarliestDate})</span>
+											)}
 										</span>
 									</div>
 

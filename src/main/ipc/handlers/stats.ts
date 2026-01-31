@@ -244,6 +244,15 @@ export function registerStatsHandlers(deps: StatsHandlerDependencies): void {
 		})
 	);
 
+	// Get earliest stat timestamp (for UI display)
+	ipcMain.handle(
+		'stats:get-earliest-timestamp',
+		withIpcErrorLogging(handlerOpts('getEarliestTimestamp'), async () => {
+			const db = getStatsDB();
+			return db.getEarliestStatTimestamp();
+		})
+	);
+
 	// Record session creation (launched)
 	ipcMain.handle(
 		'stats:record-session-created',

@@ -2211,6 +2211,8 @@ interface MaestroAPI {
 		}>;
 		// Get database size in bytes
 		getDatabaseSize: () => Promise<number>;
+		// Get earliest stat timestamp (null if no entries exist)
+		getEarliestTimestamp: () => Promise<number | null>;
 		// Record session creation (launched)
 		recordSessionCreated: (event: {
 			sessionId: string;

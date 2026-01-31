@@ -929,7 +929,11 @@ describe('AutoRun', () => {
 			renderWithProvider(<AutoRun {...props} />);
 
 			await waitFor(() => {
-				expect(mockMaestro.autorun.listImages).toHaveBeenCalledWith('/test/folder', 'test-doc', undefined);
+				expect(mockMaestro.autorun.listImages).toHaveBeenCalledWith(
+					'/test/folder',
+					'test-doc',
+					undefined
+				);
 			});
 		});
 

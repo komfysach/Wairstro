@@ -139,7 +139,12 @@ describe('Autorun Preload API', () => {
 
 				const result = await api.listImages('/project/.maestro', 'doc1');
 
-				expect(mockInvoke).toHaveBeenCalledWith('autorun:listImages', '/project/.maestro', 'doc1', undefined);
+				expect(mockInvoke).toHaveBeenCalledWith(
+					'autorun:listImages',
+					'/project/.maestro',
+					'doc1',
+					undefined
+				);
 				expect(result).toEqual(['image1.png', 'image2.jpg']);
 			});
 		});
@@ -254,7 +259,11 @@ describe('Autorun Preload API', () => {
 
 				await api.deleteBackups('/project/.maestro');
 
-				expect(mockInvoke).toHaveBeenCalledWith('autorun:deleteBackups', '/project/.maestro', undefined);
+			expect(mockInvoke).toHaveBeenCalledWith(
+					'autorun:deleteBackups',
+					'/project/.maestro',
+					undefined
+				);
 			});
 		});
 

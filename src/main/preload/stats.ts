@@ -178,6 +178,10 @@ export function createStatsApi() {
 		// Get database size in bytes
 		getDatabaseSize: (): Promise<number> => ipcRenderer.invoke('stats:get-database-size'),
 
+		// Get earliest stat timestamp (null if no entries)
+		getEarliestTimestamp: (): Promise<number | null> =>
+			ipcRenderer.invoke('stats:get-earliest-timestamp'),
+
 		// Record session creation (for lifecycle tracking)
 		recordSessionCreated: (event: SessionCreatedEvent): Promise<string | null> =>
 			ipcRenderer.invoke('stats:record-session-created', event),

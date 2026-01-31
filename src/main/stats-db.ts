@@ -667,6 +667,40 @@ export class StatsDB {
 	}
 
 	/**
+	 * Get the timestamp of the earliest stat entry in the database.
+	 * Checks query_events, auto_run_sessions, and session_lifecycle tables.
+	 * Returns null if no entries exist.
+	 */
+	getEarliestStatTimestamp(): number | null {
+		if (!this.db) throw new Error('Database not initialized');
+
+		// Query minimum start_time from each table and find the overall minimum
+		const queryEventsMin = this.db
+			.prepare('SELECT MIN(start_time) as min_time FROM query_events')
+			.get() as { min_time: number | null } | undefined;
+
+		const autoRunMin = this.db
+			.prepare('SELECT MIN(start_time) as min_time FROM auto_run_sessions')
+			.get() as { min_time: number | null } | undefined;
+
+		const lifecycleMin = this.db
+			.prepare('SELECT MIN(created_at) as min_time FROM session_lifecycle')
+			.get() as { min_time: number | null } | undefined;
+
+		const timestamps = [
+			queryEventsMin?.min_time,
+			autoRunMin?.min_time,
+			lifecycleMin?.min_time,
+		].filter((t): t is number => t !== null && t !== undefined);
+
+		if (timestamps.length === 0) {
+			return null;
+		}
+
+		return Math.min(...timestamps);
+	}
+
+	/**
 	 * Run VACUUM on the database to reclaim unused space and optimize structure.
 	 *
 	 * VACUUM rebuilds the database file, repacking it into a minimal amount of disk space.
