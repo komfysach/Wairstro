@@ -158,7 +158,7 @@ describe('GraphLegend', () => {
 			render(<GraphLegend {...defaultProps} />);
 
 			expect(screen.getByText('Enter')).toBeInTheDocument();
-			expect(screen.getByText('Recenter on focused node')).toBeInTheDocument();
+			expect(screen.getByText('Preview document in-graph')).toBeInTheDocument();
 		});
 
 		it('displays preview shortcut', () => {
