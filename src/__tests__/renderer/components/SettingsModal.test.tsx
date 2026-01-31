@@ -65,7 +65,7 @@ vi.mock('../../../renderer/components/CustomThemeBuilder', () => ({
 	),
 }));
 
-// Mock useSettings hook (used for context management settings)
+// Mock useSettings hook (used for context management settings and SSH remote ignore settings)
 vi.mock('../../../renderer/hooks/settings/useSettings', () => ({
 	useSettings: () => ({
 		contextManagementSettings: {
@@ -79,6 +79,11 @@ vi.mock('../../../renderer/hooks/settings/useSettings', () => ({
 			contextWarningRedThreshold: 80,
 		},
 		updateContextManagementSettings: vi.fn(),
+		// SSH remote ignore settings
+		sshRemoteIgnorePatterns: ['.git', '.*cache*'],
+		setSshRemoteIgnorePatterns: vi.fn(),
+		sshRemoteHonorGitignore: false,
+		setSshRemoteHonorGitignore: vi.fn(),
 	}),
 }));
 
