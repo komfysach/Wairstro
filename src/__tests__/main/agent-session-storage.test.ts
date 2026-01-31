@@ -1427,3 +1427,581 @@ describe('FactoryDroidSessionStorage SSH Remote Support', () => {
 		});
 	});
 });
+
+/**
+ * Integration-style tests for SSH config flow verification
+ *
+ * These tests verify that SSH config flows through correctly across all agent types:
+ * - OpenCodeSessionStorage
+ * - CodexSessionStorage
+ * - FactoryDroidSessionStorage
+ *
+ * Tests verify:
+ * - Mock SshRemoteConfig object is properly accepted
+ * - Correct remote paths are constructed for each agent type
+ * - SSH utility functions are called with the correct sshConfig parameter
+ * - Local operations still work when sshConfig is undefined/null
+ */
+describe('SSH Config Integration Flow Verification', () => {
+	// Standardized SSH remote config for integration testing
+	// This config simulates a real SSH connection to a remote development server
+	const integrationSshConfig = {
+		id: 'integration-test-ssh',
+		name: 'Integration Test Server',
+		host: 'dev-server.internal.example.com',
+		port: 22,
+		username: 'developer',
+		useSshConfig: true,
+		enabled: true,
+	};
+
+	// Alternative SSH config for testing different configurations
+	const alternativeSshConfig = {
+		id: 'alt-ssh-config',
+		name: 'Alternative Server',
+		host: '192.168.1.100',
+		port: 2222,
+		username: 'admin',
+		useSshConfig: false,
+		enabled: true,
+	};
+
+	describe('Remote Path Construction Verification', () => {
+		it('should construct correct remote paths for OpenCode storage', async () => {
+			const { OpenCodeSessionStorage } = await import('../../main/storage/opencode-session-storage');
+			const storage = new OpenCodeSessionStorage();
+
+			// Test with various project paths and session IDs
+			const testCases = [
+				{
+					projectPath: '/home/developer/projects/my-app',
+					sessionId: 'ses_abc123def456',
+					expectedPathPattern: '~/.local/share/opencode/storage/message/ses_abc123def456',
+				},
+				{
+					projectPath: '/var/www/production',
+					sessionId: 'ses_xyz789',
+					expectedPathPattern: '~/.local/share/opencode/storage/message/ses_xyz789',
+				},
+				{
+					projectPath: '/root/workspace',
+					sessionId: 'ses_test',
+					expectedPathPattern: '~/.local/share/opencode/storage/message/ses_test',
+				},
+			];
+
+			for (const testCase of testCases) {
+				const path = storage.getSessionPath(
+					testCase.projectPath,
+					testCase.sessionId,
+					integrationSshConfig
+				);
+				expect(path).toBe(testCase.expectedPathPattern);
+				// Verify POSIX path format (forward slashes only)
+				expect(path).not.toContain('\\');
+				// Verify home directory expansion format
+				expect(path).toMatch(/^~\//);
+			}
+		});
+
+		it('should construct correct remote paths for Codex storage', async () => {
+			const { CodexSessionStorage } = await import('../../main/storage/codex-session-storage');
+			const storage = new CodexSessionStorage();
+
+			// Codex getSessionPath returns null (requires async file lookup)
+			// but the internal path construction should use ~/.codex/sessions
+			expect(storage.agentId).toBe('codex');
+
+			// Verify that SSH config is accepted without errors
+			const path = storage.getSessionPath('/project/path', 'session-id', integrationSshConfig);
+			expect(path).toBeNull(); // Expected - Codex needs async file search
+		});
+
+		it('should construct correct remote paths for Factory Droid storage', async () => {
+			const { FactoryDroidSessionStorage } = await import(
+				'../../main/storage/factory-droid-session-storage'
+			);
+			const storage = new FactoryDroidSessionStorage();
+
+			// Test path encoding (Factory Droid replaces / with - in project paths)
+			const testCases = [
+				{
+					projectPath: '/home/developer/my-project',
+					sessionId: 'uuid-1234-5678',
+					// Encoded: -home-developer-my-project
+					expectedPattern: /^~\/\.factory\/sessions\/-home-developer-my-project\/uuid-1234-5678\.jsonl$/,
+				},
+				{
+					projectPath: '/var/www/app',
+					sessionId: 'test-session',
+					// Encoded: -var-www-app
+					expectedPattern: /^~\/\.factory\/sessions\/-var-www-app\/test-session\.jsonl$/,
+				},
+			];
+
+			for (const testCase of testCases) {
+				const path = storage.getSessionPath(
+					testCase.projectPath,
+					testCase.sessionId,
+					integrationSshConfig
+				);
+				expect(path).toMatch(testCase.expectedPattern);
+				// Verify POSIX path format
+				expect(path).not.toContain('\\');
+				// Verify home directory expansion format
+				expect(path).toMatch(/^~\//);
+				// Verify .jsonl extension
+				expect(path).toMatch(/\.jsonl$/);
+			}
+		});
+	});
+
+	describe('SSH Config Parameter Propagation', () => {
+		it('should propagate sshConfig to all OpenCode methods correctly', async () => {
+			const { OpenCodeSessionStorage } = await import('../../main/storage/opencode-session-storage');
+			const storage = new OpenCodeSessionStorage();
+
+			// Verify all public methods accept and handle sshConfig without throwing
+			const results = await Promise.all([
+				storage.listSessions('/test/path', integrationSshConfig),
+				storage.listSessionsPaginated('/test/path', { limit: 10 }, integrationSshConfig),
+				storage.readSessionMessages('/test/path', 'session-id', { limit: 20 }, integrationSshConfig),
+				storage.searchSessions('/test/path', 'query', 'all', integrationSshConfig),
+				storage.deleteMessagePair('/test/path', 'session-id', 'msg-id', undefined, integrationSshConfig),
+			]);
+
+			// Verify all methods returned valid results (not thrown)
+			expect(Array.isArray(results[0])).toBe(true); // listSessions
+			expect(results[1]).toHaveProperty('sessions'); // listSessionsPaginated
+			expect(results[2]).toHaveProperty('messages'); // readSessionMessages
+			expect(Array.isArray(results[3])).toBe(true); // searchSessions
+			expect(results[4]).toHaveProperty('success'); // deleteMessagePair
+			expect(results[4].success).toBe(false); // Should fail for remote
+			expect(results[4].error).toContain('remote');
+
+			// Verify getSessionPath (synchronous) also works
+			const sessionPath = storage.getSessionPath('/test/path', 'session-id', integrationSshConfig);
+			expect(sessionPath).toContain('~/.local/share/opencode');
+		});
+
+		it('should propagate sshConfig to all Codex methods correctly', async () => {
+			const { CodexSessionStorage } = await import('../../main/storage/codex-session-storage');
+			const storage = new CodexSessionStorage();
+
+			// Verify all public methods accept and handle sshConfig without throwing
+			const results = await Promise.all([
+				storage.listSessions('/test/path', integrationSshConfig),
+				storage.listSessionsPaginated('/test/path', { limit: 10 }, integrationSshConfig),
+				storage.readSessionMessages('/test/path', 'session-id', { limit: 20 }, integrationSshConfig),
+				storage.searchSessions('/test/path', 'query', 'all', integrationSshConfig),
+				storage.deleteMessagePair('/test/path', 'session-id', 'msg-id', undefined, integrationSshConfig),
+			]);
+
+			// Verify all methods returned valid results
+			expect(Array.isArray(results[0])).toBe(true);
+			expect(results[1]).toHaveProperty('sessions');
+			expect(results[2]).toHaveProperty('messages');
+			expect(Array.isArray(results[3])).toBe(true);
+			expect(results[4].success).toBe(false); // Should fail for remote
+			expect(results[4].error).toContain('remote');
+		});
+
+		it('should propagate sshConfig to all Factory Droid methods correctly', async () => {
+			const { FactoryDroidSessionStorage } = await import(
+				'../../main/storage/factory-droid-session-storage'
+			);
+			const storage = new FactoryDroidSessionStorage();
+
+			// Verify all public methods accept and handle sshConfig without throwing
+			const results = await Promise.all([
+				storage.listSessions('/test/path', integrationSshConfig),
+				storage.listSessionsPaginated('/test/path', { limit: 10 }, integrationSshConfig),
+				storage.readSessionMessages('/test/path', 'session-id', { limit: 20 }, integrationSshConfig),
+				storage.searchSessions('/test/path', 'query', 'all', integrationSshConfig),
+				storage.deleteMessagePair('/test/path', 'session-id', 'msg-id', undefined, integrationSshConfig),
+			]);
+
+			// Verify all methods returned valid results
+			expect(Array.isArray(results[0])).toBe(true);
+			expect(results[1]).toHaveProperty('sessions');
+			expect(results[2]).toHaveProperty('messages');
+			expect(Array.isArray(results[3])).toBe(true);
+			expect(results[4].success).toBe(false); // Should fail for remote
+			expect(results[4].error).toContain('remote');
+
+			// Verify getSessionPath (synchronous) also works
+			const sessionPath = storage.getSessionPath('/test/path', 'session-id', integrationSshConfig);
+			expect(sessionPath).toContain('~/.factory/sessions/');
+		});
+	});
+
+	describe('Local vs Remote Operation Differentiation', () => {
+		it('should correctly differentiate local and remote paths for OpenCode', async () => {
+			const { OpenCodeSessionStorage } = await import('../../main/storage/opencode-session-storage');
+			const storage = new OpenCodeSessionStorage();
+
+			const projectPath = '/home/developer/project';
+			const sessionId = 'ses_test123';
+
+			// With SSH config - remote path
+			const remotePath = storage.getSessionPath(projectPath, sessionId, integrationSshConfig);
+			expect(remotePath).toContain('~'); // Uses ~ for home expansion
+			expect(remotePath).toMatch(/^~\//);
+
+			// Without SSH config - local path
+			const localPath = storage.getSessionPath(projectPath, sessionId);
+			expect(localPath).not.toContain('~'); // Local paths are absolute
+			expect(localPath?.startsWith('/') || localPath?.match(/^[A-Z]:\\/)).toBeTruthy();
+		});
+
+		it('should correctly differentiate local and remote paths for Factory Droid', async () => {
+			const { FactoryDroidSessionStorage } = await import(
+				'../../main/storage/factory-droid-session-storage'
+			);
+			const storage = new FactoryDroidSessionStorage();
+
+			const projectPath = '/home/developer/project';
+			const sessionId = 'test-uuid';
+
+			// With SSH config - remote path
+			const remotePath = storage.getSessionPath(projectPath, sessionId, integrationSshConfig);
+			expect(remotePath).toContain('~'); // Uses ~ for home expansion
+			expect(remotePath).toMatch(/^~\//);
+			expect(remotePath).toContain('.factory/sessions/');
+
+			// Without SSH config - local path
+			const localPath = storage.getSessionPath(projectPath, sessionId);
+			expect(localPath).not.toContain('~'); // Local paths are absolute
+			expect(localPath?.startsWith('/') || localPath?.match(/^[A-Z]:\\/)).toBeTruthy();
+			expect(localPath).toContain('.factory');
+		});
+	});
+
+	describe('SshRemoteConfig Interface Acceptance', () => {
+		it('should accept full SshRemoteConfig with all fields', async () => {
+			const fullConfig = {
+				id: 'full-config-id',
+				name: 'Full Configuration',
+				host: 'full.example.com',
+				port: 22,
+				username: 'fulluser',
+				useSshConfig: true,
+				enabled: true,
+			};
+
+			const { OpenCodeSessionStorage } = await import('../../main/storage/opencode-session-storage');
+			const { CodexSessionStorage } = await import('../../main/storage/codex-session-storage');
+			const { FactoryDroidSessionStorage } = await import(
+				'../../main/storage/factory-droid-session-storage'
+			);
+
+			const openCode = new OpenCodeSessionStorage();
+			const codex = new CodexSessionStorage();
+			const factoryDroid = new FactoryDroidSessionStorage();
+
+			// All should accept the full config without errors
+			await expect(openCode.listSessions('/test', fullConfig)).resolves.toBeDefined();
+			await expect(codex.listSessions('/test', fullConfig)).resolves.toBeDefined();
+			await expect(factoryDroid.listSessions('/test', fullConfig)).resolves.toBeDefined();
+		});
+
+		it('should accept minimal required SshRemoteConfig fields', async () => {
+			const minimalConfig = {
+				id: 'min',
+				name: 'Minimal',
+				host: 'min.example.com',
+				port: 22,
+				username: 'user',
+				useSshConfig: false,
+				enabled: true,
+			};
+
+			const { OpenCodeSessionStorage } = await import('../../main/storage/opencode-session-storage');
+			const { CodexSessionStorage } = await import('../../main/storage/codex-session-storage');
+			const { FactoryDroidSessionStorage } = await import(
+				'../../main/storage/factory-droid-session-storage'
+			);
+
+			const openCode = new OpenCodeSessionStorage();
+			const codex = new CodexSessionStorage();
+			const factoryDroid = new FactoryDroidSessionStorage();
+
+			// All should accept minimal config without errors
+			await expect(openCode.listSessions('/test', minimalConfig)).resolves.toBeDefined();
+			await expect(codex.listSessions('/test', minimalConfig)).resolves.toBeDefined();
+			await expect(factoryDroid.listSessions('/test', minimalConfig)).resolves.toBeDefined();
+		});
+
+		it('should handle alternative SSH configurations for path construction', async () => {
+			const { OpenCodeSessionStorage } = await import('../../main/storage/opencode-session-storage');
+			const { FactoryDroidSessionStorage } = await import(
+				'../../main/storage/factory-droid-session-storage'
+			);
+
+			const openCode = new OpenCodeSessionStorage();
+			const factoryDroid = new FactoryDroidSessionStorage();
+
+			// Verify paths are constructed the same regardless of host/port differences
+			// The remote path should only depend on the project path and session ID,
+			// not on the specific SSH host/port configuration
+			const openCodePath = openCode.getSessionPath('/project', 'session', integrationSshConfig);
+			const openCodePathAlt = openCode.getSessionPath('/project', 'session', alternativeSshConfig);
+			expect(openCodePath).toBe(openCodePathAlt); // Paths should be identical
+
+			const factoryPath = factoryDroid.getSessionPath('/project', 'session', integrationSshConfig);
+			const factoryPathAlt = factoryDroid.getSessionPath('/project', 'session', alternativeSshConfig);
+			expect(factoryPath).toBe(factoryPathAlt); // Paths should be identical
+
+			// Verify the paths are correctly formatted regardless of which config is used
+			expect(openCodePath).toMatch(/^~\/.local\/share\/opencode\//);
+			expect(factoryPath).toMatch(/^~\/\.factory\/sessions\//);
+		});
+	});
+
+	describe('Local Operations with undefined/null sshConfig', () => {
+		it('should use local file system for all agents when sshConfig is undefined', async () => {
+			const { OpenCodeSessionStorage } = await import('../../main/storage/opencode-session-storage');
+			const { CodexSessionStorage } = await import('../../main/storage/codex-session-storage');
+			const { FactoryDroidSessionStorage } = await import(
+				'../../main/storage/factory-droid-session-storage'
+			);
+
+			const openCode = new OpenCodeSessionStorage();
+			const codex = new CodexSessionStorage();
+			const factoryDroid = new FactoryDroidSessionStorage();
+
+			// All should return empty results for non-existent paths (not throw)
+			const openCodeSessions = await openCode.listSessions('/nonexistent/path', undefined);
+			const codexSessions = await codex.listSessions('/nonexistent/path', undefined);
+			const factorySessions = await factoryDroid.listSessions('/nonexistent/path', undefined);
+
+			expect(openCodeSessions).toEqual([]);
+			expect(codexSessions).toEqual([]);
+			expect(factorySessions).toEqual([]);
+		});
+
+		it('should return local paths when sshConfig is not provided', async () => {
+			const { OpenCodeSessionStorage } = await import('../../main/storage/opencode-session-storage');
+			const { FactoryDroidSessionStorage } = await import(
+				'../../main/storage/factory-droid-session-storage'
+			);
+
+			const openCode = new OpenCodeSessionStorage();
+			const factoryDroid = new FactoryDroidSessionStorage();
+
+			// Without sshConfig, paths should be absolute local paths
+			const openCodePath = openCode.getSessionPath('/project', 'session-id');
+			const factoryPath = factoryDroid.getSessionPath('/project', 'session-id');
+
+			// Should not contain ~ (remote home expansion)
+			expect(openCodePath).not.toContain('~');
+			expect(factoryPath).not.toContain('~');
+
+			// Should be absolute paths
+			expect(openCodePath?.startsWith('/') || openCodePath?.match(/^[A-Z]:\\/)).toBeTruthy();
+			expect(factoryPath?.startsWith('/') || factoryPath?.match(/^[A-Z]:\\/)).toBeTruthy();
+		});
+
+		it('should handle all pagination options correctly without sshConfig', async () => {
+			const { OpenCodeSessionStorage } = await import('../../main/storage/opencode-session-storage');
+			const { CodexSessionStorage } = await import('../../main/storage/codex-session-storage');
+			const { FactoryDroidSessionStorage } = await import(
+				'../../main/storage/factory-droid-session-storage'
+			);
+
+			const openCode = new OpenCodeSessionStorage();
+			const codex = new CodexSessionStorage();
+			const factoryDroid = new FactoryDroidSessionStorage();
+
+			const paginationOptions = { limit: 50, cursor: undefined };
+
+			// All should work without sshConfig
+			const openCodeResult = await openCode.listSessionsPaginated(
+				'/test/path',
+				paginationOptions,
+				undefined
+			);
+			const codexResult = await codex.listSessionsPaginated('/test/path', paginationOptions, undefined);
+			const factoryResult = await factoryDroid.listSessionsPaginated(
+				'/test/path',
+				paginationOptions,
+				undefined
+			);
+
+			expect(openCodeResult.sessions).toEqual([]);
+			expect(openCodeResult.totalCount).toBe(0);
+			expect(codexResult.sessions).toEqual([]);
+			expect(codexResult.totalCount).toBe(0);
+			expect(factoryResult.sessions).toEqual([]);
+			expect(factoryResult.totalCount).toBe(0);
+		});
+	});
+
+	describe('Cross-Agent Consistency', () => {
+		it('should have consistent delete behavior for remote sessions across all agents', async () => {
+			const { OpenCodeSessionStorage } = await import('../../main/storage/opencode-session-storage');
+			const { CodexSessionStorage } = await import('../../main/storage/codex-session-storage');
+			const { FactoryDroidSessionStorage } = await import(
+				'../../main/storage/factory-droid-session-storage'
+			);
+
+			const openCode = new OpenCodeSessionStorage();
+			const codex = new CodexSessionStorage();
+			const factoryDroid = new FactoryDroidSessionStorage();
+
+			// All agents should reject delete operations for remote sessions with consistent error
+			const openCodeDelete = await openCode.deleteMessagePair(
+				'/test',
+				'session',
+				'msg',
+				undefined,
+				integrationSshConfig
+			);
+			const codexDelete = await codex.deleteMessagePair(
+				'/test',
+				'session',
+				'msg',
+				undefined,
+				integrationSshConfig
+			);
+			const factoryDelete = await factoryDroid.deleteMessagePair(
+				'/test',
+				'session',
+				'msg',
+				undefined,
+				integrationSshConfig
+			);
+
+			// All should fail
+			expect(openCodeDelete.success).toBe(false);
+			expect(codexDelete.success).toBe(false);
+			expect(factoryDelete.success).toBe(false);
+
+			// All should have consistent error message pattern
+			expect(openCodeDelete.error).toContain('remote');
+			expect(codexDelete.error).toContain('remote');
+			expect(factoryDelete.error).toContain('remote');
+		});
+
+		it('should return consistent empty results for empty search queries across all agents', async () => {
+			const { OpenCodeSessionStorage } = await import('../../main/storage/opencode-session-storage');
+			const { CodexSessionStorage } = await import('../../main/storage/codex-session-storage');
+			const { FactoryDroidSessionStorage } = await import(
+				'../../main/storage/factory-droid-session-storage'
+			);
+
+			const openCode = new OpenCodeSessionStorage();
+			const codex = new CodexSessionStorage();
+			const factoryDroid = new FactoryDroidSessionStorage();
+
+			// Empty and whitespace-only queries should return empty results for all agents
+			const emptyQueries = ['', '   ', '\t', '\n'];
+
+			for (const query of emptyQueries) {
+				const openCodeSearch = await openCode.searchSessions(
+					'/test',
+					query,
+					'all',
+					integrationSshConfig
+				);
+				const codexSearch = await codex.searchSessions('/test', query, 'all', integrationSshConfig);
+				const factorySearch = await factoryDroid.searchSessions(
+					'/test',
+					query,
+					'all',
+					integrationSshConfig
+				);
+
+				expect(openCodeSearch).toEqual([]);
+				expect(codexSearch).toEqual([]);
+				expect(factorySearch).toEqual([]);
+			}
+		});
+
+		it('should support all search modes with SSH config across all agents', async () => {
+			const { OpenCodeSessionStorage } = await import('../../main/storage/opencode-session-storage');
+			const { CodexSessionStorage } = await import('../../main/storage/codex-session-storage');
+			const { FactoryDroidSessionStorage } = await import(
+				'../../main/storage/factory-droid-session-storage'
+			);
+
+			const openCode = new OpenCodeSessionStorage();
+			const codex = new CodexSessionStorage();
+			const factoryDroid = new FactoryDroidSessionStorage();
+
+			const searchModes: Array<'title' | 'user' | 'assistant' | 'all'> = [
+				'title',
+				'user',
+				'assistant',
+				'all',
+			];
+
+			for (const mode of searchModes) {
+				// All should accept the mode with SSH config without throwing
+				await expect(
+					openCode.searchSessions('/test', 'query', mode, integrationSshConfig)
+				).resolves.toBeDefined();
+				await expect(
+					codex.searchSessions('/test', 'query', mode, integrationSshConfig)
+				).resolves.toBeDefined();
+				await expect(
+					factoryDroid.searchSessions('/test', 'query', mode, integrationSshConfig)
+				).resolves.toBeDefined();
+			}
+		});
+	});
+
+	describe('Remote Path Format Verification', () => {
+		it('should use POSIX path separators for all remote paths', async () => {
+			const { OpenCodeSessionStorage } = await import('../../main/storage/opencode-session-storage');
+			const { FactoryDroidSessionStorage } = await import(
+				'../../main/storage/factory-droid-session-storage'
+			);
+
+			const openCode = new OpenCodeSessionStorage();
+			const factoryDroid = new FactoryDroidSessionStorage();
+
+			// Test with various project paths that might have Windows-style separators locally
+			const testPaths = [
+				'/home/user/project',
+				'/var/www/app',
+				'/opt/application/workspace',
+				'/tmp/test-project',
+			];
+
+			for (const projectPath of testPaths) {
+				const openCodePath = openCode.getSessionPath(projectPath, 'session-id', integrationSshConfig);
+				const factoryPath = factoryDroid.getSessionPath(projectPath, 'session-id', integrationSshConfig);
+
+				// Should not contain Windows backslashes
+				expect(openCodePath).not.toContain('\\');
+				expect(factoryPath).not.toContain('\\');
+
+				// Should use forward slashes
+				expect(openCodePath).toContain('/');
+				expect(factoryPath).toContain('/');
+			}
+		});
+
+		it('should use tilde (~) for home directory expansion on remote paths', async () => {
+			const { OpenCodeSessionStorage } = await import('../../main/storage/opencode-session-storage');
+			const { FactoryDroidSessionStorage } = await import(
+				'../../main/storage/factory-droid-session-storage'
+			);
+
+			const openCode = new OpenCodeSessionStorage();
+			const factoryDroid = new FactoryDroidSessionStorage();
+
+			const openCodePath = openCode.getSessionPath('/project', 'session', integrationSshConfig);
+			const factoryPath = factoryDroid.getSessionPath('/project', 'session', integrationSshConfig);
+
+			// Both should start with ~/ for remote home directory expansion
+			expect(openCodePath).toMatch(/^~\//);
+			expect(factoryPath).toMatch(/^~\//);
+
+			// Verify the expected base directories
+			expect(openCodePath).toContain('~/.local/share/opencode/');
+			expect(factoryPath).toContain('~/.factory/sessions/');
+		});
+	});
+});
