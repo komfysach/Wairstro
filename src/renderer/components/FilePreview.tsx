@@ -2071,7 +2071,7 @@ export const FilePreview = forwardRef<FilePreviewHandle, FilePreviewProps>(funct
 						{/* Floating TOC Button */}
 						<button
 							onClick={() => setShowTocOverlay(!showTocOverlay)}
-							className="absolute bottom-4 left-4 p-2.5 rounded-full shadow-lg transition-all duration-200 hover:scale-105 z-10"
+							className="absolute bottom-4 right-4 p-2.5 rounded-full shadow-lg transition-all duration-200 hover:scale-105 z-10"
 							style={{
 								backgroundColor: showTocOverlay ? theme.colors.accent : theme.colors.bgSidebar,
 								color: showTocOverlay ? theme.colors.accentForeground : theme.colors.textMain,
@@ -2085,7 +2085,7 @@ export const FilePreview = forwardRef<FilePreviewHandle, FilePreviewProps>(funct
 						{/* TOC Overlay */}
 						{showTocOverlay && (
 							<div
-								className="absolute bottom-16 left-4 rounded-lg shadow-xl overflow-hidden z-20 animate-in fade-in slide-in-from-bottom-2 duration-200"
+								className="absolute bottom-16 right-4 rounded-lg shadow-xl overflow-hidden z-20 animate-in fade-in slide-in-from-bottom-2 duration-200"
 								style={{
 									backgroundColor: theme.colors.bgSidebar,
 									border: `1px solid ${theme.colors.border}`,
