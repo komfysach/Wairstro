@@ -137,6 +137,17 @@ export class ExitHandler {
 			const stdoutToCheck = managedProcess.stdoutBuffer || managedProcess.streamedText || '';
 			const combinedOutput = `${stdoutToCheck}\n${stderrToCheck}`;
 
+			// Log detailed info before SSH error check to help debug shell parse errors
+			logger.info('[ProcessManager] Checking for SSH errors at exit', 'ProcessManager', {
+				sessionId,
+				exitCode: code,
+				sshRemoteId: managedProcess.sshRemoteId,
+				stderrLength: stderrToCheck.length,
+				stderrPreview: stderrToCheck.substring(0, 300),
+				stdoutLength: stdoutToCheck.length,
+				combinedLength: combinedOutput.length,
+			});
+
 			const sshError = matchSshErrorPattern(combinedOutput);
 			if (sshError) {
 				managedProcess.errorEmitted = true;

@@ -938,6 +938,18 @@ export function matchErrorPattern(
 				// Support dynamic message functions that can use captured groups
 				const message =
 					typeof pattern.message === 'function' ? pattern.message(match) : pattern.message;
+
+				// Log detailed info for SSH shell parse errors to help debug
+				if (pattern.pattern.source.includes('parse error') || pattern.pattern.source.includes('syntax error')) {
+					logger.info('[ErrorPatterns] Shell parse error detected', 'error-patterns', {
+						errorType,
+						patternSource: pattern.pattern.source,
+						matchedText: match[0],
+						linePreview: line.substring(0, 200),
+						lineLength: line.length,
+					});
+				}
+
 				return {
 					type: errorType,
 					message,
