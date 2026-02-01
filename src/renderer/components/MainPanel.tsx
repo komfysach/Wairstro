@@ -1077,6 +1077,7 @@ export const MainPanel = React.memo(
 										isGitRepo={activeSession.isGitRepo}
 										theme={theme}
 										onViewDiff={handleViewGitDiff}
+										onViewLog={() => setGitLogOpen?.(true)}
 										compact={useCompactGitWidget}
 									/>
 								</div>
