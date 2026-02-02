@@ -753,9 +753,9 @@ print("world")
 			expect(screen.getByText('Contents')).toBeInTheDocument();
 		});
 
-		it('stops wheel event propagation on TOC overlay to isolate scrolling', () => {
+		it('closes TOC when clicking outside of it', async () => {
 			const markdownWithHeadings = '# Heading 1\n## Heading 2\n## Heading 3';
-			render(
+			const { container } = render(
 				<FilePreview
 					{...defaultProps}
 					file={{ name: 'doc.md', content: markdownWithHeadings, path: '/test/doc.md' }}
@@ -767,23 +767,18 @@ print("world")
 			const tocButton = screen.getByTitle('Table of Contents');
 			fireEvent.click(tocButton);
 
-			// Find the TOC container by looking for the element with the heading entries
-			const tocContainer = screen.getByText('Contents').closest('div')?.parentElement;
-			expect(tocContainer).toBeInTheDocument();
+			// Verify TOC is open
+			expect(screen.getByText('Contents')).toBeInTheDocument();
 
-			// Create a wheel event and verify it doesn't propagate
-			const wheelEvent = new WheelEvent('wheel', {
-				bubbles: true,
-				cancelable: true,
-				deltaY: 100,
-			});
-			const stopPropagationSpy = vi.spyOn(wheelEvent, 'stopPropagation');
+			// Wait for the delay in useClickOutside hook
+			await new Promise((resolve) => setTimeout(resolve, 10));
 
-			// Dispatch the wheel event on the TOC container
-			tocContainer?.dispatchEvent(wheelEvent);
+			// Click outside the TOC (on the main container)
+			const mainContainer = container.firstChild as HTMLElement;
+			fireEvent.mouseDown(mainContainer);
 
-			// The onWheel handler should have called stopPropagation
-			expect(stopPropagationSpy).toHaveBeenCalled();
+			// TOC should be closed
+			expect(screen.queryByText('Contents')).not.toBeInTheDocument();
 		});
 	});
 

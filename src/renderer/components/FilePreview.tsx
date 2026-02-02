@@ -689,6 +689,8 @@ export const FilePreview = forwardRef<FilePreviewHandle, FilePreviewProps>(funct
 	const matchElementsRef = useRef<HTMLElement[]>([]);
 	const cancelButtonRef = useRef<HTMLButtonElement>(null);
 	const scrollSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+	const tocButtonRef = useRef<HTMLButtonElement>(null);
+	const tocOverlayRef = useRef<HTMLDivElement>(null);
 
 	// Expose focus method to parent via ref
 	useImperativeHandle(
@@ -1157,6 +1159,11 @@ export const FilePreview = forwardRef<FilePreviewHandle, FilePreviewProps>(funct
 	// Use delay to prevent the click that opened the preview from immediately closing it
 	// Disable click-outside in tab mode - tabs should only close via explicit user action
 	useClickOutside(containerRef, handleEscapeRequest, !!file && !isTabMode, { delay: true });
+
+	// Click outside ToC overlay to dismiss (exclude both overlay and the toggle button)
+	// Use delay to prevent the click that opened it from immediately closing it
+	const closeTocOverlay = useCallback(() => setShowTocOverlay(false), []);
+	useClickOutside<HTMLElement>([tocOverlayRef, tocButtonRef], closeTocOverlay, showTocOverlay, { delay: true });
 
 	// Keep search input focused when search is open
 	useEffect(() => {
@@ -2231,6 +2238,7 @@ export const FilePreview = forwardRef<FilePreviewHandle, FilePreviewProps>(funct
 					<>
 						{/* Floating TOC Button */}
 						<button
+							ref={tocButtonRef}
 							onClick={() => setShowTocOverlay(!showTocOverlay)}
 							className="absolute bottom-4 right-4 p-2.5 rounded-full shadow-lg transition-all duration-200 hover:scale-105 z-10"
 							style={{
@@ -2243,19 +2251,14 @@ export const FilePreview = forwardRef<FilePreviewHandle, FilePreviewProps>(funct
 							<List className="w-5 h-5" />
 						</button>
 
-						{/* TOC Overlay */}
+						{/* TOC Overlay - click outside handled by useClickOutside hook */}
 						{showTocOverlay && (
-							<>
-								{/* Click-outside backdrop */}
-								<div
-									className="fixed inset-0 z-15"
-									onClick={() => setShowTocOverlay(false)}
-								/>
-								<div
-									className="absolute bottom-16 right-4 rounded-lg shadow-xl overflow-hidden z-20 animate-in fade-in slide-in-from-bottom-2 duration-200 flex flex-col"
-									style={{
-										backgroundColor: theme.colors.bgSidebar,
-										border: `1px solid ${theme.colors.border}`,
+							<div
+								ref={tocOverlayRef}
+								className="absolute bottom-16 right-4 rounded-lg shadow-xl overflow-hidden z-20 animate-in fade-in slide-in-from-bottom-2 duration-200 flex flex-col"
+								style={{
+									backgroundColor: theme.colors.bgSidebar,
+									border: `1px solid ${theme.colors.border}`,
 										maxHeight: 'calc(70vh - 80px)',
 										minWidth: '200px',
 										maxWidth: '350px',
@@ -2363,7 +2366,6 @@ export const FilePreview = forwardRef<FilePreviewHandle, FilePreviewProps>(funct
 									<span>Bottom</span>
 								</button>
 							</div>
-							</>
 						)}
 					</>
 				)}
