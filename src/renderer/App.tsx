@@ -3880,7 +3880,15 @@ function MaestroConsoleInner() {
 	 * For SSH remote files, pass sshRemoteId so content can be re-fetched if needed.
 	 */
 	const handleOpenFileTab = useCallback(
-		(file: { path: string; name: string; content: string; sshRemoteId?: string; lastModified?: number }) => {
+		(
+			file: { path: string; name: string; content: string; sshRemoteId?: string; lastModified?: number },
+			options?: {
+				/** If true, create new tab adjacent to current file tab. If false, replace current file tab content. Default: true (create new tab) */
+				openInNewTab?: boolean;
+			}
+		) => {
+			const openInNewTab = options?.openInNewTab ?? true; // Default to opening in new tab for backward compatibility
+
 			setSessions((prev) =>
 				prev.map((s) => {
 					if (s.id !== activeSessionIdRef.current) return s;
@@ -3904,6 +3912,42 @@ function MaestroConsoleInner() {
 							filePreviewTabs: updatedTabs,
 							activeFileTabId: existingTab.id,
 							activeTabId: s.activeTabId, // Keep AI tab reference but it's not visually active
+						};
+					}
+
+					// If not opening in new tab and there's an active file tab, replace its content
+					if (!openInNewTab && s.activeFileTabId) {
+						const currentTabId = s.activeFileTabId;
+						const extension = file.name.includes('.')
+							? '.' + file.name.split('.').pop()
+							: '';
+						const nameWithoutExtension = extension
+							? file.name.slice(0, -extension.length)
+							: file.name;
+
+						// Replace current tab's content with new file
+						const updatedTabs = s.filePreviewTabs.map((tab) =>
+							tab.id === currentTabId
+								? {
+										...tab,
+										path: file.path,
+										name: nameWithoutExtension,
+										extension,
+										content: file.content,
+										scrollTop: 0, // Reset scroll for new file
+										searchQuery: '', // Clear search
+										editMode: false,
+										editContent: undefined,
+										lastModified: file.lastModified ?? Date.now(),
+										sshRemoteId: file.sshRemoteId,
+										isLoading: false,
+									}
+								: tab
+						);
+						return {
+							...s,
+							filePreviewTabs: updatedTabs,
+							// activeFileTabId stays the same since we're replacing in-place
 						};
 					}
 
@@ -3935,10 +3979,32 @@ function MaestroConsoleInner() {
 					// Create the unified tab reference
 					const newTabRef: UnifiedTabRef = { type: 'file', id: newTabId };
 
+					// If opening in new tab and there's an active file tab, insert adjacent to it
+					let updatedUnifiedTabOrder: UnifiedTabRef[];
+					if (openInNewTab && s.activeFileTabId) {
+						const currentIndex = s.unifiedTabOrder.findIndex(
+							(ref) => ref.type === 'file' && ref.id === s.activeFileTabId
+						);
+						if (currentIndex !== -1) {
+							// Insert right after the current file tab
+							updatedUnifiedTabOrder = [
+								...s.unifiedTabOrder.slice(0, currentIndex + 1),
+								newTabRef,
+								...s.unifiedTabOrder.slice(currentIndex + 1),
+							];
+						} else {
+							// Fallback: append at end
+							updatedUnifiedTabOrder = [...s.unifiedTabOrder, newTabRef];
+						}
+					} else {
+						// No active file tab or not specified - append at end
+						updatedUnifiedTabOrder = [...s.unifiedTabOrder, newTabRef];
+					}
+
 					return {
 						...s,
 						filePreviewTabs: [...s.filePreviewTabs, newFileTab],
-						unifiedTabOrder: [...s.unifiedTabOrder, newTabRef],
+						unifiedTabOrder: updatedUnifiedTabOrder,
 						activeFileTabId: newTabId,
 						// Deselect AI tab when file tab becomes active
 						// Note: activeTabId stays as is - it tracks the last active AI tab for when user switches back
@@ -6431,43 +6497,51 @@ You are taking over this conversation. Based on the context above, provide a bri
 	// PERF: Memoized callbacks for MainPanel file preview navigation
 	// These were inline arrow functions causing MainPanel re-renders on every keystroke
 	// Updated to use file tabs (handleOpenFileTab) instead of legacy preview overlay
-	const handleMainPanelFileClick = useCallback(async (relativePath: string) => {
-		const currentSession = sessionsRef.current.find((s) => s.id === activeSessionIdRef.current);
-		if (!currentSession) return;
-		const filename = relativePath.split('/').pop() || relativePath;
+	const handleMainPanelFileClick = useCallback(
+		async (relativePath: string, options?: { openInNewTab?: boolean }) => {
+			const currentSession = sessionsRef.current.find((s) => s.id === activeSessionIdRef.current);
+			if (!currentSession) return;
+			const filename = relativePath.split('/').pop() || relativePath;
 
-		// Get SSH remote ID
-		const sshRemoteId =
-			currentSession.sshRemoteId || currentSession.sessionSshRemoteConfig?.remoteId || undefined;
+			// Get SSH remote ID
+			const sshRemoteId =
+				currentSession.sshRemoteId || currentSession.sessionSshRemoteConfig?.remoteId || undefined;
 
-		// Check if file should be opened externally (PDF, etc.)
-		if (!sshRemoteId && shouldOpenExternally(filename)) {
-			const fullPath = `${currentSession.fullPath}/${relativePath}`;
-			window.maestro.shell.openExternal(`file://${fullPath}`);
-			return;
-		}
+			// Check if file should be opened externally (PDF, etc.)
+			if (!sshRemoteId && shouldOpenExternally(filename)) {
+				const fullPath = `${currentSession.fullPath}/${relativePath}`;
+				window.maestro.shell.openExternal(`file://${fullPath}`);
+				return;
+			}
 
-		try {
-			const fullPath = `${currentSession.fullPath}/${relativePath}`;
-			// Fetch content and stat in parallel for efficiency
-			const [content, stat] = await Promise.all([
-				window.maestro.fs.readFile(fullPath, sshRemoteId),
-				window.maestro.fs.stat(fullPath, sshRemoteId).catch(() => null), // stat is optional, don't fail if unavailable
-			]);
-			const lastModified = stat?.modifiedAt ? new Date(stat.modifiedAt).getTime() : undefined;
-			// Open file in a tab (or select existing tab if already open)
-			handleOpenFileTab({
-				path: fullPath,
-				name: filename,
-				content,
-				sshRemoteId,
-				lastModified,
-			});
-			setActiveFocus('main');
-		} catch (error) {
-			console.error('[onFileClick] Failed to read file:', error);
-		}
-	}, [handleOpenFileTab]);
+			try {
+				const fullPath = `${currentSession.fullPath}/${relativePath}`;
+				// Fetch content and stat in parallel for efficiency
+				const [content, stat] = await Promise.all([
+					window.maestro.fs.readFile(fullPath, sshRemoteId),
+					window.maestro.fs.stat(fullPath, sshRemoteId).catch(() => null), // stat is optional, don't fail if unavailable
+				]);
+				const lastModified = stat?.modifiedAt ? new Date(stat.modifiedAt).getTime() : undefined;
+				// Open file in a tab:
+				// - openInNewTab=true (Cmd/Ctrl+Click): create new tab adjacent to current
+				// - openInNewTab=false (regular click): replace current tab content
+				handleOpenFileTab(
+					{
+						path: fullPath,
+						name: filename,
+						content,
+						sshRemoteId,
+						lastModified,
+					},
+					{ openInNewTab: options?.openInNewTab ?? false } // Default to replacing current tab for in-content links
+				);
+				setActiveFocus('main');
+			} catch (error) {
+				console.error('[onFileClick] Failed to read file:', error);
+			}
+		},
+		[handleOpenFileTab]
+	);
 
 	const handleNavigateBack = useCallback(() => {
 		const currentSession = sessionsRef.current.find((s) => s.id === activeSessionIdRef.current);

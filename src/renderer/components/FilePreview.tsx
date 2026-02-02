@@ -84,8 +84,12 @@ interface FilePreviewProps {
 	fileTree?: FileNode[];
 	/** Current working directory for proximity-based matching */
 	cwd?: string;
-	/** Callback when a file link is clicked */
-	onFileClick?: (path: string) => void;
+	/** Callback when a file link is clicked
+	 * @param path - The file path to open
+	 * @param options - Options for how to open the file
+	 * @param options.openInNewTab - If true, open in a new tab adjacent to current; if false, replace current tab content
+	 */
+	onFileClick?: (path: string, options?: { openInNewTab?: boolean }) => void;
 	/** Whether back navigation is available */
 	canGoBack?: boolean;
 	/** Whether forward navigation is available */
@@ -814,7 +818,9 @@ export const FilePreview = forwardRef<FilePreviewHandle, FilePreviewProps>(funct
 						onClick={(e) => {
 							e.preventDefault();
 							if (isMaestroFile && filePath && onFileClick) {
-								onFileClick(filePath);
+								// Cmd/Ctrl+Click opens in new tab, regular click replaces current tab
+								const openInNewTab = e.metaKey || e.ctrlKey;
+								onFileClick(filePath, { openInNewTab });
 							} else if (isAnchorLink && anchorId) {
 								// Handle anchor links - scroll to the target element
 								const targetElement = markdownContainerRef.current

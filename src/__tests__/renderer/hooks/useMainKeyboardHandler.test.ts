@@ -344,6 +344,7 @@ describe('useMainKeyboardHandler', () => {
 			const mockActiveSession = {
 				id: 'test-session',
 				name: 'Test',
+				inputMode: 'ai',
 				aiTabs: [],
 				activeTabId: 'tab-1',
 				unifiedTabOrder: [],
@@ -353,6 +354,7 @@ describe('useMainKeyboardHandler', () => {
 				hasOpenLayers: () => true, // Overlay is open (e.g., file preview)
 				hasOpenModal: () => false, // But no true modal
 				isTabShortcut: (_e: KeyboardEvent, actionId: string) => actionId === 'newTab',
+				activeSessionId: 'test-session',
 				activeSession: mockActiveSession,
 				createTab: vi.fn().mockReturnValue({
 					session: { ...mockActiveSession, aiTabs: [{ id: 'new-tab' }] },
@@ -383,10 +385,20 @@ describe('useMainKeyboardHandler', () => {
 			const { result } = renderHook(() => useMainKeyboardHandler());
 
 			const mockSetTabSwitcherOpen = vi.fn();
+			const mockActiveSession = {
+				id: 'test-session',
+				name: 'Test',
+				inputMode: 'ai',
+				aiTabs: [],
+				activeTabId: 'tab-1',
+				unifiedTabOrder: [],
+			};
 			result.current.keyboardHandlerRef.current = createMockContext({
 				hasOpenLayers: () => true, // Overlay is open (e.g., file preview)
 				hasOpenModal: () => false, // But no true modal
 				isTabShortcut: (_e: KeyboardEvent, actionId: string) => actionId === 'tabSwitcher',
+				activeSessionId: 'test-session',
+				activeSession: mockActiveSession,
 				setTabSwitcherOpen: mockSetTabSwitcherOpen,
 			});
 
@@ -418,6 +430,8 @@ describe('useMainKeyboardHandler', () => {
 			const mockActiveSession = {
 				id: 'test-session',
 				name: 'Test',
+				inputMode: 'ai',
+				aiTabs: [],
 				unifiedClosedTabHistory: [{ type: 'file', tab: { id: 'closed-tab' } }],
 			};
 
@@ -425,6 +439,7 @@ describe('useMainKeyboardHandler', () => {
 				hasOpenLayers: () => true, // Overlay is open (e.g., file preview)
 				hasOpenModal: () => false, // But no true modal
 				isTabShortcut: (_e: KeyboardEvent, actionId: string) => actionId === 'reopenClosedTab',
+				activeSessionId: 'test-session',
 				activeSession: mockActiveSession,
 				reopenUnifiedClosedTab: mockReopenUnifiedClosedTab,
 				setSessions: mockSetSessions,

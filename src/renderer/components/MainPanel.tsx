@@ -236,7 +236,8 @@ interface MainPanelProps {
 	// File tree for linking file references in AI responses
 	fileTree?: import('../types/fileTree').FileNode[];
 	// Callback when a file link is clicked in AI response
-	onFileClick?: (relativePath: string) => void;
+	// options.openInNewTab: true = open in new tab adjacent to current, false = replace current tab content
+	onFileClick?: (relativePath: string, options?: { openInNewTab?: boolean }) => void;
 	// File preview navigation
 	canGoBack?: boolean;
 	canGoForward?: boolean;
