@@ -2236,6 +2236,41 @@ describe('MainPanel', () => {
 
 			expect(writeText).toHaveBeenCalledWith('https://github.com/user/repo.git');
 		});
+
+		it('should open remote URL in system browser when clicked', async () => {
+			setMockGitStatus('session-1', {
+				fileCount: 0,
+				branch: 'main',
+				remote: 'https://github.com/user/repo.git',
+				ahead: 0,
+				behind: 0,
+				totalAdditions: 0,
+				totalDeletions: 0,
+				modifiedCount: 0,
+				fileChanges: [],
+				lastUpdated: Date.now(),
+			});
+
+			const session = createSession({ isGitRepo: true });
+			render(<MainPanel {...defaultProps} activeSession={session} />);
+
+			await waitFor(() => {
+				expect(screen.getByText(/main|GIT/)).toBeInTheDocument();
+			});
+
+			const gitBadge = screen.getByText(/main|GIT/);
+			fireEvent.mouseEnter(gitBadge.parentElement!);
+
+			await waitFor(() => {
+				expect(screen.getByText('github.com/user/repo')).toBeInTheDocument();
+			});
+
+			// Click the remote URL link
+			const remoteLink = screen.getByText('github.com/user/repo');
+			fireEvent.click(remoteLink);
+
+			expect(window.maestro.shell.openExternal).toHaveBeenCalledWith('https://github.com/user/repo');
+		});
 	});
 
 	describe('Edge cases', () => {

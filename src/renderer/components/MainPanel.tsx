@@ -972,7 +972,7 @@ export const MainPanel = React.memo(
 																			onClick={(e) => {
 																				e.stopPropagation();
 																				const url = remoteUrlToBrowserUrl(gitInfo.remote);
-																				if (url) window.open(url, '_blank');
+																				if (url) window.maestro.shell.openExternal(url);
 																			}}
 																			className="text-xs font-mono truncate hover:underline text-left"
 																			style={{ color: theme.colors.textMain }}
