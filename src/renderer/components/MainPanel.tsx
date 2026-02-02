@@ -214,6 +214,12 @@ interface MainPanelProps {
 	onFileTabSelect?: (tabId: string) => void;
 	onFileTabClose?: (tabId: string) => void;
 	onOpenFileTab?: (filePath: string) => void;
+	/** Handler to update file tab editMode when toggled in FilePreview */
+	onFileTabEditModeChange?: (tabId: string, editMode: boolean) => void;
+	/** Handler to update file tab editContent when changed in FilePreview */
+	onFileTabEditContentChange?: (tabId: string, editContent: string | undefined) => void;
+	/** Handler to update file tab scrollTop when scrolling in FilePreview */
+	onFileTabScrollPositionChange?: (tabId: string, scrollTop: number) => void;
 
 	// Scroll position persistence
 	onScrollPositionChange?: (scrollTop: number) => void;
@@ -479,6 +485,9 @@ export const MainPanel = React.memo(
 			activeFileTab,
 			onFileTabSelect,
 			onFileTabClose,
+			onFileTabEditModeChange,
+			onFileTabEditContentChange,
+			onFileTabScrollPositionChange,
 		} = props;
 
 		// Get the active tab for header display
@@ -1568,7 +1577,8 @@ export const MainPanel = React.memo(
 									ref={filePreviewRef}
 									file={{
 										name: activeFileTab.name + activeFileTab.extension,
-										content: activeFileTab.editContent ?? activeFileTab.content,
+										// Always pass original content - editContent is passed separately for edit mode state
+										content: activeFileTab.content,
 										path: activeFileTab.path,
 									}}
 									onClose={() => {
@@ -1577,10 +1587,14 @@ export const MainPanel = React.memo(
 									}}
 									theme={theme}
 									markdownEditMode={activeFileTab.editMode}
-									setMarkdownEditMode={setMarkdownEditMode}
+									setMarkdownEditMode={(editMode) => {
+										// Update both the file tab's editMode and the legacy markdownEditMode setting
+										onFileTabEditModeChange?.(activeFileTabId, editMode);
+									}}
 									onSave={async (path, content) => {
 										await window.maestro.fs.writeFile(path, content);
-										// TODO: Update the file tab's editContent after save
+										// After save, clear the editContent to indicate no pending changes
+										onFileTabEditContentChange?.(activeFileTabId, undefined);
 									}}
 									shortcuts={shortcuts}
 									fileTree={props.fileTree}
@@ -1612,6 +1626,18 @@ export const MainPanel = React.memo(
 										undefined
 									}
 									showCloseButton={false}
+									// Pass external edit content for persistence across tab switches
+									externalEditContent={activeFileTab.editContent}
+									onEditContentChange={(content) => {
+										// Store edit content on the tab - undefined means no changes (content matches file)
+										const hasChanges = content !== activeFileTab.content;
+										onFileTabEditContentChange?.(activeFileTabId, hasChanges ? content : undefined);
+									}}
+									// Pass scroll position props for persistence across tab switches
+									initialScrollTop={activeFileTab.scrollTop}
+									onScrollPositionChange={(scrollTop) => {
+										onFileTabScrollPositionChange?.(activeFileTabId, scrollTop);
+									}}
 								/>
 							</div>
 						) : previewFile ? (

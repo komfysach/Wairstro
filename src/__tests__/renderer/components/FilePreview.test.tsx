@@ -454,6 +454,76 @@ describe('FilePreview', () => {
 		});
 	});
 
+	describe('edit content state persistence', () => {
+		it('calls onEditContentChange when editing content', () => {
+			const onEditContentChange = vi.fn();
+			render(
+				<FilePreview
+					{...defaultProps}
+					file={{ name: 'test.md', content: 'original content', path: '/test/test.md' }}
+					markdownEditMode={true}
+					onEditContentChange={onEditContentChange}
+				/>
+			);
+
+			const textarea = screen.getByRole('textbox');
+			fireEvent.change(textarea, { target: { value: 'modified content' } });
+
+			expect(onEditContentChange).toHaveBeenCalledWith('modified content');
+		});
+
+		it('uses externalEditContent when provided', () => {
+			render(
+				<FilePreview
+					{...defaultProps}
+					file={{ name: 'test.md', content: 'original content', path: '/test/test.md' }}
+					markdownEditMode={true}
+					externalEditContent="externally managed content"
+				/>
+			);
+
+			const textarea = screen.getByRole('textbox');
+			expect(textarea).toHaveValue('externally managed content');
+		});
+
+		it('falls back to internal state when externalEditContent is not provided', () => {
+			render(
+				<FilePreview
+					{...defaultProps}
+					file={{ name: 'test.md', content: 'file content', path: '/test/test.md' }}
+					markdownEditMode={true}
+				/>
+			);
+
+			const textarea = screen.getByRole('textbox');
+			expect(textarea).toHaveValue('file content');
+		});
+
+		it('preserves external edit content across re-renders', () => {
+			const { rerender } = render(
+				<FilePreview
+					{...defaultProps}
+					file={{ name: 'test.md', content: 'original', path: '/test/test.md' }}
+					markdownEditMode={true}
+					externalEditContent="preserved content"
+				/>
+			);
+
+			// Re-render with same external content
+			rerender(
+				<FilePreview
+					{...defaultProps}
+					file={{ name: 'test.md', content: 'original', path: '/test/test.md' }}
+					markdownEditMode={true}
+					externalEditContent="preserved content"
+				/>
+			);
+
+			const textarea = screen.getByRole('textbox');
+			expect(textarea).toHaveValue('preserved content');
+		});
+	});
+
 	describe('table of contents', () => {
 		it('shows TOC button for markdown files with headings in preview mode', () => {
 			const markdownWithHeadings = '# Heading 1\n## Heading 2\n### Heading 3\nContent here';
@@ -662,6 +732,100 @@ print("world")
 
 			// TOC overlay should close
 			expect(screen.queryByText('Contents')).not.toBeInTheDocument();
+		});
+	});
+
+	describe('scroll position persistence', () => {
+		it('calls onScrollPositionChange when scrolling (throttled)', async () => {
+			const onScrollPositionChange = vi.fn();
+			vi.useFakeTimers();
+
+			render(
+				<FilePreview
+					{...defaultProps}
+					file={{ name: 'test.md', content: 'Some content', path: '/test/test.md' }}
+					onScrollPositionChange={onScrollPositionChange}
+				/>
+			);
+
+			// Get the content container (the scrollable div)
+			const container = document.querySelector('.overflow-y-auto');
+			expect(container).not.toBeNull();
+
+			// Simulate scroll events
+			fireEvent.scroll(container!, { target: { scrollTop: 100 } });
+
+			// The callback is throttled at 200ms
+			expect(onScrollPositionChange).not.toHaveBeenCalled();
+
+			// Fast-forward timers
+			vi.advanceTimersByTime(200);
+
+			expect(onScrollPositionChange).toHaveBeenCalledWith(100);
+
+			vi.useRealTimers();
+		});
+
+		it('accepts initialScrollTop prop without errors', () => {
+			// This just verifies the prop is accepted without errors
+			// The actual scroll restoration uses requestAnimationFrame which is hard to test
+			expect(() =>
+				render(
+					<FilePreview
+						{...defaultProps}
+						file={{ name: 'test.md', content: 'Some content', path: '/test/test.md' }}
+						initialScrollTop={150}
+					/>
+				)
+			).not.toThrow();
+		});
+
+		it('does not call onScrollPositionChange when not provided', () => {
+			vi.useFakeTimers();
+
+			render(
+				<FilePreview
+					{...defaultProps}
+					file={{ name: 'test.md', content: 'Some content', path: '/test/test.md' }}
+					// No onScrollPositionChange prop
+				/>
+			);
+
+			const container = document.querySelector('.overflow-y-auto');
+			expect(container).not.toBeNull();
+
+			// Simulate scroll - should not throw
+			fireEvent.scroll(container!, { target: { scrollTop: 100 } });
+			vi.advanceTimersByTime(200);
+
+			// Test passes if no errors occurred
+
+			vi.useRealTimers();
+		});
+
+		it('clears pending scroll save timer on unmount', () => {
+			const onScrollPositionChange = vi.fn();
+			vi.useFakeTimers();
+
+			const { unmount } = render(
+				<FilePreview
+					{...defaultProps}
+					file={{ name: 'test.md', content: 'Some content', path: '/test/test.md' }}
+					onScrollPositionChange={onScrollPositionChange}
+				/>
+			);
+
+			const container = document.querySelector('.overflow-y-auto');
+			fireEvent.scroll(container!, { target: { scrollTop: 100 } });
+
+			// Unmount before timer fires
+			unmount();
+			vi.advanceTimersByTime(200);
+
+			// Callback should not be called after unmount
+			expect(onScrollPositionChange).not.toHaveBeenCalled();
+
+			vi.useRealTimers();
 		});
 	});
 });

@@ -99,6 +99,14 @@ interface FilePreviewProps {
 	sshRemoteId?: string;
 	/** Whether to show the close button in the header (default: true, set to false when rendered as tab) */
 	showCloseButton?: boolean;
+	/** Current edit content (used for file tab persistence) - if provided, overrides internal state */
+	externalEditContent?: string;
+	/** Callback when edit content changes (used for file tab persistence) */
+	onEditContentChange?: (content: string) => void;
+	/** Initial scroll position to restore (used for file tab persistence) */
+	initialScrollTop?: number;
+	/** Callback when scroll position changes (used for file tab persistence) */
+	onScrollPositionChange?: (scrollTop: number) => void;
 }
 
 export interface FilePreviewHandle {
@@ -558,6 +566,10 @@ export const FilePreview = forwardRef<FilePreviewHandle, FilePreviewProps>(funct
 		onOpenInGraph,
 		sshRemoteId,
 		showCloseButton = true, // Default to true for backwards compatibility
+		externalEditContent,
+		onEditContentChange,
+		initialScrollTop,
+		onScrollPositionChange,
 	},
 	ref
 ) {
@@ -575,8 +587,15 @@ export const FilePreview = forwardRef<FilePreviewHandle, FilePreviewProps>(funct
 	const [showStatsBar, setShowStatsBar] = useState(true);
 	const [tokenCount, setTokenCount] = useState<number | null>(null);
 	const [showRemoteImages, setShowRemoteImages] = useState(false);
-	// Edit mode state
-	const [editContent, setEditContent] = useState('');
+	// Edit mode state - use external content when provided (for file tab persistence)
+	const [internalEditContent, setInternalEditContent] = useState('');
+	// Computed edit content - prefer external if provided
+	const editContent = externalEditContent ?? internalEditContent;
+	// Wrapper to update both internal state and notify parent
+	const setEditContent = useCallback((content: string) => {
+		setInternalEditContent(content);
+		onEditContentChange?.(content);
+	}, [onEditContentChange]);
 	const [isSaving, setIsSaving] = useState(false);
 	const [showUnsavedChangesModal, setShowUnsavedChangesModal] = useState(false);
 	const [copyNotificationMessage, setCopyNotificationMessage] = useState('');
@@ -589,6 +608,7 @@ export const FilePreview = forwardRef<FilePreviewHandle, FilePreviewProps>(funct
 	const layerIdRef = useRef<string>();
 	const matchElementsRef = useRef<HTMLElement[]>([]);
 	const cancelButtonRef = useRef<HTMLButtonElement>(null);
+	const scrollSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
 	// Expose focus method to parent via ref
 	useImperativeHandle(
@@ -850,12 +870,13 @@ export const FilePreview = forwardRef<FilePreviewHandle, FilePreviewProps>(funct
 			});
 	}, [file?.content, isImage, isBinary, isLargeFile]);
 
-	// Sync edit content when file changes or when entering edit mode
+	// Sync internal edit content when file changes (only when NOT using external content)
+	// When externalEditContent is provided (file tab mode), the parent manages the state
 	useEffect(() => {
-		if (file?.content) {
-			setEditContent(file.content);
+		if (file?.content && externalEditContent === undefined) {
+			setInternalEditContent(file.content);
 		}
-	}, [file?.content, file?.path]);
+	}, [file?.content, file?.path, externalEditContent]);
 
 	// Focus appropriate element and sync scroll position when mode changes
 	const prevMarkdownEditModeRef = useRef(markdownEditMode);
@@ -924,7 +945,7 @@ export const FilePreview = forwardRef<FilePreviewHandle, FilePreviewProps>(funct
 		}
 	}, [file, onSave, hasChanges, isSaving, editContent]);
 
-	// Track scroll position to show/hide stats bar
+	// Track scroll position to show/hide stats bar and report changes
 	useEffect(() => {
 		const contentEl = contentRef.current;
 		if (!contentEl) return;
@@ -932,11 +953,53 @@ export const FilePreview = forwardRef<FilePreviewHandle, FilePreviewProps>(funct
 		const handleScroll = () => {
 			// Show stats bar when scrolled to top (within 10px), hide otherwise
 			setShowStatsBar(contentEl.scrollTop <= 10);
+
+			// Throttled scroll position save (200ms) - same timing as TerminalOutput
+			if (onScrollPositionChange) {
+				if (scrollSaveTimerRef.current) {
+					clearTimeout(scrollSaveTimerRef.current);
+				}
+				scrollSaveTimerRef.current = setTimeout(() => {
+					onScrollPositionChange(contentEl.scrollTop);
+					scrollSaveTimerRef.current = null;
+				}, 200);
+			}
 		};
 
 		contentEl.addEventListener('scroll', handleScroll, { passive: true });
-		return () => contentEl.removeEventListener('scroll', handleScroll);
-	}, []);
+		return () => {
+			contentEl.removeEventListener('scroll', handleScroll);
+			// Clear any pending scroll save timer
+			if (scrollSaveTimerRef.current) {
+				clearTimeout(scrollSaveTimerRef.current);
+				scrollSaveTimerRef.current = null;
+			}
+		};
+	}, [onScrollPositionChange]);
+
+	// Restore scroll position when initialScrollTop is provided (file tab switching)
+	// Use a ref to track if we've already restored for this file to avoid re-scrolling on re-renders
+	const hasRestoredScrollRef = useRef<string | null>(null);
+	useEffect(() => {
+		const contentEl = contentRef.current;
+		if (!contentEl || !file?.path) return;
+
+		// Only restore if this is a new file and we have a scroll position to restore
+		if (
+			initialScrollTop !== undefined &&
+			initialScrollTop > 0 &&
+			hasRestoredScrollRef.current !== file.path
+		) {
+			// Use requestAnimationFrame to ensure DOM is ready
+			requestAnimationFrame(() => {
+				contentEl.scrollTop = initialScrollTop;
+			});
+			hasRestoredScrollRef.current = file.path;
+		} else if (hasRestoredScrollRef.current !== file.path) {
+			// New file without saved scroll position - reset to top
+			hasRestoredScrollRef.current = file.path;
+		}
+	}, [file?.path, initialScrollTop]);
 
 	// Auto-focus on mount and when file changes so keyboard shortcuts work immediately
 	useEffect(() => {

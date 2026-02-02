@@ -5527,6 +5527,25 @@ You are taking over this conversation. Based on the context above, provide a bri
 	}, []);
 
 	/**
+	 * Update a file tab's scroll position.
+	 * Called when user scrolls within FilePreview (throttled at 200ms).
+	 */
+	const handleFileTabScrollPositionChange = useCallback((tabId: string, scrollTop: number) => {
+		setSessions((prev) =>
+			prev.map((s) => {
+				if (s.id !== activeSessionIdRef.current) return s;
+
+				const updatedFileTabs = s.filePreviewTabs.map((tab) => {
+					if (tab.id !== tabId) return tab;
+					return { ...tab, scrollTop };
+				});
+
+				return { ...s, filePreviewTabs: updatedFileTabs };
+			})
+		);
+	}, []);
+
+	/**
 	 * Select a file preview tab. This sets the file tab as active.
 	 * activeTabId is preserved to track the last active AI tab for when the user switches back.
 	 * If fileTabAutoRefreshEnabled setting is true, checks if file has changed on disk and refreshes content.
@@ -13130,6 +13149,7 @@ You are taking over this conversation. Based on the context above, provide a bri
 		handleFileTabClose: handleCloseFileTab,
 		handleFileTabEditModeChange,
 		handleFileTabEditContentChange,
+		handleFileTabScrollPositionChange,
 
 		handleScrollPositionChange,
 		handleAtBottomChange,
