@@ -1950,8 +1950,12 @@ export const FilePreview = forwardRef<FilePreviewHandle, FilePreviewProps>(funct
 				) : null}
 			</div>
 
-			{/* Content */}
-			<div ref={contentRef} className="flex-1 overflow-y-auto px-6 pt-3 pb-6 scrollbar-thin">
+			{/* Content - isolated scroll to prevent scroll chaining */}
+			<div
+				ref={contentRef}
+				className="flex-1 overflow-y-auto px-6 pt-3 pb-6 scrollbar-thin"
+				style={{ overscrollBehavior: 'contain' }}
+			>
 				{/* Floating Search */}
 				{searchOpen && (
 					<div className="sticky top-0 z-10 pb-4">
@@ -2289,7 +2293,11 @@ export const FilePreview = forwardRef<FilePreviewHandle, FilePreviewProps>(funct
 								</button>
 
 								{/* TOC Entries - scrollable middle section */}
-								<div className="overflow-y-auto px-1 py-1 flex-1 min-h-0">
+								<div
+									className="overflow-y-auto px-1 py-1 flex-1 min-h-0"
+									style={{ overscrollBehavior: 'contain' }}
+									onWheel={(e) => e.stopPropagation()}
+								>
 									{tocEntries.map((entry, index) => {
 										// Get color based on heading level (match the prose styles)
 										const levelColors: Record<number, string> = {
