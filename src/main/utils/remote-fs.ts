@@ -155,12 +155,6 @@ async function execRemoteCommand(
 		const sshArgs = deps.buildSshArgs(config);
 		sshArgs.push(remoteCommand);
 
-		// Log SSH command for debugging connection issues
-		if (attempt === 0) {
-			logger.debug(
-				`[remote-fs] SSH to ${config.host}: ${sshPath} ${sshArgs.slice(0, -1).join(' ')} "<command>"`
-			);
-		}
 
 		const result = await deps.execSsh(sshPath, sshArgs);
 		lastResult = result;
