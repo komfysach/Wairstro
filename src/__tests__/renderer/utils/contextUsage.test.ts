@@ -6,6 +6,7 @@ import {
 	estimateContextUsage,
 	calculateContextTokens,
 	estimateAccumulatedGrowth,
+	estimateAccumulatedGrowth,
 	DEFAULT_CONTEXT_WINDOWS,
 } from '../../../renderer/utils/contextUsage';
 import type { UsageStats } from '../../../shared/types';

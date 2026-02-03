@@ -69,12 +69,17 @@ export function calculateContextTokens(
 		return (
 			(stats.inputTokens || 0) + (stats.cacheCreationInputTokens || 0) + (stats.outputTokens || 0)
 		);
+		return (
+			(stats.inputTokens || 0) + (stats.cacheCreationInputTokens || 0) + (stats.outputTokens || 0)
+		);
 	}
 
 	// Claude models: total input = uncached + cache-hit + newly-cached
 	// Output tokens don't consume the input context window
 	return (
 		(stats.inputTokens || 0) +
+		(stats.cacheReadInputTokens || 0) +
+		(stats.cacheCreationInputTokens || 0)(stats.inputTokens || 0) +
 		(stats.cacheReadInputTokens || 0) +
 		(stats.cacheCreationInputTokens || 0)
 	);
