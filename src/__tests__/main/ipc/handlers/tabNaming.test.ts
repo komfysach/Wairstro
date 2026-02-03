@@ -659,5 +659,141 @@ describe('extractTabName utility', () => {
 			const result = await resultPromise;
 			expect(result).toBe('Code Style Name');
 		});
+
+		it('removes trailing punctuation from output', async () => {
+			let onDataCallback: ((sessionId: string, data: string) => void) | undefined;
+			let onExitCallback: ((sessionId: string) => void) | undefined;
+
+			mockProcessManager.on.mockImplementation((event: string, callback: (...args: any[]) => void) => {
+				if (event === 'data') onDataCallback = callback;
+				if (event === 'exit') onExitCallback = callback;
+			});
+
+			const resultPromise = invokeHandler('tabNaming:generateTabName', {
+				userMessage: 'Test',
+				agentType: 'claude-code',
+				cwd: '/test',
+			});
+
+			await vi.waitFor(() => {
+				expect(mockProcessManager.spawn).toHaveBeenCalled();
+			});
+
+			onDataCallback?.('tab-naming-mock-uuid-1234', 'Tab Name With Period.');
+			onExitCallback?.('tab-naming-mock-uuid-1234');
+
+			const result = await resultPromise;
+			expect(result).toBe('Tab Name With Period');
+		});
+
+		it('removes markdown headers from output', async () => {
+			let onDataCallback: ((sessionId: string, data: string) => void) | undefined;
+			let onExitCallback: ((sessionId: string) => void) | undefined;
+
+			mockProcessManager.on.mockImplementation((event: string, callback: (...args: any[]) => void) => {
+				if (event === 'data') onDataCallback = callback;
+				if (event === 'exit') onExitCallback = callback;
+			});
+
+			const resultPromise = invokeHandler('tabNaming:generateTabName', {
+				userMessage: 'Test',
+				agentType: 'claude-code',
+				cwd: '/test',
+			});
+
+			await vi.waitFor(() => {
+				expect(mockProcessManager.spawn).toHaveBeenCalled();
+			});
+
+			onDataCallback?.('tab-naming-mock-uuid-1234', '## Header Name');
+			onExitCallback?.('tab-naming-mock-uuid-1234');
+
+			const result = await resultPromise;
+			expect(result).toBe('Header Name');
+		});
+
+		it('removes common preamble phrases', async () => {
+			let onDataCallback: ((sessionId: string, data: string) => void) | undefined;
+			let onExitCallback: ((sessionId: string) => void) | undefined;
+
+			mockProcessManager.on.mockImplementation((event: string, callback: (...args: any[]) => void) => {
+				if (event === 'data') onDataCallback = callback;
+				if (event === 'exit') onExitCallback = callback;
+			});
+
+			const resultPromise = invokeHandler('tabNaming:generateTabName', {
+				userMessage: 'Test',
+				agentType: 'claude-code',
+				cwd: '/test',
+			});
+
+			await vi.waitFor(() => {
+				expect(mockProcessManager.spawn).toHaveBeenCalled();
+			});
+
+			onDataCallback?.('tab-naming-mock-uuid-1234', "Here's the tab name: Auth Bug Fix");
+			onExitCallback?.('tab-naming-mock-uuid-1234');
+
+			const result = await resultPromise;
+			expect(result).toBe('Auth Bug Fix');
+		});
+
+		it('filters out lines with example keywords', async () => {
+			let onDataCallback: ((sessionId: string, data: string) => void) | undefined;
+			let onExitCallback: ((sessionId: string) => void) | undefined;
+
+			mockProcessManager.on.mockImplementation((event: string, callback: (...args: any[]) => void) => {
+				if (event === 'data') onDataCallback = callback;
+				if (event === 'exit') onExitCallback = callback;
+			});
+
+			const resultPromise = invokeHandler('tabNaming:generateTabName', {
+				userMessage: 'Test',
+				agentType: 'claude-code',
+				cwd: '/test',
+			});
+
+			await vi.waitFor(() => {
+				expect(mockProcessManager.spawn).toHaveBeenCalled();
+			});
+
+			// Agent might echo back example text before giving the actual name
+			onDataCallback?.(
+				'tab-naming-mock-uuid-1234',
+				'Example: Dark Mode\nActual Tab Name'
+			);
+			onExitCallback?.('tab-naming-mock-uuid-1234');
+
+			const result = await resultPromise;
+			expect(result).toBe('Actual Tab Name');
+		});
+
+		it('truncates names longer than 40 characters', async () => {
+			let onDataCallback: ((sessionId: string, data: string) => void) | undefined;
+			let onExitCallback: ((sessionId: string) => void) | undefined;
+
+			mockProcessManager.on.mockImplementation((event: string, callback: (...args: any[]) => void) => {
+				if (event === 'data') onDataCallback = callback;
+				if (event === 'exit') onExitCallback = callback;
+			});
+
+			const resultPromise = invokeHandler('tabNaming:generateTabName', {
+				userMessage: 'Test',
+				agentType: 'claude-code',
+				cwd: '/test',
+			});
+
+			await vi.waitFor(() => {
+				expect(mockProcessManager.spawn).toHaveBeenCalled();
+			});
+
+			const longName = 'This Is A Very Long Tab Name That Exceeds The Maximum Length Limit';
+			onDataCallback?.('tab-naming-mock-uuid-1234', longName);
+			onExitCallback?.('tab-naming-mock-uuid-1234');
+
+			const result = await resultPromise;
+			expect(result).toBe('This Is A Very Long Tab Name That Ex...');
+			expect(result!.length).toBe(40);
+		});
 	});
 });

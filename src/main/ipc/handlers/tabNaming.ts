@@ -248,14 +248,30 @@ function extractTabName(output: string): string | null {
 	// Remove ANSI escape codes
 	let cleaned = output.replace(/\x1B\[[0-9;]*[mGKH]/g, '');
 
-	// Remove any markdown formatting (bold, italic, code blocks)
+	// Remove any markdown formatting (bold, italic, code blocks, headers)
+	cleaned = cleaned.replace(/#{1,6}\s*/g, ''); // Remove markdown headers
 	cleaned = cleaned.replace(/\*\*/g, '').replace(/\*/g, '').replace(/`/g, '');
+
+	// Remove common preamble phrases the agent might add
+	cleaned = cleaned.replace(/^(here'?s?|the tab name is|tab name:|name:|→|output:)\s*/gi, '');
 
 	// Remove any newlines and extra whitespace
 	cleaned = cleaned.replace(/[\n\r]+/g, ' ').trim();
 
-	// Take only the last line if there are multiple (agent may have preamble)
-	const lines = cleaned.split(/[.\n]/).filter((line) => line.trim().length > 0);
+	// Split by newlines, periods, or arrow symbols and take meaningful lines
+	const lines = cleaned.split(/[.\n→]/).filter((line) => {
+		const trimmed = line.trim();
+		// Filter out empty lines and lines that look like instructions/examples
+		return (
+			trimmed.length > 0 &&
+			trimmed.length <= 40 && // Tab names should be short
+			!trimmed.toLowerCase().includes('example') &&
+			!trimmed.toLowerCase().includes('message:') &&
+			!trimmed.toLowerCase().includes('rules:') &&
+			!trimmed.startsWith('"') // Skip example inputs in quotes
+		);
+	});
+
 	if (lines.length === 0) {
 		return null;
 	}
@@ -266,9 +282,12 @@ function extractTabName(output: string): string | null {
 	// Remove any leading/trailing quotes
 	tabName = tabName.replace(/^["']|["']$/g, '');
 
-	// Ensure reasonable length (max 50 chars for tab names)
-	if (tabName.length > 50) {
-		tabName = tabName.substring(0, 47) + '...';
+	// Remove trailing punctuation (periods, colons, etc.)
+	tabName = tabName.replace(/[.:;,!?]+$/, '');
+
+	// Ensure reasonable length (max 40 chars for tab names)
+	if (tabName.length > 40) {
+		tabName = tabName.substring(0, 37) + '...';
 	}
 
 	// If the result is empty or too short, return null
