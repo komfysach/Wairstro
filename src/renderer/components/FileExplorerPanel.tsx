@@ -589,6 +589,14 @@ function FileExplorerPanelInner(props: FileExplorerPanelProps) {
 		setContextMenu(null);
 	}, [contextMenu, session.fullPath]);
 
+	const handleOpenInDefaultApp = useCallback(() => {
+		if (contextMenu) {
+			const absolutePath = `${session.fullPath}/${contextMenu.path}`;
+			window.maestro?.shell?.openExternal(`file://${absolutePath}`);
+		}
+		setContextMenu(null);
+	}, [contextMenu, session.fullPath]);
+
 	const handleOpenInExplorer = useCallback(() => {
 		if (contextMenu) {
 			const absolutePath = `${session.fullPath}/${contextMenu.path}`;
@@ -1387,6 +1395,18 @@ function FileExplorerPanelInner(props: FileExplorerPanelProps) {
 										<span>Document Graph</span>
 									</button>
 								)}
+
+							{/* Open in Default App option - for files only */}
+							{contextMenu.node.type === 'file' && (
+								<button
+									onClick={handleOpenInDefaultApp}
+									className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs hover:bg-white/10 transition-colors"
+									style={{ color: theme.colors.textMain }}
+								>
+									<ExternalLink className="w-3.5 h-3.5" style={{ color: theme.colors.accent }} />
+									<span>Open in Default App</span>
+								</button>
+							)}
 
 							{/* Divider after preview/graph options if any were shown */}
 							{contextMenu.node.type === 'file' && (

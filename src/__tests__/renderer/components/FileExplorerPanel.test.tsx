@@ -1665,6 +1665,42 @@ describe('FileExplorerPanel', () => {
 			expect(screen.queryByText('Rename File')).not.toBeInTheDocument();
 		});
 
+		it('shows Open in Default App option for files', () => {
+			const { container } = render(<FileExplorerPanel {...defaultProps} />);
+			const fileItem = Array.from(container.querySelectorAll('[data-file-index]')).find((el) =>
+				el.textContent?.includes('package.json')
+			);
+			fireEvent.contextMenu(fileItem!, { clientX: 100, clientY: 200 });
+
+			expect(screen.getByText('Open in Default App')).toBeInTheDocument();
+		});
+
+		it('does not show Open in Default App option for folders', () => {
+			const { container } = render(<FileExplorerPanel {...defaultProps} />);
+			const folderItem = Array.from(container.querySelectorAll('[data-file-index]')).find((el) =>
+				el.textContent?.includes('src')
+			);
+			fireEvent.contextMenu(folderItem!, { clientX: 100, clientY: 200 });
+
+			expect(screen.queryByText('Open in Default App')).not.toBeInTheDocument();
+		});
+
+		it('calls shell.openExternal with full file path when Open in Default App is clicked', () => {
+			const mockShell = { openExternal: vi.fn().mockResolvedValue(undefined) };
+			(window as any).maestro = { shell: mockShell };
+
+			const { container } = render(<FileExplorerPanel {...defaultProps} />);
+			const fileItem = Array.from(container.querySelectorAll('[data-file-index]')).find((el) =>
+				el.textContent?.includes('package.json')
+			);
+			fireEvent.contextMenu(fileItem!, { clientX: 100, clientY: 200 });
+
+			const openButton = screen.getByText('Open in Default App');
+			fireEvent.click(openButton);
+
+			expect(mockShell.openExternal).toHaveBeenCalledWith('file:///Users/test/project/package.json');
+		});
+
 		it('shows folder delete warning with item count', async () => {
 			// Mock countItems for the delete modal
 			const mockFs = {
