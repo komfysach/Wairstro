@@ -320,6 +320,28 @@ export function createSymphonyApi() {
 		): Promise<{ success: boolean; content?: string; error?: string }> =>
 			ipcRenderer.invoke('symphony:fetchDocumentContent', { url }),
 
+		manualCredit: (params: {
+			repoSlug: string;
+			repoName: string;
+			issueNumber: number;
+			issueTitle: string;
+			prNumber: number;
+			prUrl: string;
+			startedAt?: string;
+			completedAt?: string;
+			wasMerged?: boolean;
+			mergedAt?: string;
+			tokenUsage?: {
+				inputTokens?: number;
+				outputTokens?: number;
+				totalCost?: number;
+			};
+			timeSpent?: number;
+			documentsProcessed?: number;
+			tasksCompleted?: number;
+		}): Promise<{ success: boolean; contributionId?: string; error?: string }> =>
+			ipcRenderer.invoke('symphony:manualCredit', params),
+
 		// Real-time updates
 		onUpdated: (callback: () => void) => {
 			const handler = () => callback();

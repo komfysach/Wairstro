@@ -17,6 +17,7 @@ import { logger } from '../../utils/logger';
 import { isWebContentsAvailable } from '../../utils/safe-send';
 import { createIpcHandler, CreateHandlerOptions } from '../../utils/ipcHandler';
 import { execFileNoThrow } from '../../utils/execFile';
+import { getExpandedEnv } from '../../agents/path-prober';
 import {
 	SYMPHONY_REGISTRY_URL,
 	REGISTRY_CACHE_TTL_MS,
@@ -575,7 +576,7 @@ async function createBranch(
  * Check if gh CLI is authenticated.
  */
 async function checkGhAuthentication(): Promise<{ authenticated: boolean; error?: string }> {
-	const result = await execFileNoThrow('gh', ['auth', 'status']);
+	const result = await execFileNoThrow('gh', ['auth', 'status'], undefined, getExpandedEnv());
 	if (result.exitCode !== 0) {
 		// gh auth status outputs to stderr even on success for some info
 		const output = result.stderr + result.stdout;
@@ -685,7 +686,8 @@ async function createDraftPR(
 			'--body',
 			body,
 		],
-		repoPath
+		repoPath,
+		getExpandedEnv()
 	);
 
 	if (prResult.exitCode !== 0) {
@@ -710,7 +712,12 @@ async function markPRReady(
 	repoPath: string,
 	prNumber: number
 ): Promise<{ success: boolean; error?: string }> {
-	const result = await execFileNoThrow('gh', ['pr', 'ready', String(prNumber)], repoPath);
+	const result = await execFileNoThrow(
+		'gh',
+		['pr', 'ready', String(prNumber)],
+		repoPath,
+		getExpandedEnv()
+	);
 
 	if (result.exitCode !== 0) {
 		return { success: false, error: result.stderr };
@@ -833,7 +840,8 @@ This pull request was created using [Maestro Symphony](https://runmaestro.ai/sym
 	const result = await execFileNoThrow(
 		'gh',
 		['pr', 'comment', String(prNumber), '--body', commentBody],
-		repoPath
+		repoPath,
+		getExpandedEnv()
 	);
 
 	if (result.exitCode !== 0) {
@@ -2575,6 +2583,162 @@ This PR will be updated automatically when the Auto Run completes.`;
 						error: error instanceof Error ? error.message : 'Failed to fetch document',
 					};
 				}
+			}
+		)
+	);
+
+	/**
+	 * Manually credit a contribution (for contributions made outside Symphony workflow).
+	 * This allows crediting a user for work done on a PR that wasn't tracked through Symphony.
+	 */
+	ipcMain.handle(
+		'symphony:manualCredit',
+		createIpcHandler(
+			handlerOpts('manualCredit'),
+			async (params: {
+				repoSlug: string;
+				repoName: string;
+				issueNumber: number;
+				issueTitle: string;
+				prNumber: number;
+				prUrl: string;
+				startedAt?: string;
+				completedAt?: string;
+				wasMerged?: boolean;
+				mergedAt?: string;
+				tokenUsage?: {
+					inputTokens?: number;
+					outputTokens?: number;
+					totalCost?: number;
+				};
+				timeSpent?: number;
+				documentsProcessed?: number;
+				tasksCompleted?: number;
+			}): Promise<{ contributionId?: string; error?: string }> => {
+				const {
+					repoSlug,
+					repoName,
+					issueNumber,
+					issueTitle,
+					prNumber,
+					prUrl,
+					startedAt,
+					completedAt,
+					wasMerged,
+					mergedAt,
+					tokenUsage,
+					timeSpent,
+					documentsProcessed,
+					tasksCompleted,
+				} = params;
+
+				// Validate required fields
+				if (!repoSlug || !repoName || !issueNumber || !prNumber || !prUrl) {
+					return { error: 'Missing required fields: repoSlug, repoName, issueNumber, prNumber, prUrl' };
+				}
+
+				const state = await readState(app);
+
+				// Check if this PR is already credited
+				const existingContribution = state.history.find(
+					(c) => c.repoSlug === repoSlug && c.prNumber === prNumber
+				);
+				if (existingContribution) {
+					return { error: `PR #${prNumber} is already credited (contribution: ${existingContribution.id})` };
+				}
+
+				const now = new Date().toISOString();
+				const contributionId = `manual_${issueNumber}_${Date.now()}`;
+
+				const completed: CompletedContribution = {
+					id: contributionId,
+					repoSlug,
+					repoName,
+					issueNumber,
+					issueTitle: issueTitle || `Issue #${issueNumber}`,
+					startedAt: startedAt || now,
+					completedAt: completedAt || now,
+					prUrl,
+					prNumber,
+					tokenUsage: {
+						inputTokens: tokenUsage?.inputTokens ?? 0,
+						outputTokens: tokenUsage?.outputTokens ?? 0,
+						totalCost: tokenUsage?.totalCost ?? 0,
+					},
+					timeSpent: timeSpent ?? 0,
+					documentsProcessed: documentsProcessed ?? 0,
+					tasksCompleted: tasksCompleted ?? 1,
+					wasMerged: wasMerged ?? false,
+					mergedAt: mergedAt,
+				};
+
+				// Add to history
+				state.history.push(completed);
+
+				// Update stats
+				state.stats.totalContributions += 1;
+				state.stats.totalDocumentsProcessed += completed.documentsProcessed;
+				state.stats.totalTasksCompleted += completed.tasksCompleted;
+				state.stats.totalTokensUsed +=
+					completed.tokenUsage.inputTokens + completed.tokenUsage.outputTokens;
+				state.stats.totalTimeSpent += completed.timeSpent;
+				state.stats.estimatedCostDonated += completed.tokenUsage.totalCost;
+
+				if (!state.stats.repositoriesContributed.includes(repoSlug)) {
+					state.stats.repositoriesContributed.push(repoSlug);
+				}
+
+				if (wasMerged) {
+					state.stats.totalMerged = (state.stats.totalMerged || 0) + 1;
+					state.stats.totalIssuesResolved = (state.stats.totalIssuesResolved || 0) + 1;
+				}
+
+				state.stats.lastContributionAt = completed.completedAt;
+				if (!state.stats.firstContributionAt) {
+					state.stats.firstContributionAt = completed.completedAt;
+				}
+
+				// Update streak
+				const getWeekNumber = (date: Date): string => {
+					const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+					const dayNum = d.getUTCDay() || 7;
+					d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+					const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+					const weekNo = Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+					return `${d.getUTCFullYear()}-W${weekNo}`;
+				};
+				const currentWeek = getWeekNumber(new Date());
+				const lastWeek = state.stats.lastContributionDate;
+				if (lastWeek) {
+					const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+					const previousWeek = getWeekNumber(oneWeekAgo);
+					if (lastWeek === previousWeek || lastWeek === currentWeek) {
+						if (lastWeek !== currentWeek) {
+							state.stats.currentStreak += 1;
+						}
+					} else {
+						state.stats.currentStreak = 1;
+					}
+				} else {
+					state.stats.currentStreak = 1;
+				}
+				state.stats.lastContributionDate = currentWeek;
+				if (state.stats.currentStreak > state.stats.longestStreak) {
+					state.stats.longestStreak = state.stats.currentStreak;
+				}
+
+				await writeState(app, state);
+
+				logger.info('Manual contribution credited', LOG_CONTEXT, {
+					contributionId,
+					repoSlug,
+					prNumber,
+					prUrl,
+				});
+
+				broadcastSymphonyUpdate(getMainWindow);
+
+				return { contributionId };
 			}
 		)
 	);

@@ -5244,4 +5244,198 @@ This is a Symphony task document.
 			expect(result.success).toBe(true);
 		});
 	});
+
+	// ============================================================================
+	// Manual Credit Tests (symphony:manualCredit)
+	// ============================================================================
+
+	describe('symphony:manualCredit', () => {
+		const getManualCreditHandler = () => handlers.get('symphony:manualCredit');
+
+		beforeEach(() => {
+			// Reset state to empty
+			vi.mocked(fs.readFile).mockRejectedValue(new Error('ENOENT'));
+			vi.mocked(fs.mkdir).mockResolvedValue(undefined);
+			vi.mocked(fs.writeFile).mockResolvedValue(undefined);
+		});
+
+		describe('validation', () => {
+			it('should reject missing required fields', async () => {
+				const handler = getManualCreditHandler();
+				const result = await handler!({} as any, {});
+
+				// Handler returns { error: '...' }, wrapper adds success: true
+				// So validation errors show as { success: true, error: '...' }
+				expect(result.error).toContain('Missing required fields');
+				expect(result.contributionId).toBeUndefined();
+			});
+
+			it('should reject missing repoSlug', async () => {
+				const handler = getManualCreditHandler();
+				const result = await handler!({} as any, {
+					repoName: 'Test Repo',
+					issueNumber: 123,
+					prNumber: 456,
+					prUrl: 'https://github.com/owner/repo/pull/456',
+				});
+
+				expect(result.error).toContain('Missing required fields');
+				expect(result.contributionId).toBeUndefined();
+			});
+
+			it('should reject duplicate PR credit', async () => {
+				// Setup existing state with a contribution
+				vi.mocked(fs.readFile).mockResolvedValue(
+					JSON.stringify({
+						active: [],
+						history: [
+							{
+								id: 'existing_contrib',
+								repoSlug: 'owner/repo',
+								prNumber: 456,
+							},
+						],
+						stats: {
+							totalContributions: 1,
+							totalMerged: 0,
+							totalIssuesResolved: 0,
+							totalDocumentsProcessed: 0,
+							totalTasksCompleted: 0,
+							totalTokensUsed: 0,
+							totalTimeSpent: 0,
+							estimatedCostDonated: 0,
+							repositoriesContributed: ['owner/repo'],
+							currentStreak: 0,
+							longestStreak: 0,
+						},
+					})
+				);
+
+				const handler = getManualCreditHandler();
+				const result = await handler!({} as any, {
+					repoSlug: 'owner/repo',
+					repoName: 'Test Repo',
+					issueNumber: 123,
+					issueTitle: 'Test Issue',
+					prNumber: 456,
+					prUrl: 'https://github.com/owner/repo/pull/456',
+				});
+
+				expect(result.error).toContain('already credited');
+				expect(result.contributionId).toBeUndefined();
+			});
+		});
+
+		describe('successful credit', () => {
+			it('should create a completed contribution with minimal params', async () => {
+				const handler = getManualCreditHandler();
+				const result = await handler!({} as any, {
+					repoSlug: 'owner/repo',
+					repoName: 'Test Repo',
+					issueNumber: 123,
+					issueTitle: 'Test Issue',
+					prNumber: 456,
+					prUrl: 'https://github.com/owner/repo/pull/456',
+				});
+
+				expect(result.success).toBe(true);
+				expect(result.contributionId).toMatch(/^manual_123_/);
+
+				// Verify state was written
+				expect(fs.writeFile).toHaveBeenCalled();
+				const writeCall = vi.mocked(fs.writeFile).mock.calls[0];
+				const writtenState = JSON.parse(writeCall[1] as string);
+
+				expect(writtenState.history).toHaveLength(1);
+				expect(writtenState.history[0].repoSlug).toBe('owner/repo');
+				expect(writtenState.history[0].prNumber).toBe(456);
+				expect(writtenState.stats.totalContributions).toBe(1);
+			});
+
+			it('should handle wasMerged flag correctly', async () => {
+				const handler = getManualCreditHandler();
+				const result = await handler!({} as any, {
+					repoSlug: 'owner/repo',
+					repoName: 'Test Repo',
+					issueNumber: 123,
+					issueTitle: 'Test Issue',
+					prNumber: 456,
+					prUrl: 'https://github.com/owner/repo/pull/456',
+					wasMerged: true,
+					mergedAt: '2026-02-02T23:31:31Z',
+				});
+
+				expect(result.success).toBe(true);
+
+				const writeCall = vi.mocked(fs.writeFile).mock.calls[0];
+				const writtenState = JSON.parse(writeCall[1] as string);
+
+				expect(writtenState.history[0].wasMerged).toBe(true);
+				expect(writtenState.history[0].mergedAt).toBe('2026-02-02T23:31:31Z');
+				expect(writtenState.stats.totalMerged).toBe(1);
+				expect(writtenState.stats.totalIssuesResolved).toBe(1);
+			});
+
+			it('should add repo to repositoriesContributed if not already present', async () => {
+				const handler = getManualCreditHandler();
+				await handler!({} as any, {
+					repoSlug: 'new-owner/new-repo',
+					repoName: 'New Repo',
+					issueNumber: 1,
+					issueTitle: 'Issue 1',
+					prNumber: 1,
+					prUrl: 'https://github.com/new-owner/new-repo/pull/1',
+				});
+
+				const writeCall = vi.mocked(fs.writeFile).mock.calls[0];
+				const writtenState = JSON.parse(writeCall[1] as string);
+
+				expect(writtenState.stats.repositoriesContributed).toContain('new-owner/new-repo');
+			});
+
+			it('should accept custom token usage', async () => {
+				const handler = getManualCreditHandler();
+				await handler!({} as any, {
+					repoSlug: 'owner/repo',
+					repoName: 'Test Repo',
+					issueNumber: 123,
+					issueTitle: 'Test Issue',
+					prNumber: 456,
+					prUrl: 'https://github.com/owner/repo/pull/456',
+					tokenUsage: {
+						inputTokens: 50000,
+						outputTokens: 25000,
+						totalCost: 1.5,
+					},
+				});
+
+				const writeCall = vi.mocked(fs.writeFile).mock.calls[0];
+				const writtenState = JSON.parse(writeCall[1] as string);
+
+				expect(writtenState.history[0].tokenUsage.inputTokens).toBe(50000);
+				expect(writtenState.history[0].tokenUsage.outputTokens).toBe(25000);
+				expect(writtenState.history[0].tokenUsage.totalCost).toBe(1.5);
+				expect(writtenState.stats.totalTokensUsed).toBe(75000);
+				expect(writtenState.stats.estimatedCostDonated).toBe(1.5);
+			});
+
+			it('should set firstContributionAt on first credit', async () => {
+				const handler = getManualCreditHandler();
+				await handler!({} as any, {
+					repoSlug: 'owner/repo',
+					repoName: 'Test Repo',
+					issueNumber: 123,
+					issueTitle: 'Test Issue',
+					prNumber: 456,
+					prUrl: 'https://github.com/owner/repo/pull/456',
+				});
+
+				const writeCall = vi.mocked(fs.writeFile).mock.calls[0];
+				const writtenState = JSON.parse(writeCall[1] as string);
+
+				expect(writtenState.stats.firstContributionAt).toBeDefined();
+				expect(writtenState.stats.lastContributionAt).toBeDefined();
+			});
+		});
+	});
 });
