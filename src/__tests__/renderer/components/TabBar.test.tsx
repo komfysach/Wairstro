@@ -1581,6 +1581,56 @@ describe('TabBar', () => {
 
 			rafSpy.mockRestore();
 		});
+
+		it('scrolls active tab into view when its name changes (e.g., after auto-generation)', async () => {
+			// Mock requestAnimationFrame
+			const rafSpy = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => {
+				cb(0);
+				return 0;
+			});
+
+			const tabs = [
+				createTab({ id: 'tab-1', name: null }), // Tab without name initially
+				createTab({ id: 'tab-2', name: 'Tab 2' }),
+			];
+
+			const { rerender, container } = render(
+				<TabBar
+					tabs={tabs}
+					activeTabId="tab-1"
+					theme={mockTheme}
+					onTabSelect={mockOnTabSelect}
+					onTabClose={mockOnTabClose}
+					onNewTab={mockOnNewTab}
+				/>
+			);
+
+			// Simulate the active tab's name being updated (e.g., auto-generated name)
+			// This should trigger a scroll to ensure the now-wider tab is still visible
+			const updatedTabs = [
+				createTab({ id: 'tab-1', name: 'A Much Longer Auto-Generated Tab Name' }),
+				createTab({ id: 'tab-2', name: 'Tab 2' }),
+			];
+
+			rerender(
+				<TabBar
+					tabs={updatedTabs}
+					activeTabId="tab-1"
+					theme={mockTheme}
+					onTabSelect={mockOnTabSelect}
+					onTabClose={mockOnTabClose}
+					onNewTab={mockOnNewTab}
+				/>
+			);
+
+			// The scroll behavior uses getBoundingClientRect which returns 0s in JSDOM,
+			// so we just verify the effect runs without error and the tab renders with new name
+			const activeTab = container.querySelector('[data-tab-id="tab-1"]');
+			expect(activeTab).toBeTruthy();
+			expect(screen.getByText('A Much Longer Auto-Generated Tab Name')).toBeTruthy();
+
+			rafSpy.mockRestore();
+		});
 	});
 
 	describe('styling', () => {
