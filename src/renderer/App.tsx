@@ -61,6 +61,9 @@ const DocumentGraphView = lazy(() =>
 		default: m.DocumentGraphView,
 	}))
 );
+const DirectorNotesModal = lazy(() =>
+	import('./components/DirectorNotes').then((m) => ({ default: m.DirectorNotesModal }))
+);
 
 // Re-import the type for SymphonyContributionData (types don't need lazy loading)
 import type { SymphonyContributionData } from './components/SymphonyModal';
@@ -439,6 +442,9 @@ function MaestroConsoleInner() {
 		// Symphony Modal
 		symphonyModalOpen,
 		setSymphonyModalOpen,
+		// Director's Notes Modal
+		directorNotesOpen,
+		setDirectorNotesOpen,
 	} = useModalActions();
 
 	// --- MOBILE LANDSCAPE MODE (reading-only view) ---
@@ -12703,6 +12709,7 @@ You are taking over this conversation. Based on the context above, provide a bri
 		setFuzzyFileSearchOpen,
 		setMarketplaceModalOpen,
 		setSymphonyModalOpen,
+		setDirectorNotesOpen,
 		setShowNewGroupChatModal,
 		deleteGroupChatWithConfirmation,
 		// Group chat context
@@ -13389,6 +13396,7 @@ You are taking over this conversation. Based on the context above, provide a bri
 		setProcessMonitorOpen,
 		setUsageDashboardOpen,
 		setSymphonyModalOpen,
+		setDirectorNotesOpen,
 		setGroups,
 		setSessions,
 		setRenameInstanceModalOpen,
@@ -13842,6 +13850,7 @@ You are taking over this conversation. Based on the context above, provide a bri
 					onAutoRunRefresh={handleAutoRunRefresh}
 					onOpenMarketplace={handleOpenMarketplace}
 					onOpenSymphony={() => setSymphonyModalOpen(true)}
+					onOpenDirectorNotes={() => setDirectorNotesOpen(true)}
 					tabSwitcherOpen={tabSwitcherOpen}
 					onCloseTabSwitcher={handleCloseTabSwitcher}
 					onTabSelect={handleUtilityTabSelect}
@@ -14193,6 +14202,18 @@ You are taking over this conversation. Based on the context above, provide a bri
 								// Switch to Auto Run tab so user sees the documents
 								setActiveRightTab('autorun');
 							}}
+						/>
+					</Suspense>
+				)}
+
+				{/* --- DIRECTOR'S NOTES MODAL (lazy-loaded) --- */}
+				{directorNotesOpen && (
+					<Suspense fallback={null}>
+						<DirectorNotesModal
+							theme={theme}
+							onClose={() => setDirectorNotesOpen(false)}
+							fileTree={activeSession?.fileTree}
+							onFileClick={(path: string) => handleFileClick({ name: path.split('/').pop() || path, type: 'file' }, path)}
 						/>
 					</Suspense>
 				)}
