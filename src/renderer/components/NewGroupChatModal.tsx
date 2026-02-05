@@ -163,15 +163,18 @@ export function NewGroupChatModal({
 
 	// Build moderator config from state
 	const buildModeratorConfig = useCallback((): ModeratorConfig | undefined => {
-		const hasConfig = customPath || customArgs || Object.keys(customEnvVars).length > 0;
+		const customModelValue = agentConfig.model;
+		const hasConfig =
+			customPath || customArgs || Object.keys(customEnvVars).length > 0 || customModelValue;
 		if (!hasConfig) return undefined;
 
 		return {
 			customPath: customPath || undefined,
 			customArgs: customArgs || undefined,
 			customEnvVars: Object.keys(customEnvVars).length > 0 ? customEnvVars : undefined,
+			customModel: customModelValue || undefined,
 		};
-	}, [customPath, customArgs, customEnvVars]);
+	}, [customPath, customArgs, customEnvVars, agentConfig]);
 
 	const handleCreate = useCallback(() => {
 		if (name.trim() && selectedAgent) {
@@ -351,9 +354,7 @@ export function NewGroupChatModal({
 								>
 									{availableTiles.map((tile) => {
 										const isBeta =
-											tile.id === 'codex' ||
-											tile.id === 'opencode' ||
-											tile.id === 'factory-droid';
+											tile.id === 'codex' || tile.id === 'opencode' || tile.id === 'factory-droid';
 										return (
 											<option key={tile.id} value={tile.id}>
 												{tile.name}

@@ -8394,6 +8394,7 @@ You are taking over this conversation. Based on the context above, provide a bri
 				customPath?: string;
 				customArgs?: string;
 				customEnvVars?: Record<string, string>;
+				customModel?: string;
 			}
 		) => {
 			const chat = await window.maestro.groupChat.create(name, moderatorAgentId, moderatorConfig);
