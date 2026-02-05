@@ -1599,7 +1599,14 @@ function TabBarInner({
 	const tabRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 	const [isOverflowing, setIsOverflowing] = useState(false);
 
-	// Ensure the active tab is fully visible (including close button) when activeTabId or activeFileTabId changes, or filter is toggled
+	// Get active tab's name to trigger scroll when it changes (e.g., after auto-generated name)
+	const activeTab = tabs.find((t) => t.id === activeTabId);
+	const activeTabName = activeTab?.name ?? null;
+
+	// Ensure the active tab is fully visible (including close button) when:
+	// - activeTabId or activeFileTabId changes (new tab selected)
+	// - activeTabName changes (tab renamed, so width may have changed)
+	// - filter is toggled
 	useEffect(() => {
 		// Double requestAnimationFrame ensures the DOM has fully updated after React's state changes
 		// First rAF: React has committed changes but browser hasn't painted yet
@@ -1634,7 +1641,7 @@ function TabBarInner({
 				}
 			});
 		});
-	}, [activeTabId, activeFileTabId, showUnreadOnly]);
+	}, [activeTabId, activeFileTabId, activeTabName, showUnreadOnly]);
 
 	// Can always close tabs - closing the last one creates a fresh new tab
 	const canClose = true;
