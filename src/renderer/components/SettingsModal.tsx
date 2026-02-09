@@ -51,7 +51,7 @@ import { MODAL_PRIORITIES } from '../constants/modalPriorities';
 import { AICommandsPanel } from './AICommandsPanel';
 import { SpecKitCommandsPanel } from './SpecKitCommandsPanel';
 import { OpenSpecCommandsPanel } from './OpenSpecCommandsPanel';
-import { formatShortcutKeys, isMacOS } from '../utils/shortcutFormatter';
+import { formatShortcutKeys, formatMetaKey, formatEnterToSend } from '../utils/shortcutFormatter';
 import { ToggleButtonGroup } from './ToggleButtonGroup';
 import { SettingCheckbox } from './SettingCheckbox';
 import { FontConfigurationPanel } from './FontConfigurationPanel';
@@ -1392,7 +1392,7 @@ export const SettingsModal = memo(function SettingsModal(props: SettingsModalPro
 								</label>
 								<p className="text-xs opacity-50 mb-3">
 									Configure how to send messages in each mode. Choose between Enter or{' '}
-									{isMacOS() ? 'Command' : 'Ctrl'}+Enter for each input type.
+									{formatMetaKey()}+Enter for each input type.
 								</p>
 
 								{/* AI Mode Setting */}
@@ -1413,13 +1413,13 @@ export const SettingsModal = memo(function SettingsModal(props: SettingsModalPro
 												border: `1px solid ${theme.colors.border}`,
 											}}
 										>
-											{props.enterToSendAI ? 'Enter' : isMacOS() ? '⌘ + Enter' : 'Ctrl + Enter'}
+											{formatEnterToSend(props.enterToSendAI)}
 										</button>
 									</div>
 									<p className="text-xs opacity-50">
 										{props.enterToSendAI
 											? 'Press Enter to send. Use Shift+Enter for new line.'
-											: `Press ${isMacOS() ? 'Command' : 'Ctrl'}+Enter to send. Enter creates new line.`}
+											: `Press ${formatMetaKey()}+Enter to send. Enter creates new line.`}
 									</p>
 								</div>
 
@@ -1441,17 +1441,13 @@ export const SettingsModal = memo(function SettingsModal(props: SettingsModalPro
 												border: `1px solid ${theme.colors.border}`,
 											}}
 										>
-											{props.enterToSendTerminal
-												? 'Enter'
-												: isMacOS()
-													? '⌘ + Enter'
-													: 'Ctrl + Enter'}
+											{formatEnterToSend(props.enterToSendTerminal)}
 										</button>
 									</div>
 									<p className="text-xs opacity-50">
 										{props.enterToSendTerminal
 											? 'Press Enter to send. Use Shift+Enter for new line.'
-											: `Press ${isMacOS() ? 'Command' : 'Ctrl'}+Enter to send. Enter creates new line.`}
+											: `Press ${formatMetaKey()}+Enter to send. Enter creates new line.`}
 									</p>
 								</div>
 							</div>
@@ -2659,7 +2655,7 @@ export const SettingsModal = memo(function SettingsModal(props: SettingsModalPro
 											className="px-1.5 py-0.5 rounded font-mono"
 											style={{ backgroundColor: theme.colors.bgActivity }}
 										>
-											⌘/
+											{formatShortcutKeys(['Meta', '/'])}
 										</kbd>{' '}
 										from the main interface to view the full list of keyboard shortcuts.
 									</p>
