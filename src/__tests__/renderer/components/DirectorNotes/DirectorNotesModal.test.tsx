@@ -442,6 +442,16 @@ describe('DirectorNotesModal', () => {
 
 			expect(mockUnregisterLayer).toHaveBeenCalledWith('layer-director-notes');
 		});
+
+		it('onEscape calls onClose when no tab consumes it', () => {
+			renderModal();
+
+			// Extract the onEscape handler from the registerLayer call
+			const layerConfig = mockRegisterLayer.mock.calls[0][0];
+			layerConfig.onEscape();
+
+			expect(onClose).toHaveBeenCalledTimes(1);
+		});
 	});
 
 	describe('Props Forwarding', () => {

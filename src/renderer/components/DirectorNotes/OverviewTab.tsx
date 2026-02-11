@@ -16,6 +16,8 @@ import { formatShortcutKeys } from '../../utils/shortcutFormatter';
 
 export interface TabFocusHandle {
 	focus: () => void;
+	/** Return true if the tab consumed the Escape (e.g. closed an inner search bar). */
+	onEscape?: () => boolean;
 }
 
 interface OverviewTabProps {

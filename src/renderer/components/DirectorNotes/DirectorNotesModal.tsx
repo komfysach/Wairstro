@@ -69,6 +69,8 @@ export function DirectorNotesModal({
 	onCloseRef.current = onClose;
 	const focusActiveTabRef = useRef(focusActiveTab);
 	focusActiveTabRef.current = focusActiveTab;
+	const activeTabRef = useRef(activeTab);
+	activeTabRef.current = activeTab;
 
 	// Register modal layer
 	useEffect(() => {
@@ -79,6 +81,11 @@ export function DirectorNotesModal({
 			capturesFocus: true,
 			focusTrap: 'lenient',
 			onEscape: () => {
+				// Delegate Escape to the active tab first (e.g. to close search)
+				const tabRef = activeTabRef.current === 'history' ? historyTabRef
+					: activeTabRef.current === 'overview' ? overviewTabRef
+					: null;
+				if (tabRef?.current?.onEscape?.()) return;
 				onCloseRef.current();
 			},
 		});

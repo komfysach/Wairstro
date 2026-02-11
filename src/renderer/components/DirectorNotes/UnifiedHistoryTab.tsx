@@ -62,7 +62,16 @@ export const UnifiedHistoryTab = forwardRef<TabFocusHandle, UnifiedHistoryTabPro
 
 	useImperativeHandle(ref, () => ({
 		focus: () => listRef.current?.focus(),
-	}));
+		onEscape: () => {
+			if (searchExpanded) {
+				setSearchExpanded(false);
+				setSearchQuery('');
+				listRef.current?.focus();
+				return true;
+			}
+			return false;
+		},
+	}), [searchExpanded]);
 
 	// Load a page of unified history
 	const loadPage = useCallback(async (offset: number, append: boolean, lookback: number | null) => {
@@ -228,14 +237,6 @@ export const UnifiedHistoryTab = forwardRef<TabFocusHandle, UnifiedHistoryTabPro
 		listNavKeyDown(e);
 	}, [listNavKeyDown, searchExpanded, openSearch]);
 
-	const handleSearchKeyDown = useCallback((e: React.KeyboardEvent) => {
-		if (e.key === 'Escape') {
-			e.preventDefault();
-			e.stopPropagation();
-			closeSearch();
-		}
-	}, [closeSearch]);
-
 	// Navigate to a session tab — looks up sourceSessionId from the unified entry
 	const handleOpenSessionAsTab = useCallback((agentSessionId: string) => {
 		if (!onResumeSession) return;
@@ -277,87 +278,83 @@ export const UnifiedHistoryTab = forwardRef<TabFocusHandle, UnifiedHistoryTabPro
 
 	return (
 		<div className="flex flex-col h-full p-4">
-			{/* Header: Search + Filters + Activity Graph */}
-			<div className="flex items-start gap-3 mb-4">
-				{searchExpanded ? (
-					/* Expanded search input overlays the pills/graph area */
-					<div
-						className="flex items-center gap-2 flex-1 px-3 py-1.5 rounded-full border"
-						style={{
-							backgroundColor: theme.colors.bgActivity,
-							borderColor: theme.colors.accent + '40',
-						}}
-					>
-						<Search className="w-3.5 h-3.5 flex-shrink-0" style={{ color: theme.colors.accent }} />
-						<input
-							ref={searchInputRef}
-							type="text"
-							value={searchQuery}
-							onChange={(e) => setSearchQuery(e.target.value)}
-							onKeyDown={handleSearchKeyDown}
-							placeholder="Filter by summary or agent name..."
-							className="flex-1 bg-transparent outline-none text-xs"
-							style={{ color: theme.colors.textMain }}
-							autoFocus
-						/>
-						{searchQuery && (
-							<span
-								className="text-[10px] font-mono whitespace-nowrap flex-shrink-0"
-								style={{ color: theme.colors.textDim }}
-							>
-								{filteredEntries.length}
-							</span>
-						)}
-						<button
-							onClick={closeSearch}
-							className="p-0.5 rounded hover:bg-white/10 transition-colors flex-shrink-0"
-							title="Close search (Esc)"
-						>
-							<X className="w-3.5 h-3.5" style={{ color: theme.colors.textDim }} />
-						</button>
-					</div>
-				) : (
-					<>
-						{/* Search icon button */}
-						<button
-							onClick={openSearch}
-							className="flex-shrink-0 p-1.5 rounded-full transition-colors hover:bg-white/10"
-							title="Search entries (⌘F)"
+			{/* Search bar (above filter row) */}
+			{searchExpanded && (
+				<div
+					className="flex items-center gap-2 px-3 py-1.5 mb-2 rounded-full border"
+					style={{
+						backgroundColor: theme.colors.bgActivity,
+						borderColor: theme.colors.accent + '40',
+					}}
+				>
+					<Search className="w-3.5 h-3.5 flex-shrink-0" style={{ color: theme.colors.accent }} />
+					<input
+						ref={searchInputRef}
+						type="text"
+						value={searchQuery}
+						onChange={(e) => setSearchQuery(e.target.value)}
+						placeholder="Filter by summary or agent name..."
+						className="flex-1 bg-transparent outline-none text-xs"
+						style={{ color: theme.colors.textMain }}
+						autoFocus
+					/>
+					{searchQuery && (
+						<span
+							className="text-[10px] font-mono whitespace-nowrap flex-shrink-0"
 							style={{ color: theme.colors.textDim }}
 						>
-							<Search className="w-4 h-4" />
-						</button>
-						<HistoryFilterToggle
-							activeFilters={activeFilters}
-							onToggleFilter={toggleFilter}
-							theme={theme}
-						/>
-						<ActivityGraph
-							entries={graphEntries}
-							theme={theme}
-							lookbackHours={lookbackHours}
-							onLookbackChange={handleLookbackChange}
-							onBarClick={(start, end) => {
-								// Find first entry in range and select it
-								const idx = filteredEntries.findIndex(e => e.timestamp >= start && e.timestamp < end);
-								if (idx >= 0) {
-									setSelectedIndex(idx);
-									virtualizer.scrollToIndex(idx, { align: 'center', behavior: 'smooth' });
-								}
-							}}
-						/>
-						{/* Entry count badge */}
-						{!isLoading && totalEntries > 0 && (
-							<span
-								className="text-[10px] font-mono whitespace-nowrap flex-shrink-0 mt-1"
-								style={{ color: theme.colors.textDim }}
-							>
-								{entries.length < totalEntries
-									? `${entries.length}/${totalEntries}`
-									: `${totalEntries}`}
-							</span>
-						)}
-					</>
+							{filteredEntries.length}
+						</span>
+					)}
+					<button
+						onClick={closeSearch}
+						className="p-0.5 rounded hover:bg-white/10 transition-colors flex-shrink-0"
+						title="Close search (Esc)"
+					>
+						<X className="w-3.5 h-3.5" style={{ color: theme.colors.textDim }} />
+					</button>
+				</div>
+			)}
+
+			{/* Header: Search icon + Filters + Activity Graph */}
+			<div className="flex items-start gap-3 mb-4">
+				<button
+					onClick={openSearch}
+					className="flex-shrink-0 p-1.5 rounded-full transition-colors hover:bg-white/10"
+					title="Search entries (⌘F)"
+					style={{ color: searchExpanded ? theme.colors.accent : theme.colors.textDim }}
+				>
+					<Search className="w-4 h-4" />
+				</button>
+				<HistoryFilterToggle
+					activeFilters={activeFilters}
+					onToggleFilter={toggleFilter}
+					theme={theme}
+				/>
+				<ActivityGraph
+					entries={graphEntries}
+					theme={theme}
+					lookbackHours={lookbackHours}
+					onLookbackChange={handleLookbackChange}
+					onBarClick={(start, end) => {
+						// Find first entry in range and select it
+						const idx = filteredEntries.findIndex(e => e.timestamp >= start && e.timestamp < end);
+						if (idx >= 0) {
+							setSelectedIndex(idx);
+							virtualizer.scrollToIndex(idx, { align: 'center', behavior: 'smooth' });
+						}
+					}}
+				/>
+				{/* Entry count badge */}
+				{!isLoading && totalEntries > 0 && (
+					<span
+						className="text-[10px] font-mono whitespace-nowrap flex-shrink-0 mt-1"
+						style={{ color: theme.colors.textDim }}
+					>
+						{entries.length < totalEntries
+							? `${entries.length}/${totalEntries}`
+							: `${totalEntries}`}
+					</span>
 				)}
 			</div>
 
