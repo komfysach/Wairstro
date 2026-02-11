@@ -69,6 +69,15 @@ export interface UnifiedHistoryEntry extends HistoryEntry {
 	sourceSessionId: string; // Which session this entry came from
 }
 
+/** Aggregate stats returned alongside unified history (computed from the full unfiltered set) */
+export interface UnifiedHistoryStats {
+	agentCount: number;       // Distinct Maestro agents with history
+	sessionCount: number;     // Distinct provider sessions across all agents
+	autoCount: number;        // Total AUTO entries
+	userCount: number;        // Total USER entries
+	totalCount: number;       // Total entries (autoCount + userCount)
+}
+
 export interface SynopsisOptions {
 	lookbackDays: number;
 	provider: string;
@@ -107,7 +116,7 @@ export function registerDirectorNotesHandlers(deps: DirectorNotesHandlerDependen
 		'director-notes:getUnifiedHistory',
 		withIpcErrorLogging(
 			handlerOpts('getUnifiedHistory'),
-			async (options: UnifiedHistoryOptions): Promise<PaginatedResult<UnifiedHistoryEntry>> => {
+			async (options: UnifiedHistoryOptions): Promise<PaginatedResult<UnifiedHistoryEntry> & { stats: UnifiedHistoryStats }> => {
 				const { lookbackDays, filter, limit, offset } = options;
 				// lookbackDays <= 0 means "all time" — no cutoff
 				const cutoffTime = lookbackDays > 0
@@ -120,21 +129,27 @@ export function registerDirectorNotesHandlers(deps: DirectorNotesHandlerDependen
 				// Resolve Maestro session names (the names shown in the left bar)
 				const sessionNameMap = buildSessionNameMap();
 
-				// For each session, get entries within time range
+				// Collect all entries within time range (unfiltered by type for stats)
 				const allEntries: UnifiedHistoryEntry[] = [];
+				const uniqueAgentSessions = new Set<string>(); // track unique provider sessions
+				let autoCount = 0;
+				let userCount = 0;
+
 				for (const sessionId of sessionIds) {
 					const entries = historyManager.getEntries(sessionId);
-					const filtered = entries.filter((e) => {
-						if (cutoffTime > 0 && e.timestamp < cutoffTime) return false;
-						if (filter && e.type !== filter) return false;
-						return true;
-					});
-
-					// Resolve Maestro session name (the name from the left bar)
 					const maestroSessionName = sessionNameMap.get(sessionId);
 
-					// Add source session info to each entry
-					for (const entry of filtered) {
+					for (const entry of entries) {
+						if (cutoffTime > 0 && entry.timestamp < cutoffTime) continue;
+
+						// Track stats from all entries (before type filter)
+						if (entry.type === 'AUTO') autoCount++;
+						else if (entry.type === 'USER') userCount++;
+						if (entry.agentSessionId) uniqueAgentSessions.add(entry.agentSessionId);
+
+						// Apply type filter for the result set
+						if (filter && entry.type !== filter) continue;
+
 						allEntries.push({
 							...entry,
 							sourceSessionId: sessionId,
@@ -149,12 +164,21 @@ export function registerDirectorNotesHandlers(deps: DirectorNotesHandlerDependen
 				// Apply pagination
 				const result = paginateEntries(allEntries, { limit, offset });
 
+				// Build stats from unfiltered data
+				const stats: UnifiedHistoryStats = {
+					agentCount: sessionIds.length,
+					sessionCount: uniqueAgentSessions.size,
+					autoCount,
+					userCount,
+					totalCount: autoCount + userCount,
+				};
+
 				logger.debug(
 					`Unified history: ${result.entries.length}/${result.total} entries from ${sessionIds.length} sessions (offset=${result.offset}, hasMore=${result.hasMore})`,
 					LOG_CONTEXT
 				);
 
-				return result;
+				return { ...result, stats };
 			}
 		)
 	);

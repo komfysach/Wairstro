@@ -8,6 +8,15 @@
 
 import { ipcRenderer } from 'electron';
 
+/** Aggregate stats returned alongside unified history */
+export interface UnifiedHistoryStats {
+	agentCount: number;       // Distinct Maestro agents with history
+	sessionCount: number;     // Distinct provider sessions across all agents
+	autoCount: number;        // Total AUTO entries
+	userCount: number;        // Total USER entries
+	totalCount: number;       // Total entries (autoCount + userCount)
+}
+
 /**
  * Paginated result wrapper (mirrors shared/history.ts PaginatedResult)
  */
@@ -17,6 +26,7 @@ export interface PaginatedUnifiedHistoryResult {
 	limit: number;
 	offset: number;
 	hasMore: boolean;
+	stats: UnifiedHistoryStats;
 }
 
 /**

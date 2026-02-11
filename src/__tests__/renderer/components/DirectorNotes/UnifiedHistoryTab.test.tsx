@@ -109,6 +109,15 @@ vi.mock('../../../../renderer/components/History', () => ({
 			</button>
 		</div>
 	),
+	HistoryStatsBar: ({ stats }: any) => (
+		<div data-testid="history-stats-bar">
+			<span data-testid="stats-agents">{stats.agentCount}</span>
+			<span data-testid="stats-sessions">{stats.sessionCount}</span>
+			<span data-testid="stats-auto">{stats.autoCount}</span>
+			<span data-testid="stats-user">{stats.userCount}</span>
+			<span data-testid="stats-total">{stats.totalCount}</span>
+		</div>
+	),
 	ESTIMATED_ROW_HEIGHT: 80,
 	ESTIMATED_ROW_HEIGHT_SIMPLE: 60,
 }));
@@ -176,6 +185,13 @@ const createPaginatedResponse = (entries: any[], hasMore = false, total?: number
 	limit: 100,
 	offset: 0,
 	hasMore,
+	stats: {
+		agentCount: 2,
+		sessionCount: 5,
+		autoCount: entries.filter((e: any) => e.type === 'AUTO').length,
+		userCount: entries.filter((e: any) => e.type === 'USER').length,
+		totalCount: entries.length,
+	},
 });
 
 beforeEach(() => {
@@ -260,6 +276,38 @@ describe('UnifiedHistoryTab', () => {
 			await waitFor(() => {
 				expect(screen.getByText('3/250')).toBeInTheDocument();
 			});
+		});
+	});
+
+	describe('Stats Bar', () => {
+		it('renders stats bar with aggregate counts after loading', async () => {
+			render(<UnifiedHistoryTab theme={mockTheme} />);
+
+			await waitFor(() => {
+				expect(screen.getByTestId('history-stats-bar')).toBeInTheDocument();
+				expect(screen.getByTestId('stats-agents')).toHaveTextContent('2');
+				expect(screen.getByTestId('stats-sessions')).toHaveTextContent('5');
+			});
+		});
+
+		it('does not render stats bar when no entries exist', async () => {
+			mockGetUnifiedHistory.mockResolvedValue({
+				...createPaginatedResponse([]),
+				stats: { agentCount: 0, sessionCount: 0, autoCount: 0, userCount: 0, totalCount: 0 },
+			});
+			render(<UnifiedHistoryTab theme={mockTheme} />);
+
+			await waitFor(() => {
+				expect(screen.getByText(/No history entries found/)).toBeInTheDocument();
+			});
+			expect(screen.queryByTestId('history-stats-bar')).not.toBeInTheDocument();
+		});
+
+		it('does not render stats bar while loading', () => {
+			mockGetUnifiedHistory.mockReturnValue(new Promise(() => {}));
+			render(<UnifiedHistoryTab theme={mockTheme} />);
+
+			expect(screen.queryByTestId('history-stats-bar')).not.toBeInTheDocument();
 		});
 	});
 

@@ -2643,6 +2643,13 @@ interface MaestroAPI {
 			limit: number;
 			offset: number;
 			hasMore: boolean;
+			stats: {
+				agentCount: number;
+				sessionCount: number;
+				autoCount: number;
+				userCount: number;
+				totalCount: number;
+			};
 		}>;
 		generateSynopsis: (options: {
 			lookbackDays: number;

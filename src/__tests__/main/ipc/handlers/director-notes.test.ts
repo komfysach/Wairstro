@@ -163,6 +163,54 @@ describe('director-notes IPC handlers', () => {
 			expect(result.hasMore).toBe(false);
 		});
 
+		it('should include stats in the response', async () => {
+			const now = Date.now();
+			vi.mocked(mockHistoryManager.listSessionsWithHistory).mockReturnValue([
+				'session-1',
+				'session-2',
+			]);
+
+			vi.mocked(mockHistoryManager.getEntries)
+				.mockReturnValueOnce([
+					createMockEntry({ id: 'e1', type: 'AUTO', timestamp: now - 1000, agentSessionId: 'as-1' }),
+					createMockEntry({ id: 'e2', type: 'USER', timestamp: now - 2000, agentSessionId: 'as-1' }),
+				])
+				.mockReturnValueOnce([
+					createMockEntry({ id: 'e3', type: 'AUTO', timestamp: now - 3000, agentSessionId: 'as-2' }),
+					createMockEntry({ id: 'e4', type: 'USER', timestamp: now - 4000, agentSessionId: 'as-3' }),
+				]);
+
+			const handler = handlers.get('director-notes:getUnifiedHistory');
+			const result = await handler!({} as any, { lookbackDays: 7 });
+
+			expect(result.stats).toBeDefined();
+			expect(result.stats.agentCount).toBe(2);       // 2 Maestro sessions
+			expect(result.stats.sessionCount).toBe(3);      // 3 unique provider sessions (as-1, as-2, as-3)
+			expect(result.stats.autoCount).toBe(2);
+			expect(result.stats.userCount).toBe(2);
+			expect(result.stats.totalCount).toBe(4);
+		});
+
+		it('should compute stats from unfiltered data when type filter is applied', async () => {
+			const now = Date.now();
+			vi.mocked(mockHistoryManager.listSessionsWithHistory).mockReturnValue(['session-1']);
+			vi.mocked(mockHistoryManager.getEntries).mockReturnValue([
+				createMockEntry({ id: 'e1', type: 'AUTO', timestamp: now - 1000, agentSessionId: 'as-1' }),
+				createMockEntry({ id: 'e2', type: 'USER', timestamp: now - 2000, agentSessionId: 'as-1' }),
+				createMockEntry({ id: 'e3', type: 'AUTO', timestamp: now - 3000, agentSessionId: 'as-2' }),
+			]);
+
+			const handler = handlers.get('director-notes:getUnifiedHistory');
+			const result = await handler!({} as any, { lookbackDays: 7, filter: 'AUTO' });
+
+			// Entries filtered to AUTO only
+			expect(result.entries).toHaveLength(2);
+			// Stats include ALL entries regardless of type filter
+			expect(result.stats.autoCount).toBe(2);
+			expect(result.stats.userCount).toBe(1);
+			expect(result.stats.totalCount).toBe(3);
+		});
+
 		it('should filter by lookbackDays', async () => {
 			const now = Date.now();
 			const twoDaysAgo = now - 2 * 24 * 60 * 60 * 1000;

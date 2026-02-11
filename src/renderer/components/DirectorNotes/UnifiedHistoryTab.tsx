@@ -7,9 +7,11 @@ import {
 	ActivityGraph,
 	HistoryEntryItem,
 	HistoryFilterToggle,
+	HistoryStatsBar,
 	ESTIMATED_ROW_HEIGHT,
 	ESTIMATED_ROW_HEIGHT_SIMPLE,
 } from '../History';
+import type { HistoryStats } from '../History';
 import { HistoryDetailModal } from '../HistoryDetailModal';
 import { useListNavigation } from '../../hooks';
 import type { TabFocusHandle } from './OverviewTab';
@@ -50,6 +52,7 @@ export const UnifiedHistoryTab = forwardRef<TabFocusHandle, UnifiedHistoryTabPro
 	const [activeFilters, setActiveFilters] = useState<Set<HistoryEntryType>>(new Set(['AUTO', 'USER']));
 	const [detailModalEntry, setDetailModalEntry] = useState<HistoryEntry | null>(null);
 	const [lookbackHours, setLookbackHours] = useState<number | null>(null); // null = all time
+	const [historyStats, setHistoryStats] = useState<HistoryStats | null>(null);
 	const [searchExpanded, setSearchExpanded] = useState(false);
 	const [searchQuery, setSearchQuery] = useState('');
 
@@ -97,6 +100,10 @@ export const UnifiedHistoryTab = forwardRef<TabFocusHandle, UnifiedHistoryTabPro
 			}
 			setHasMore(result.hasMore);
 			setTotalEntries(result.total);
+			// Capture stats on every load (they cover the full dataset, not just the page)
+			if (result.stats) {
+				setHistoryStats(result.stats);
+			}
 		} catch (error) {
 			console.error('Failed to load unified history:', error);
 			if (!append) {
@@ -131,6 +138,7 @@ export const UnifiedHistoryTab = forwardRef<TabFocusHandle, UnifiedHistoryTabPro
 		setGraphEntries([]);
 		setHasMore(true);
 		setTotalEntries(0);
+		setHistoryStats(null);
 	}, []);
 
 	// Load next page when scrolling near the bottom
@@ -366,6 +374,11 @@ export const UnifiedHistoryTab = forwardRef<TabFocusHandle, UnifiedHistoryTabPro
 				onKeyDown={handleKeyDown}
 				onScroll={handleScroll}
 			>
+				{/* Stats bar — scrolls with entries */}
+				{!isLoading && historyStats && historyStats.totalCount > 0 && (
+					<HistoryStatsBar stats={historyStats} theme={theme} />
+				)}
+
 				{isLoading ? (
 					<div className="text-center py-8 text-xs opacity-70">Loading history...</div>
 				) : filteredEntries.length === 0 ? (
