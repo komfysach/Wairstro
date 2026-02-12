@@ -1101,7 +1101,7 @@ export const InputArea = React.memo(function InputArea(props: InputAreaProps) {
 						</div>
 					</div>
 					{/* Context Warning Sash - AI mode only, appears below input when context usage is high */}
-					{session.inputMode === 'ai' && onSummarizeAndContinue && (
+					{session.inputMode === 'ai' && contextWarningsEnabled && onSummarizeAndContinue && (
 						<ContextWarningSash
 							theme={theme}
 							contextUsage={contextUsage}
