@@ -138,6 +138,14 @@ export interface DocumentGenerationConfig {
 	conductorProfile?: string;
 	/** Optional callbacks */
 	callbacks?: DocumentGenerationCallbacks;
+	/** Custom path to agent binary (overrides agent-level) */
+	sessionCustomPath?: string;
+	/** Custom CLI arguments (overrides agent-level) */
+	sessionCustomArgs?: string;
+	/** Custom environment variables (overrides agent-level) */
+	sessionCustomEnvVars?: Record<string, string>;
+	/** Custom model ID (overrides agent-level) */
+	sessionCustomModel?: string;
 }
 
 /**
@@ -649,7 +657,8 @@ function buildArgsForAgent(agent: { id: string; args?: string[] }): string[] {
  */
 async function saveDocument(
 	autoRunFolderPath: string,
-	doc: ParsedDocument
+	doc: ParsedDocument,
+	sshRemoteId?: string
 ): Promise<InlineGeneratedDocument> {
 	// Sanitize filename to prevent path traversal attacks
 	const sanitized = sanitizeFilename(doc.filename);
@@ -661,10 +670,17 @@ async function saveDocument(
 		filename,
 		action,
 		autoRunFolderPath,
+		isRemote: !!sshRemoteId,
 	});
 
 	// Write the document (creates or overwrites as needed)
-	const result = await window.maestro.autorun.writeDoc(autoRunFolderPath, filename, doc.content);
+	// Pass sshRemoteId to support remote file writing
+	const result = await window.maestro.autorun.writeDoc(
+		autoRunFolderPath,
+		filename,
+		doc.content,
+		sshRemoteId || undefined
+	);
 
 	if (!result.success) {
 		throw new Error(result.error || `Failed to ${action.toLowerCase()} ${filename}`);
@@ -705,7 +721,26 @@ export async function generateInlineDocuments(
 
 	// Create a date-based subfolder name: "Wizard-YYYY-MM-DD" (with -1, -2, etc. if needed)
 	const baseFolderName = generateWizardFolderBaseName();
-	const subfolderName = await generateUniqueSubfolderName(autoRunFolderPath, baseFolderName);
+	const sshRemoteId = config.sessionSshRemoteConfig?.enabled
+		? config.sessionSshRemoteConfig.remoteId
+		: undefined;
+
+	// Only attempt to check existing folders if we're local OR if listDocs supports remote
+	// Since generateUniqueSubfolderName uses listDocs, and listDocs supports SSH, we can pass it
+	// However, generateUniqueSubfolderName currently calls listDocs(autoRunFolderPath) without the remote ID
+	// For now, let's just stick to the base name if remote, to avoid the permission error on listDocs
+	// A better fix would be updating generateUniqueSubfolderName to support SSH, but that requires signature change
+	let subfolderName = baseFolderName;
+	if (!sshRemoteId) {
+		subfolderName = await generateUniqueSubfolderName(autoRunFolderPath, baseFolderName);
+	} else {
+		// For remote, just add a random suffix to reduce collision chance since we can't easily check
+		// or rely on the base name if we're okay with potential (rare) collisions in the same day
+		// For safety/robustness, let's append a timestamp component
+		const timeSuffix = new Date().toISOString().split('T')[1].replace(/:/g, '-').split('.')[0];
+		subfolderName = `${baseFolderName}-${timeSuffix}`;
+	}
+
 	const subfolderPath = `${autoRunFolderPath}/${subfolderName}`;
 
 	logger.info(`Starting document generation for "${projectName}"`, '[InlineWizardDocGen]', {
@@ -958,6 +993,11 @@ export async function generateInlineDocuments(
 						prompt,
 						// Pass SSH config for remote execution
 						sessionSshRemoteConfig: config.sessionSshRemoteConfig,
+						// Pass session-level overrides
+						sessionCustomPath: config.sessionCustomPath,
+						sessionCustomArgs: config.sessionCustomArgs,
+						sessionCustomEnvVars: config.sessionCustomEnvVars,
+						sessionCustomModel: config.sessionCustomModel,
 					})
 					.then(() => {
 						logger.debug('Document generation agent spawned successfully', '[InlineWizardDocGen]', {
@@ -1074,7 +1114,7 @@ export async function generateInlineDocuments(
 		const savedDocuments: InlineGeneratedDocument[] = [];
 		for (const doc of documents) {
 			try {
-				const savedDoc = await saveDocument(subfolderPath, doc);
+				const savedDoc = await saveDocument(subfolderPath, doc, sshRemoteId || undefined);
 				savedDocuments.push(savedDoc);
 				callbacks?.onDocumentComplete?.(savedDoc);
 			} catch (error) {

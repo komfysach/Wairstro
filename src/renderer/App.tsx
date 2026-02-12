@@ -5936,7 +5936,13 @@ You are taking over this conversation. Based on the context above, provide a bri
 				activeSession.id, // Session ID for playbook creation
 				activeSession.autoRunFolderPath, // User-configured Auto Run folder path (if set)
 				activeSession.sessionSshRemoteConfig, // SSH remote config for remote execution
-				conductorProfile // Conductor profile (user's About Me from settings)
+				conductorProfile, // Conductor profile (user's About Me from settings)
+				{
+					customPath: activeSession.customPath,
+					customArgs: activeSession.customArgs,
+					customEnvVars: activeSession.customEnvVars,
+					customModel: activeSession.customModel,
+				}
 			);
 
 			// Rename the tab to "Wizard" immediately when wizard starts
@@ -6020,7 +6026,13 @@ You are taking over this conversation. Based on the context above, provide a bri
 				activeSession.id,
 				activeSession.autoRunFolderPath, // User-configured Auto Run folder path (if set)
 				activeSession.sessionSshRemoteConfig, // SSH remote config for remote execution
-				conductorProfile // Conductor profile (user's About Me from settings)
+				conductorProfile, // Conductor profile (user's About Me from settings)
+				{
+					customPath: activeSession.customPath,
+					customArgs: activeSession.customArgs,
+					customEnvVars: activeSession.customEnvVars,
+					customModel: activeSession.customModel,
+				}
 			);
 
 			// Show a system log entry
