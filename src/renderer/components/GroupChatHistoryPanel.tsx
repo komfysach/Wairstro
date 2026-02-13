@@ -214,7 +214,7 @@ function GroupChatActivityGraph({
 
 	return (
 		<div
-			className="flex-1 min-w-0 flex flex-col relative mt-0.5"
+			className="w-full flex flex-col relative"
 			title={`${lookbackConfig.label} (right-click to change)`}
 			onContextMenu={handleContextMenu}
 		>
@@ -575,35 +575,34 @@ export function GroupChatHistoryPanel({
 
 	return (
 		<div className="flex-1 flex flex-col overflow-hidden p-3" tabIndex={0} onKeyDown={handleKeyDown}>
-			{/* Type Filter Pills + Activity Graph */}
-			<div className="flex items-start gap-3 mb-3">
-				{/* Filter pills */}
-				<div className="flex gap-1.5 flex-shrink-0 flex-wrap">
-					{TYPE_FILTER_CONFIG.map(({ type, label, icon: Icon }) => {
-						const isActive = activeFilters.has(type);
-						const colors = getTypePillColor(type);
-						return (
-							<button
-								key={type}
-								onClick={() => toggleFilter(type)}
-								className={`flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold uppercase transition-all ${
-									isActive ? 'opacity-100' : 'opacity-40'
-								}`}
-								style={{
-									backgroundColor: isActive ? colors.bg : 'transparent',
-									color: isActive ? colors.text : theme.colors.textDim,
-									border: `1px solid ${isActive ? colors.border : theme.colors.border}`,
-								}}
-								title={`${isActive ? 'Hide' : 'Show'} ${label} entries`}
-							>
-								<Icon className="w-2.5 h-2.5" />
-								{label}
-							</button>
-						);
-					})}
-				</div>
+			{/* Type Filter Pills */}
+			<div className="flex gap-1.5 flex-wrap mb-2 justify-center">
+				{TYPE_FILTER_CONFIG.map(({ type, label, icon: Icon }) => {
+					const isActive = activeFilters.has(type);
+					const colors = getTypePillColor(type);
+					return (
+						<button
+							key={type}
+							onClick={() => toggleFilter(type)}
+							className={`flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold uppercase transition-all ${
+								isActive ? 'opacity-100' : 'opacity-40'
+							}`}
+							style={{
+								backgroundColor: isActive ? colors.bg : 'transparent',
+								color: isActive ? colors.text : theme.colors.textDim,
+								border: `1px solid ${isActive ? colors.border : theme.colors.border}`,
+							}}
+							title={`${isActive ? 'Hide' : 'Show'} ${label} entries`}
+						>
+							<Icon className="w-2.5 h-2.5" />
+							{label}
+						</button>
+					);
+				})}
+			</div>
 
-				{/* Activity Graph */}
+			{/* Activity Graph */}
+			<div className="mb-3">
 				<GroupChatActivityGraph
 					entries={filteredEntries}
 					theme={theme}
