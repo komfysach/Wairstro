@@ -54,7 +54,7 @@ import { getStatusColor, getContextColor, formatActiveTime } from '../utils/them
 import { formatShortcutKeys } from '../utils/shortcutFormatter';
 import { SessionItem } from './SessionItem';
 import { GroupChatList } from './GroupChatList';
-import { useLiveOverlay, useClickOutside } from '../hooks';
+import { useLiveOverlay, useClickOutside, useResizablePanel } from '../hooks';
 import { useGitFileStatus } from '../contexts/GitStatusContext';
 import { useUIStore } from '../stores/uiStore';
 
@@ -1232,7 +1232,15 @@ function SessionListInner(props: SessionListProps) {
 	const isAnyBusy = useMemo(() => sessions.some((s) => s.state === 'busy'), [sessions]);
 
 	const [sessionFilter, setSessionFilter] = useState('');
-	const [isResizingSidebar, setIsResizingSidebar] = useState(false);
+	const { onResizeStart: onSidebarResizeStart, transitionClass: sidebarTransitionClass } = useResizablePanel({
+		width: leftSidebarWidthState,
+		minWidth: 256,
+		maxWidth: 600,
+		settingsKey: 'leftSidebarWidth',
+		setWidth: setLeftSidebarWidthState,
+		side: 'left',
+		externalRef: sidebarContainerRef,
+	});
 	const sessionFilterOpen = useUIStore((s) => s.sessionFilterOpen);
 	const setSessionFilterOpen = useUIStore((s) => s.setSessionFilterOpen);
 	const [preFilterGroupStates, setPreFilterGroupStates] = useState<Map<string, boolean>>(new Map());
@@ -1908,7 +1916,7 @@ function SessionListInner(props: SessionListProps) {
 		<div
 			ref={sidebarContainerRef}
 			tabIndex={0}
-			className={`border-r flex flex-col shrink-0 ${isResizingSidebar ? 'transition-none' : 'transition-[width] duration-150'} outline-none relative z-20 ${activeFocus === 'sidebar' && !activeGroupChatId ? 'ring-1 ring-inset' : ''}`}
+			className={`border-r flex flex-col shrink-0 ${sidebarTransitionClass} outline-none relative z-20 ${activeFocus === 'sidebar' && !activeGroupChatId ? 'ring-1 ring-inset' : ''}`}
 			style={
 				{
 					width: leftSidebarOpen ? `${leftSidebarWidthState}px` : '64px',
@@ -1937,34 +1945,7 @@ function SessionListInner(props: SessionListProps) {
 			{leftSidebarOpen && (
 				<div
 					className="absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-blue-500 transition-colors z-20"
-					onMouseDown={(e) => {
-						e.preventDefault();
-						setIsResizingSidebar(true);
-						const startX = e.clientX;
-						const startWidth = leftSidebarWidthState;
-						let currentWidth = startWidth;
-
-						const handleMouseMove = (e: MouseEvent) => {
-							const delta = e.clientX - startX;
-							currentWidth = Math.max(256, Math.min(600, startWidth + delta));
-							// Direct DOM update during drag for performance (avoids ~60 re-renders/sec)
-							if (sidebarContainerRef?.current) {
-								sidebarContainerRef.current.style.width = `${currentWidth}px`;
-							}
-						};
-
-						const handleMouseUp = () => {
-							// Only update React state once on mouseup
-							setIsResizingSidebar(false);
-							setLeftSidebarWidthState(currentWidth);
-							window.maestro.settings.set('leftSidebarWidth', currentWidth);
-							document.removeEventListener('mousemove', handleMouseMove);
-							document.removeEventListener('mouseup', handleMouseUp);
-						};
-
-						document.addEventListener('mousemove', handleMouseMove);
-						document.addEventListener('mouseup', handleMouseUp);
-					}}
+					onMouseDown={onSidebarResizeStart}
 				/>
 			)}
 
