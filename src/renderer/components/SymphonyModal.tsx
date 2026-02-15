@@ -871,8 +871,22 @@ function RepositoryDetailView({
 							style={{ backgroundColor: theme.colors.bgMain }}
 						>
 							<div className="text-center">
-								<Music className="w-12 h-12 mx-auto mb-3" style={{ color: theme.colors.textDim }} />
-								<p style={{ color: theme.colors.textDim }}>Select an issue to see details</p>
+								{!isLoadingIssues && issues.length === 0 ? (
+									<>
+										<CheckCircle className="w-12 h-12 mx-auto mb-3" style={{ color: theme.colors.textDim }} />
+										<p className="text-sm" style={{ color: theme.colors.textMain }}>
+											No outstanding work for this project
+										</p>
+										<p className="text-xs mt-1" style={{ color: theme.colors.textDim }}>
+											There are no issues labeled with runmaestro.ai
+										</p>
+									</>
+								) : (
+									<>
+										<Music className="w-12 h-12 mx-auto mb-3" style={{ color: theme.colors.textDim }} />
+										<p style={{ color: theme.colors.textDim }}>Select an issue to see details</p>
+									</>
+								)}
 							</div>
 						</div>
 					)}

@@ -224,6 +224,7 @@ const createMockSession = (overrides: Partial<Session> = {}): Session => ({
 	fileExplorerExpanded: [],
 	messageQueue: [],
 	changedFiles: [],
+	fileTreeAutoRefreshInterval: 0,
 	...overrides,
 });
 
