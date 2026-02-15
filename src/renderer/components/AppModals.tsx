@@ -1237,7 +1237,9 @@ export function AppUtilityModals({
 						onClose={onCloseGitLog}
 						sshRemoteId={
 							activeSession?.sshRemoteId ||
-							activeSession?.sessionSshRemoteConfig?.remoteId ||
+							(activeSession?.sessionSshRemoteConfig?.enabled
+								? activeSession.sessionSshRemoteConfig.remoteId
+								: undefined) ||
 							undefined
 						}
 					/>
@@ -1254,7 +1256,9 @@ export function AppUtilityModals({
 					sessionName={activeSession?.name}
 					sshRemoteId={
 						activeSession?.sshRemoteId ||
-						activeSession?.sessionSshRemoteConfig?.remoteId ||
+						(activeSession?.sessionSshRemoteConfig?.enabled
+							? activeSession.sessionSshRemoteConfig.remoteId
+							: undefined) ||
 						undefined
 					}
 					sshRemoteHost={activeSession?.sshRemote?.host}

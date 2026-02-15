@@ -1261,7 +1261,27 @@ this is not valid diff`,
 			});
 		});
 
-		it('should call git.show when selecting different commit', async () => {
+		it('should call git.log with sshRemoteId when provided', async () => {
+			render(<GitLogViewer {...defaultProps} sshRemoteId="ssh-remote-123" />);
+
+			await waitFor(() => {
+				expect(gitLogMock()).toHaveBeenCalledWith(
+					'/test/project',
+					{ limit: 200 },
+					'ssh-remote-123'
+				);
+			});
+		});
+
+		it('should call git.commitCount with sshRemoteId when provided', async () => {
+			render(<GitLogViewer {...defaultProps} sshRemoteId="ssh-remote-123" />);
+
+			await waitFor(() => {
+				expect(gitCommitCountMock()).toHaveBeenCalledWith('/test/project', 'ssh-remote-123');
+			});
+		});
+
+		it('should call git.show with sshRemoteId when selecting different commit', async () => {
 			gitLogMock().mockResolvedValue({
 				entries: [
 					createGitLogEntry({ hash: 'first-hash' }),
@@ -1270,20 +1290,24 @@ this is not valid diff`,
 				error: undefined,
 			});
 
-			render(<GitLogViewer {...defaultProps} />);
+			render(<GitLogViewer {...defaultProps} sshRemoteId="ssh-remote-123" />);
 
 			await waitFor(() => {
 				expect(screen.queryByText('Loading git log...')).not.toBeInTheDocument();
 			});
 
 			// Initially loads first commit diff
-			expect(gitShowMock()).toHaveBeenCalledWith('/test/project', 'first-hash', undefined);
+			expect(gitShowMock()).toHaveBeenCalledWith('/test/project', 'first-hash', 'ssh-remote-123');
 
 			// Navigate to second commit
 			fireEvent.keyDown(window, { key: 'ArrowDown' });
 
 			await waitFor(() => {
-				expect(gitShowMock()).toHaveBeenCalledWith('/test/project', 'second-hash', undefined);
+				expect(gitShowMock()).toHaveBeenCalledWith(
+					'/test/project',
+					'second-hash',
+					'ssh-remote-123'
+				);
 			});
 		});
 	});

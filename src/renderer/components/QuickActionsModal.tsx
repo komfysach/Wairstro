@@ -759,7 +759,9 @@ export function QuickActionsModal(props: QuickActionsModalProps) {
 									: activeSession.cwd;
 							const sshRemoteId =
 								activeSession.sshRemoteId ||
-								activeSession.sessionSshRemoteConfig?.remoteId ||
+								(activeSession.sessionSshRemoteConfig?.enabled
+									? activeSession.sessionSshRemoteConfig.remoteId
+									: undefined) ||
 								undefined;
 							const diff = await gitService.getDiff(cwd, undefined, sshRemoteId);
 							if (diff.diff) {

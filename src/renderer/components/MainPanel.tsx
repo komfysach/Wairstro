@@ -841,8 +841,16 @@ export const MainPanel = React.memo(
 		// Memoize sshRemoteId to prevent object recreation
 		const filePreviewSshRemoteId = useMemo(
 			() =>
-				activeSession?.sshRemoteId || activeSession?.sessionSshRemoteConfig?.remoteId || undefined,
-			[activeSession?.sshRemoteId, activeSession?.sessionSshRemoteConfig?.remoteId]
+				activeSession?.sshRemoteId ||
+				(activeSession?.sessionSshRemoteConfig?.enabled
+					? activeSession.sessionSshRemoteConfig.remoteId
+					: undefined) ||
+				undefined,
+			[
+				activeSession?.sshRemoteId,
+				activeSession?.sessionSshRemoteConfig?.enabled,
+				activeSession?.sessionSshRemoteConfig?.remoteId,
+			]
 		);
 
 		// Handler to view git diff

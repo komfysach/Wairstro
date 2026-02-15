@@ -1272,7 +1272,9 @@ function MaestroConsoleInner() {
 				// we must fall back to sessionSshRemoteConfig.remoteId. See CLAUDE.md "SSH Remote Sessions".
 				const sshRemoteId =
 					correctedSession.sshRemoteId ||
-					correctedSession.sessionSshRemoteConfig?.remoteId ||
+					(correctedSession.sessionSshRemoteConfig?.enabled
+						? correctedSession.sessionSshRemoteConfig.remoteId
+						: undefined) ||
 					undefined;
 
 				// For SSH remote sessions, defer git operations to background to avoid blocking
@@ -1400,7 +1402,11 @@ function MaestroConsoleInner() {
 					// For remote (SSH) sessions, fetch git info in background to avoid blocking
 					// startup on SSH connection timeouts. This runs after UI is shown.
 					for (const session of restoredSessions) {
-						const sshRemoteId = session.sshRemoteId || session.sessionSshRemoteConfig?.remoteId;
+						const sshRemoteId =
+							session.sshRemoteId ||
+							(session.sessionSshRemoteConfig?.enabled
+								? session.sessionSshRemoteConfig.remoteId
+								: undefined);
 						if (sshRemoteId) {
 							// Fire and forget - don't await, let it update sessions when done
 							fetchGitInfoInBackground(session.id, session.cwd, sshRemoteId);
@@ -1670,7 +1676,9 @@ function MaestroConsoleInner() {
 					// Get SSH remote ID for remote git operations
 					const sshRemoteId =
 						parentSession.sshRemoteId ||
-						parentSession.sessionSshRemoteConfig?.remoteId ||
+						(parentSession.sessionSshRemoteConfig?.enabled
+							? parentSession.sessionSshRemoteConfig.remoteId
+							: undefined) ||
 						undefined;
 					const scanResult = await window.maestro.git.scanWorktreeDirectory(
 						parentSession.worktreeConfig!.basePath,
