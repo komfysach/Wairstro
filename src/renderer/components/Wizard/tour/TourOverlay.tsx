@@ -274,10 +274,10 @@ export function TourOverlay({
 			<div
 				className="absolute inset-0 transition-all duration-300 ease-out"
 				style={{
-					backgroundColor: 'rgba(0, 0, 0, 0.75)',
+					backgroundColor: 'rgba(6, 14, 34, 0.82)',
 					clipPath: clipPath,
 					// If no spotlight or welcome screen, ensure full coverage
-					...(clipPath === 'none' && { backgroundColor: 'rgba(0, 0, 0, 0.85)' }),
+					...(clipPath === 'none' && { backgroundColor: 'rgba(6, 14, 34, 0.9)' }),
 				}}
 			/>
 

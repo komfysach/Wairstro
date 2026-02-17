@@ -28,6 +28,15 @@ export function TourWelcome({
 	onStartTour,
 	onSkip,
 }: TourWelcomeProps): JSX.Element {
+	const tourPalette = {
+		panelBg: '#0a1530',
+		chromeBg: '#0e1f45',
+		border: 'rgba(122, 133, 255, 0.45)',
+		text: '#e8eeff',
+		textMuted: '#bcc8f2',
+		kbdBg: 'rgba(122, 133, 255, 0.24)',
+	};
+
 	return (
 		<div
 			className="tour-step-tooltip rounded-xl shadow-2xl overflow-hidden tour-welcome-enter"
@@ -40,22 +49,23 @@ export function TourWelcome({
 				maxWidth: '90vw',
 				maxHeight: '90vh',
 				overflowY: 'auto',
-				backgroundColor: theme.colors.bgSidebar,
-				border: `1px solid ${theme.colors.border}`,
+				backgroundColor: tourPalette.panelBg,
+				border: `1px solid ${tourPalette.border}`,
+				boxShadow: '0 30px 90px rgba(2, 8, 24, 0.7)',
 			}}
 		>
 			{/* Header */}
 			<div
 				className="px-5 py-3 border-b flex items-center justify-end"
 				style={{
-					borderColor: theme.colors.border,
-					backgroundColor: theme.colors.bgMain,
+					borderColor: tourPalette.border,
+					backgroundColor: tourPalette.chromeBg,
 				}}
 			>
 				<button
 					onClick={onSkip}
 					className="text-xs hover:underline transition-colors"
-					style={{ color: theme.colors.textDim }}
+					style={{ color: tourPalette.textMuted }}
 				>
 					Skip Tour
 				</button>
@@ -82,15 +92,15 @@ export function TourWelcome({
 			<div
 				className="px-5 py-2 border-t text-center"
 				style={{
-					borderColor: theme.colors.border,
-					backgroundColor: theme.colors.bgMain,
+					borderColor: tourPalette.border,
+					backgroundColor: tourPalette.chromeBg,
 				}}
 			>
-				<span className="text-xs" style={{ color: theme.colors.textDim }}>
+				<span className="text-xs" style={{ color: tourPalette.text }}>
 					Press{' '}
 					<kbd
 						className="px-1.5 py-0.5 rounded text-xs"
-						style={{ backgroundColor: theme.colors.bgActivity }}
+						style={{ backgroundColor: tourPalette.kbdBg, color: tourPalette.text }}
 					>
 						Enter
 					</kbd>{' '}
@@ -98,7 +108,7 @@ export function TourWelcome({
 					{' • '}
 					<kbd
 						className="px-1.5 py-0.5 rounded text-xs"
-						style={{ backgroundColor: theme.colors.bgActivity }}
+						style={{ backgroundColor: tourPalette.kbdBg, color: tourPalette.text }}
 					>
 						Esc
 					</kbd>{' '}
