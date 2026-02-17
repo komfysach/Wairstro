@@ -38,7 +38,7 @@ export interface SessionItemProps {
 
 	// Handlers
 	onSelect: () => void;
-	onDragStart: () => void;
+	onDragStart: (event: React.DragEvent<HTMLDivElement>) => void;
 	onDragOver?: (e: React.DragEvent) => void;
 	onDrop?: () => void;
 	onContextMenu: (e: React.MouseEvent) => void;

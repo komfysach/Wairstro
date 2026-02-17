@@ -53,6 +53,8 @@ import {
 	registerAgentErrorHandlers,
 	registerDirectorNotesHandlers,
 	registerWakatimeHandlers,
+	registerMfeHandlers,
+	registerAdoHandlers,
 	setupLoggerEventForwarding,
 	cleanupAllGroomingSessions,
 	getActiveGroomingSessionCount,
@@ -573,6 +575,17 @@ function setupIpcHandlers() {
 	registerDocumentGraphHandlers({
 		getMainWindow: () => mainWindow,
 		app,
+	});
+
+	// Register MFE handlers for monorepo Module Federation workspace scanning
+	registerMfeHandlers();
+	// Register Azure DevOps sprint planning handlers
+	registerAdoHandlers({
+		settingsStore: store,
+		sessionsStore,
+		agentConfigsStore,
+		getProcessManager: () => processManager,
+		getAgentDetector: () => agentDetector,
 	});
 
 	// Register SSH Remote handlers for managing SSH configurations

@@ -117,6 +117,8 @@ interface QuickActionsModalProps {
 	onOpenSymphony?: () => void;
 	// Director's Notes
 	onOpenDirectorNotes?: () => void;
+	// MFE Dashboard
+	onOpenMfeDashboard?: () => void;
 }
 
 export function QuickActionsModal(props: QuickActionsModalProps) {
@@ -201,6 +203,7 @@ export function QuickActionsModal(props: QuickActionsModalProps) {
 		onOpenLastDocumentGraph,
 		onOpenSymphony,
 		onOpenDirectorNotes,
+		onOpenMfeDashboard,
 	} = props;
 
 	// UI store actions for search commands (avoid threading more props through 3-layer chain)
@@ -976,6 +979,19 @@ export function QuickActionsModal(props: QuickActionsModalProps) {
 				setQuickActionOpen(false);
 			},
 		},
+		...(onOpenMfeDashboard
+			? [
+					{
+						id: 'openMfeDashboard',
+						label: 'MFE Dashboard',
+						subtext: 'Inspect host/remotes/shared packages in your monorepo',
+						action: () => {
+							onOpenMfeDashboard();
+							setQuickActionOpen(false);
+						},
+					},
+				]
+			: []),
 		// Playbook Exchange - browse and import community playbooks
 		...(onOpenPlaybookExchange
 			? [

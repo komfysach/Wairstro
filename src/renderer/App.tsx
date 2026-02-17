@@ -44,6 +44,7 @@ import { TourOverlay } from './components/Wizard/tour';
 import { CONDUCTOR_BADGES, getBadgeForTime } from './constants/conductorBadges';
 import { EmptyStateView } from './components/EmptyStateView';
 import { DeleteAgentConfirmModal } from './components/DeleteAgentConfirmModal';
+import { MFEDashboard } from './components/MFEDashboard';
 
 // Lazy-loaded components for performance (rarely-used heavy modals)
 // These are loaded on-demand when the user first opens them
@@ -143,6 +144,7 @@ import { ToastContainer } from './components/Toast';
 import { gitService } from './services/git';
 import { getSpeckitCommands } from './services/speckit';
 import { getOpenSpecCommands } from './services/openspec';
+import { adoService, buildAgentPayload, type AdoSprintWorkItem } from './services/ado';
 
 // Import prompts and synopsis parsing
 import { autorunSynopsisPrompt, maestroSystemPrompt } from '../prompts';
@@ -873,6 +875,8 @@ function MaestroConsoleInner() {
 	// GitHub CLI availability (for gist publishing)
 	const [ghCliAvailable, setGhCliAvailable] = useState(false);
 	const [gistPublishModalOpen, setGistPublishModalOpen] = useState(false);
+	const [mfeDashboardOpen, setMfeDashboardOpen] = useState(false);
+	const [mfeAssignments, setMfeAssignments] = useState<Record<string, string>>({});
 	// Tab context gist publishing - now backed by tabStore (Zustand)
 	const tabGistContent = useTabStore((s) => s.tabGistContent);
 	const fileGistUrls = useTabStore((s) => s.fileGistUrls);
@@ -8443,8 +8447,21 @@ You are taking over this conversation. Based on the context above, provide a bri
 	};
 
 	// Drag and Drop Handlers
-	const handleDragStart = (sessionId: string) => {
+	const handleDragStart = (sessionId: string, event: React.DragEvent<HTMLDivElement>) => {
 		setDraggingSessionId(sessionId);
+		const session = sessionsRef.current.find((item) => item.id === sessionId);
+		if (!session) return;
+
+		const payload = {
+			type: 'session',
+			sessionId: session.id,
+			id: session.id,
+			name: session.name,
+			toolType: session.toolType,
+		};
+		event.dataTransfer.setData('application/json', JSON.stringify(payload));
+		event.dataTransfer.setData('text/plain', session.id);
+		event.dataTransfer.effectAllowed = 'move';
 	};
 
 	const handleDragOver = (e: React.DragEvent) => {
@@ -10638,6 +10655,17 @@ You are taking over this conversation. Based on the context above, provide a bri
 	const handleQuickActionsAutoRunResetTasks = useCallback(() => {
 		rightPanelRef.current?.openAutoRunResetTasksModal();
 	}, []);
+	const handleQuickActionsOpenMfeDashboard = useCallback(() => {
+		if (!activeSession) {
+			notifyToast({
+				type: 'info',
+				title: 'MFE Dashboard',
+				message: 'Select an active agent first so WAIRstro can resolve the monorepo root.',
+			});
+			return;
+		}
+		setMfeDashboardOpen(true);
+	}, [activeSession]);
 
 	const handleCloseQueueBrowser = useCallback(() => setQueueBrowserOpen(false), []);
 	const handleRemoveQueueItem = useCallback((sessionId: string, itemId: string) => {
@@ -11635,6 +11663,286 @@ You are taking over this conversation. Based on the context above, provide a bri
 		handleOpenLastDocumentGraph,
 	});
 
+	const handleExecuteMfeWorkItem = useCallback(
+		async ({
+			packageName,
+			packagePath,
+			agentId,
+			workItem,
+		}: {
+			packageName: string;
+			packagePath: string;
+			agentId: string;
+			workItem: AdoSprintWorkItem;
+		}): Promise<{ sessionId: string; tabId: string }> => {
+			if (!agentId) {
+				notifyToast({
+					type: 'error',
+					title: 'No Agent Assigned',
+					message: `Assign an agent to ${packageName} before routing work items.`,
+				});
+				throw new Error('No assigned agent for this MFE task.');
+			}
+
+			const templateSession = sessions.find((session) => session.id === agentId);
+			if (!templateSession) {
+				notifyToast({
+					type: 'error',
+					title: 'Assigned Agent Missing',
+					message: 'The assigned agent could not be found. Reassign and retry.',
+				});
+				throw new Error('Assigned agent session could not be found.');
+			}
+
+			const newSessionId = generateId();
+			const newTabId = generateId();
+			const initialPrompt = buildAgentPayload(
+				{
+					ticketId: workItem.id,
+					adoTitle: workItem.title,
+					adoDescription: workItem.description,
+					adoAcceptanceCriteria: workItem.acceptanceCriteria,
+				},
+				{
+					mfeName: packageName,
+					mfePath: packagePath,
+					stack: 'Rspack, React, Module Federation',
+				}
+			);
+			const initialTab: AITab = {
+				id: newTabId,
+				agentSessionId: null,
+				name: null,
+				starred: false,
+				logs: [
+					{
+						id: generateId(),
+						timestamp: Date.now(),
+						source: 'system',
+						text: `Initializing execution for #${workItem.id} (${workItem.title}) in ${packageName}.`,
+					},
+				],
+				inputValue: '',
+				stagedImages: [],
+				createdAt: Date.now(),
+				state: 'busy',
+				saveToHistory: defaultSaveToHistory,
+				showThinking: defaultShowThinking,
+			};
+
+			const routedSession: Session = {
+				id: newSessionId,
+				name: `${packageName} • #${workItem.id}`,
+				groupId: templateSession.groupId,
+				toolType: templateSession.toolType,
+				state: 'busy',
+				busySource: 'ai',
+				thinkingStartTime: Date.now(),
+				cwd: packagePath,
+				fullPath: packagePath,
+				projectRoot: packagePath,
+				isGitRepo: true,
+				gitBranches: templateSession.gitBranches,
+				gitTags: templateSession.gitTags,
+				gitRefsCacheTime: templateSession.gitRefsCacheTime,
+				parentSessionId: templateSession.id,
+				worktreeBranch: undefined,
+				aiLogs: [],
+				shellLogs: [
+					{
+						id: generateId(),
+						timestamp: Date.now(),
+						source: 'system',
+						text: 'Waiting for agent startup.',
+					},
+				],
+				workLog: [],
+				contextUsage: 0,
+				inputMode: templateSession.toolType === 'terminal' ? 'terminal' : 'ai',
+				aiPid: 0,
+				terminalPid: 0,
+				port: 3000 + Math.floor(Math.random() * 100),
+				isLive: false,
+				changedFiles: [],
+				fileTree: [],
+				fileExplorerExpanded: [],
+				fileExplorerScrollPos: 0,
+				fileTreeAutoRefreshInterval: templateSession.fileTreeAutoRefreshInterval,
+				shellCwd: packagePath,
+				aiCommandHistory: [],
+				shellCommandHistory: [],
+				executionQueue: [],
+				activeTimeMs: 0,
+				aiTabs: [initialTab],
+				activeTabId: newTabId,
+				closedTabHistory: [],
+				filePreviewTabs: [],
+				activeFileTabId: null,
+				unifiedTabOrder: [{ type: 'ai' as const, id: newTabId }],
+				unifiedClosedTabHistory: [],
+				customPath: templateSession.customPath,
+				customArgs: templateSession.customArgs,
+				customEnvVars: templateSession.customEnvVars,
+				customModel: templateSession.customModel,
+				customContextWindow: templateSession.customContextWindow,
+				customProviderPath: templateSession.customProviderPath,
+				nudgeMessage: templateSession.nudgeMessage,
+				autoRunFolderPath: templateSession.autoRunFolderPath,
+				sessionSshRemoteConfig: templateSession.sessionSshRemoteConfig,
+			};
+
+			setSessions((prev) => [...prev, routedSession]);
+
+			try {
+				const execution = await adoService.runAgentTask({
+					sessionId: newSessionId,
+					tabId: newTabId,
+					assignedAgent: templateSession.toolType,
+					templateSession: {
+						cwd: templateSession.cwd,
+						customPath: templateSession.customPath,
+						customArgs: templateSession.customArgs,
+						customEnvVars: templateSession.customEnvVars,
+						customModel: templateSession.customModel,
+						customContextWindow: templateSession.customContextWindow,
+						sessionSshRemoteConfig: templateSession.sessionSshRemoteConfig,
+					},
+					task: {
+						ticketId: workItem.id,
+						adoTitle: workItem.title,
+						adoDescription: workItem.description,
+						adoAcceptanceCriteria: workItem.acceptanceCriteria,
+						prompt: initialPrompt,
+					},
+					mfeConfig: {
+						mfeName: packageName,
+						mfePath: packagePath,
+						stack: 'Rspack, React, Module Federation',
+					},
+				});
+
+				const sshRemoteId =
+					templateSession.sshRemoteId ||
+					templateSession.sessionSshRemoteConfig?.remoteId ||
+					undefined;
+				let gitBranches: string[] | undefined;
+				let gitTags: string[] | undefined;
+				let gitRefsCacheTime: number | undefined;
+				try {
+					[gitBranches, gitTags] = await Promise.all([
+						gitService.getBranches(execution.packageCwd, sshRemoteId),
+						gitService.getTags(execution.packageCwd, sshRemoteId),
+					]);
+					gitRefsCacheTime = Date.now();
+				} catch {
+					// Non-fatal for execution.
+				}
+
+				setSessions((prev) =>
+					prev.map((session) =>
+						session.id === newSessionId
+							? {
+									...session,
+									cwd: execution.packageCwd,
+									fullPath: execution.packageCwd,
+									projectRoot: execution.packageCwd,
+									shellCwd: execution.packageCwd,
+									worktreeBranch: execution.worktreeBranch,
+									gitBranches,
+									gitTags,
+									gitRefsCacheTime,
+									aiTabs: session.aiTabs.map((tab) =>
+										tab.id === newTabId
+											? {
+													...tab,
+													logs: [
+														...tab.logs,
+														{
+															id: generateId(),
+															timestamp: Date.now(),
+															source: 'system',
+															text: `Execution started in ${execution.packageCwd}.`,
+														},
+													],
+												}
+											: tab
+									),
+								}
+							: session
+					)
+				);
+
+				notifyToast({
+					type: 'success',
+					title: 'Execution Routed',
+					message: `#${workItem.id} started for ${packageName}`,
+					sessionId: newSessionId,
+					tabId: newTabId,
+				});
+
+				return { sessionId: newSessionId, tabId: newTabId };
+			} catch (error) {
+				const errorMessage = error instanceof Error ? error.message : String(error);
+				setSessions((prev) =>
+					prev.map((session) =>
+						session.id === newSessionId
+							? {
+									...session,
+									state: 'idle',
+									busySource: undefined,
+									thinkingStartTime: undefined,
+									aiTabs: session.aiTabs.map((tab) =>
+										tab.id === newTabId
+											? {
+													...tab,
+													state: 'idle' as const,
+													logs: [
+														...tab.logs,
+														{
+															id: generateId(),
+															timestamp: Date.now(),
+															source: 'system',
+															text: `Error: Failed to execute task - ${errorMessage}`,
+														},
+													],
+												}
+											: tab
+									),
+								}
+							: session
+					)
+				);
+				notifyToast({
+					type: 'error',
+					title: 'Routing Failed',
+					message: errorMessage,
+				});
+				throw error;
+			}
+		},
+		[defaultSaveToHistory, defaultShowThinking, sessions, setSessions]
+	);
+
+	const handleViewMfeTaskTerminal = useCallback(
+		(sessionId: string, tabId: string) => {
+			setMfeDashboardOpen(false);
+			setActiveSessionId(sessionId);
+			setSessions((prev) =>
+				prev.map((session) =>
+					session.id === sessionId
+						? {
+								...session,
+								activeTabId: tabId,
+								activeFileTabId: null,
+								inputMode: 'ai',
+							}
+						: session
+				)
+			);
+		},
+		[setSessions]
+	);
+
 	return (
 		<GitStatusProvider sessions={sessions} activeSessionId={activeSessionId}>
 			<div
@@ -11942,6 +12250,7 @@ You are taking over this conversation. Based on the context above, provide a bri
 					onOpenMarketplace={handleOpenMarketplace}
 					onOpenSymphony={() => setSymphonyModalOpen(true)}
 					onOpenDirectorNotes={() => setDirectorNotesOpen(true)}
+					onOpenMfeDashboard={handleQuickActionsOpenMfeDashboard}
 					tabSwitcherOpen={tabSwitcherOpen}
 					onCloseTabSwitcher={handleCloseTabSwitcher}
 					onTabSelect={handleUtilityTabSelect}
@@ -12621,7 +12930,43 @@ You are taking over this conversation. Based on the context above, provide a bri
 
 				{/* --- CENTER WORKSPACE (hidden when no sessions, group chat is active, or log viewer is open) --- */}
 				{sessions.length > 0 && !activeGroupChatId && !logViewerOpen && (
-					<MainPanel ref={mainPanelRef} {...mainPanelProps} />
+					<>
+						{mfeDashboardOpen ? (
+							<div className="flex-1 min-w-0 h-full">
+								<MFEDashboard
+									theme={theme}
+									monorepoRoot={activeSession?.projectRoot || activeSession?.cwd || ''}
+									availableAgents={sessions.map((session) => ({
+										id: session.id,
+										name: session.name,
+									}))}
+									initialAssignments={mfeAssignments}
+									onAssignAgent={({ packagePath, agentId, packageName }) => {
+										setMfeAssignments((prev) => ({ ...prev, [packagePath]: agentId }));
+										const assignedName =
+											sessions.find((session) => session.id === agentId)?.name || agentId;
+										notifyToast({
+											type: 'success',
+											title: 'Agent Assigned',
+											message: `${assignedName} assigned to ${packageName}`,
+										});
+									}}
+									onDropWorkItem={({ packageName, workItem }) => {
+										notifyToast({
+											type: 'success',
+											title: 'Work Item Linked',
+											message: `#${workItem.id} linked to ${packageName}. Click Execute to start.`,
+										});
+									}}
+									onExecuteTask={handleExecuteMfeWorkItem}
+									onViewAgentTerminal={handleViewMfeTaskTerminal}
+									onClose={() => setMfeDashboardOpen(false)}
+								/>
+							</div>
+						) : (
+							<MainPanel ref={mainPanelRef} {...mainPanelProps} />
+						)}
+					</>
 				)}
 
 				{/* --- RIGHT PANEL (hidden in mobile landscape, when no sessions, group chat is active, or log viewer is open) --- */}

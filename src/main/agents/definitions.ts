@@ -174,6 +174,21 @@ export const AGENT_DEFINITIONS: AgentDefinition[] = [
 		binaryName: 'gemini',
 		command: 'gemini',
 		args: [],
+		promptArgs: (prompt: string) => ['-p', prompt],
+		// Keep prompts as positional flag args, not "-- <prompt>" separator.
+		noPromptSeparator: true,
+		// Preserve project context while allowing per-session cwd isolation.
+		modelArgs: (modelId: string) => ['--model', modelId],
+		configOptions: [
+			{
+				key: 'contextWindow',
+				type: 'number',
+				label: 'Context Window Size',
+				description:
+					'Maximum context window size in tokens for UI display. Adjust to match your Gemini model.',
+				default: 1048576,
+			},
+		],
 	},
 	{
 		id: 'qwen3-coder',

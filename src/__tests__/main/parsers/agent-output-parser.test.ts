@@ -316,6 +316,7 @@ describe('agent-output-parser', () => {
 			expect(isValidToolType('codex')).toBe(true);
 			expect(isValidToolType('terminal')).toBe(true);
 			expect(isValidToolType('factory-droid')).toBe(true);
+			expect(isValidToolType('gemini-cli')).toBe(true);
 		});
 
 		it('should return false for invalid agent IDs', () => {

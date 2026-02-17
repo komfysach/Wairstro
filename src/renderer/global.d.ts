@@ -2703,6 +2703,129 @@ interface MaestroAPI {
 		checkCli: () => Promise<{ available: boolean; version?: string }>;
 		validateApiKey: (key: string) => Promise<{ valid: boolean }>;
 	};
+
+	// ADO API (Sprint planning integration)
+	ado: {
+		getSettings: () => Promise<{
+			organization: string;
+			project: string;
+			team: string;
+			hasPat: boolean;
+		}>;
+		setSettings: (settings: {
+			organization: string;
+			project: string;
+			team?: string;
+			pat?: string;
+		}) => Promise<{ hasPat: boolean }>;
+		getCurrentSprintWorkItems: () => Promise<{
+			iterationId: string;
+			iterationName: string;
+			items: Array<{
+				id: number;
+				title: string;
+				description: string;
+				acceptanceCriteria: string;
+				state: string;
+				tags: string[];
+				url: string;
+			}>;
+		}>;
+		getCurrentSprintDebug: () => Promise<{
+			organization: string;
+			project: string;
+			team: string | null;
+			iterationId: string;
+			iterationName: string;
+			iterationPath: string | null;
+			idsFromIterationEndpoint: number[];
+			idsFromWiql: number[];
+			finalIds: number[];
+			itemCount: number;
+		}>;
+		generateSprintReview: () => Promise<{
+			success: boolean;
+			markdown: string;
+			generatedAt?: number;
+			stats?: {
+				worktreeCount: number;
+				completedItems: number;
+				incompleteItems: number;
+				durationMs: number;
+			};
+			warnings?: string[];
+			error?: string;
+		}>;
+		runAgentTask: (payload: {
+			sessionId: string;
+			tabId: string;
+			assignedAgent: string;
+			templateSession: {
+				cwd: string;
+				customPath?: string;
+				customArgs?: string;
+				customEnvVars?: Record<string, string>;
+				customModel?: string;
+				customContextWindow?: number;
+				sessionSshRemoteConfig?: {
+					enabled: boolean;
+					remoteId: string | null;
+					workingDirOverride?: string;
+				};
+			};
+			task: {
+				ticketId: number;
+				adoTitle: string;
+				adoDescription?: string;
+				adoAcceptanceCriteria?: string;
+				prompt: string;
+			};
+			mfeConfig: {
+				mfeName: string;
+				mfePath: string;
+				stack?: string;
+			};
+		}) => Promise<{
+			success: boolean;
+			worktreePath: string;
+			packageCwd: string;
+			worktreeBranch: string;
+			processSessionId: string;
+		}>;
+	};
+
+	// MFE API (Rspack Module Federation workspace scanning)
+	mfe: {
+		scanWorkspace: (workspaceRoot: string) => Promise<{
+			rootPath: string;
+			packages: Array<{
+				name: string;
+				role: 'host' | 'remote' | 'shared';
+				rootPath: string;
+				configPaths: string[];
+				git: {
+					branch: string;
+					pendingChanges: number;
+				};
+				detectionReason: string;
+			}>;
+			summary: {
+				hostCount: number;
+				remoteCount: number;
+				sharedCount: number;
+				totalCount: number;
+			};
+		}>;
+		scanForProposals: (mfePath: string) => Promise<
+			Array<{
+				title: string;
+				type: 'Refactor' | 'Bug Fix' | 'Testing' | 'Dependencies';
+				description: string;
+				location: string;
+				priority: 'Low' | 'Medium' | 'High';
+			}>
+		>;
+	};
 }
 
 declare global {

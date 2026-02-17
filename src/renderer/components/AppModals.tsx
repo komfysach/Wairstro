@@ -848,6 +848,8 @@ export interface AppUtilityModalsProps {
 
 	// Director's Notes
 	onOpenDirectorNotes?: () => void;
+	// MFE Dashboard
+	onOpenMfeDashboard?: () => void;
 
 	// LightboxModal
 	lightboxImage: string | null;
@@ -1046,6 +1048,8 @@ export function AppUtilityModals({
 	onOpenSymphony,
 	// Director's Notes
 	onOpenDirectorNotes,
+	// MFE Dashboard
+	onOpenMfeDashboard,
 	// LightboxModal
 	lightboxImage,
 	lightboxImages,
@@ -1201,6 +1205,7 @@ export function AppUtilityModals({
 					onOpenLastDocumentGraph={onOpenLastDocumentGraph}
 					onOpenSymphony={onOpenSymphony}
 					onOpenDirectorNotes={onOpenDirectorNotes}
+					onOpenMfeDashboard={onOpenMfeDashboard}
 				/>
 			)}
 
@@ -1984,6 +1989,8 @@ export interface AppModalsProps {
 	onOpenSymphony?: () => void;
 	// Director's Notes
 	onOpenDirectorNotes?: () => void;
+	// MFE Dashboard
+	onOpenMfeDashboard?: () => void;
 	tabSwitcherOpen: boolean;
 	onCloseTabSwitcher: () => void;
 	onTabSelect: (tabId: string) => void;
@@ -2305,6 +2312,8 @@ export function AppModals(props: AppModalsProps) {
 		onOpenSymphony,
 		// Director's Notes
 		onOpenDirectorNotes,
+		// MFE Dashboard
+		onOpenMfeDashboard,
 		tabSwitcherOpen,
 		onCloseTabSwitcher,
 		onTabSelect,
@@ -2612,6 +2621,7 @@ export function AppModals(props: AppModalsProps) {
 				onOpenMarketplace={onOpenMarketplace}
 				onOpenSymphony={onOpenSymphony}
 				onOpenDirectorNotes={onOpenDirectorNotes}
+				onOpenMfeDashboard={onOpenMfeDashboard}
 				tabSwitcherOpen={tabSwitcherOpen}
 				onCloseTabSwitcher={onCloseTabSwitcher}
 				onTabSelect={onTabSelect}

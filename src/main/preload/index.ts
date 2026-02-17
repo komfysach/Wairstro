@@ -50,6 +50,8 @@ import { createSymphonyApi } from './symphony';
 import { createTabNamingApi } from './tabNaming';
 import { createDirectorNotesApi } from './directorNotes';
 import { createWakatimeApi } from './wakatime';
+import { createMfeApi } from './mfe';
+import { createAdoApi } from './ado';
 
 // Expose protected methods that allow the renderer process to use
 // the ipcRenderer without exposing the entire object
@@ -188,6 +190,12 @@ contextBridge.exposeInMainWorld('maestro', {
 
 	// WakaTime API (CLI check, API key validation)
 	wakatime: createWakatimeApi(),
+
+	// MFE API (Rspack Module Federation workspace scanning)
+	mfe: createMfeApi(),
+
+	// ADO API (Sprint planning integration)
+	ado: createAdoApi(),
 });
 
 // Re-export factory functions for external consumers (e.g., tests)
@@ -261,6 +269,10 @@ export {
 	createDirectorNotesApi,
 	// WakaTime
 	createWakatimeApi,
+	// MFE
+	createMfeApi,
+	// ADO
+	createAdoApi,
 };
 
 // Re-export types for TypeScript consumers
@@ -469,3 +481,7 @@ export type {
 	// From wakatime
 	WakatimeApi,
 } from './wakatime';
+export type {
+	// From ado
+	AdoApi,
+} from './ado';

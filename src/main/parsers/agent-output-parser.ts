@@ -35,12 +35,13 @@ export type { AgentError, AgentErrorType } from '../../shared/types';
  * Valid ToolType values for output parser registration
  * This array is the single source of truth for agent types that can have parsers
  */
-const VALID_TOOL_TYPES: ToolType[] = [
+const VALID_TOOL_TYPES: string[] = [
 	'claude-code',
 	'opencode',
 	'codex',
 	'terminal',
 	'factory-droid',
+	'gemini-cli',
 ];
 
 /**
@@ -150,7 +151,7 @@ export interface AgentOutputParser {
 	/**
 	 * The agent ID this parser handles
 	 */
-	readonly agentId: ToolType;
+	readonly agentId: string;
 
 	/**
 	 * Parse a single JSON line from agent output
@@ -221,7 +222,7 @@ export interface AgentOutputParser {
  * Registry of output parser implementations
  * Maps agent IDs to their parser implementations
  */
-const parserRegistry = new Map<ToolType, AgentOutputParser>();
+const parserRegistry = new Map<string, AgentOutputParser>();
 
 /**
  * Register an output parser implementation

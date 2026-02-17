@@ -29,6 +29,7 @@ const VALID_TOOL_TYPES = new Set<string>([
 	'codex',
 	'terminal',
 	'factory-droid',
+	'gemini-cli',
 ]);
 
 /**
@@ -875,6 +876,7 @@ const patternRegistry = new Map<ToolType, AgentErrorPatterns>([
 	['opencode', OPENCODE_ERROR_PATTERNS],
 	['codex', CODEX_ERROR_PATTERNS],
 	['factory-droid', FACTORY_DROID_ERROR_PATTERNS],
+	['gemini-cli' as ToolType, {}],
 ]);
 
 /**

@@ -105,7 +105,7 @@ export interface UseSessionListPropsDeps {
 	toggleGlobalLive: () => void;
 	restartWebServer: () => Promise<string | null>;
 	toggleGroup: (groupId: string) => void;
-	handleDragStart: (sessionId: string) => void;
+	handleDragStart: (sessionId: string, event: React.DragEvent<HTMLDivElement>) => void;
 	handleDragOver: (e: React.DragEvent) => void;
 	handleDropOnGroup: (groupId: string) => void;
 	handleDropOnUngrouped: () => void;

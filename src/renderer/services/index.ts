@@ -33,3 +33,24 @@ export type { SummarizationConfig } from './contextSummarizer';
 // Wizard intent parser service
 export { parseWizardIntent, suggestsIterateIntent, suggestsNewIntent } from './wizardIntentParser';
 export type { WizardIntentResult } from './wizardIntentParser';
+
+// MFE workspace scanner service
+export { mfeService } from './mfe';
+export type { MfeScanResult, MfePackageInfo, MfePackageRole } from './mfe';
+
+// ADO sprint planning service
+export { adoService } from './ado';
+export type {
+	AdoSettings,
+	AdoSprintWorkItem,
+	AdoCurrentSprintResponse,
+	AdoCurrentSprintDebug,
+} from './ado';
+
+// Agent routing service (ADO work item -> isolated worktree + agent run)
+export { AgentRouterService, agentRouterService } from './AgentRouterService';
+export type {
+	RoutedWorkItemRequest,
+	RoutedWorkItemPlan,
+	SpawnRoutedAgentRequest,
+} from './AgentRouterService';

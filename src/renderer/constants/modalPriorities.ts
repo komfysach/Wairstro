@@ -50,6 +50,9 @@ export const MODAL_PRIORITIES = {
 	/** Director's Notes modal - unified history and AI overview */
 	DIRECTOR_NOTES: 848,
 
+	/** Sprint review modal - generated changelog from worktrees + ADO */
+	SPRINT_REVIEW: 847,
+
 	/** Rename group modal */
 	RENAME_GROUP: 850,
 
@@ -196,6 +199,9 @@ export const MODAL_PRIORITIES = {
 
 	/** Document Graph modal */
 	DOCUMENT_GRAPH: 545,
+
+	/** MFE Dashboard modal */
+	MFE_DASHBOARD: 542,
 
 	/** Usage Dashboard modal */
 	USAGE_DASHBOARD: 540,

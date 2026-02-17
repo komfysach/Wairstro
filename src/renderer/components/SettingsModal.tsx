@@ -62,6 +62,7 @@ import { SshRemotesSection } from './Settings/SshRemotesSection';
 import { SshRemoteIgnoreSection } from './Settings/SshRemoteIgnoreSection';
 import { AgentConfigPanel } from './shared/AgentConfigPanel';
 import { AGENT_TILES } from './Wizard/screens/AgentSelectionScreen';
+import { adoService } from '../services/ado';
 
 // Feature flags - set to true to enable dormant features
 const FEATURE_FLAGS = {
@@ -409,6 +410,14 @@ export const SettingsModal = memo(function SettingsModal(props: SettingsModalPro
 	} | null>(null);
 	const [wakatimeKeyValid, setWakatimeKeyValid] = useState<boolean | null>(null);
 	const [wakatimeKeyValidating, setWakatimeKeyValidating] = useState(false);
+	const [adoOrganization, setAdoOrganization] = useState('');
+	const [adoProject, setAdoProject] = useState('');
+	const [adoTeam, setAdoTeam] = useState('');
+	const [adoPat, setAdoPat] = useState('');
+	const [adoHasPat, setAdoHasPat] = useState(false);
+	const [adoPatDirty, setAdoPatDirty] = useState(false);
+	const [adoSaving, setAdoSaving] = useState(false);
+	const [adoError, setAdoError] = useState<string | null>(null);
 
 	// Check WakaTime CLI availability when section renders or toggle is enabled
 	// Retries after a delay to allow auto-installer time to complete
@@ -466,6 +475,24 @@ export const SettingsModal = memo(function SettingsModal(props: SettingsModalPro
 	useEffect(() => {
 		setWakatimeKeyValid(null);
 	}, [wakatimeApiKey]);
+
+	useEffect(() => {
+		if (!isOpen) return;
+		adoService
+			.getSettings()
+			.then((settings) => {
+				setAdoOrganization(settings.organization);
+				setAdoProject(settings.project);
+				setAdoTeam(settings.team || '');
+				setAdoHasPat(settings.hasPat);
+				setAdoPat('');
+				setAdoPatDirty(false);
+				setAdoError(null);
+			})
+			.catch((error) => {
+				setAdoError(error instanceof Error ? error.message : 'Failed to load Azure DevOps settings');
+			});
+	}, [isOpen]);
 
 	// Layer stack integration
 	const { registerLayer, unregisterLayer, updateLayerHandler } = useLayerStack();
@@ -2130,6 +2157,139 @@ export const SettingsModal = memo(function SettingsModal(props: SettingsModalPro
 												Get your API key from wakatime.com/settings/api-key. Keys are stored locally
 												in ~/.maestro/settings.json.
 											</p>
+										</div>
+									)}
+								</div>
+							</div>
+
+							{/* Azure DevOps Integration */}
+							<div>
+								<label className="block text-xs font-bold opacity-70 uppercase mb-2 flex items-center gap-2">
+									<Key className="w-3 h-3" />
+									Azure DevOps
+								</label>
+								<div
+									className="p-3 rounded border space-y-3"
+									style={{ borderColor: theme.colors.border, backgroundColor: theme.colors.bgMain }}
+								>
+									<div>
+										<p className="text-sm font-semibold" style={{ color: theme.colors.textMain }}>
+											Sprint Planning Credentials
+										</p>
+										<p className="text-xs opacity-60 mt-0.5">
+											Used by the Sprint Backlog panel and drag/drop into MFE package cards.
+										</p>
+									</div>
+
+									<div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+										<div>
+											<label className="block text-xs opacity-60 mb-1">Organization</label>
+											<input
+												type="text"
+												value={adoOrganization}
+												onChange={(e) => setAdoOrganization(e.target.value)}
+												className="w-full rounded border px-2 py-1.5 text-sm bg-transparent outline-none"
+												style={{ borderColor: theme.colors.border, color: theme.colors.textMain }}
+												placeholder="my-org"
+											/>
+										</div>
+										<div>
+											<label className="block text-xs opacity-60 mb-1">Project</label>
+											<input
+												type="text"
+												value={adoProject}
+												onChange={(e) => setAdoProject(e.target.value)}
+												className="w-full rounded border px-2 py-1.5 text-sm bg-transparent outline-none"
+												style={{ borderColor: theme.colors.border, color: theme.colors.textMain }}
+												placeholder="my-project"
+											/>
+										</div>
+									</div>
+									<div>
+										<label className="block text-xs opacity-60 mb-1">
+											Team / Board (optional)
+										</label>
+										<input
+											type="text"
+											value={adoTeam}
+											onChange={(e) => setAdoTeam(e.target.value)}
+											className="w-full rounded border px-2 py-1.5 text-sm bg-transparent outline-none"
+											style={{ borderColor: theme.colors.border, color: theme.colors.textMain }}
+											placeholder="Team Name"
+										/>
+									</div>
+
+									<div>
+										<label className="block text-xs opacity-60 mb-1">
+											PAT {adoHasPat && !adoPatDirty ? '(stored)' : ''}
+										</label>
+										<input
+											type="password"
+											value={adoPat}
+											onChange={(e) => {
+												setAdoPat(e.target.value);
+												setAdoPatDirty(true);
+											}}
+											className="w-full rounded border px-2 py-1.5 text-sm bg-transparent outline-none"
+											style={{ borderColor: theme.colors.border, color: theme.colors.textMain }}
+											placeholder={adoHasPat ? 'Leave blank to keep current token' : 'Enter PAT'}
+										/>
+										<p className="text-[10px] mt-1.5 opacity-50">
+											Credentials are encrypted with Electron secure storage.
+										</p>
+									</div>
+
+									<div className="flex items-center gap-2">
+										<button
+											onClick={async () => {
+												setAdoSaving(true);
+												setAdoError(null);
+												try {
+													const result = await adoService.setSettings({
+														organization: adoOrganization,
+														project: adoProject,
+														team: adoTeam,
+														pat: adoPatDirty ? adoPat : undefined,
+													});
+													setAdoHasPat(result.hasPat);
+													setAdoPat('');
+													setAdoPatDirty(false);
+												} catch (error) {
+													setAdoError(
+														error instanceof Error
+															? error.message
+															: 'Failed to save Azure DevOps settings'
+													);
+												} finally {
+													setAdoSaving(false);
+												}
+											}}
+											disabled={adoSaving || !adoOrganization.trim() || !adoProject.trim()}
+											className="px-3 py-1.5 rounded text-xs font-medium transition-colors disabled:opacity-50"
+											style={{
+												backgroundColor: theme.colors.accent,
+												color: theme.colors.bgMain,
+											}}
+										>
+											{adoSaving ? 'Saving...' : 'Save ADO Settings'}
+										</button>
+										{adoHasPat && (
+											<span className="text-[10px] opacity-60" style={{ color: theme.colors.textDim }}>
+												PAT stored
+											</span>
+										)}
+									</div>
+
+									{adoError && (
+										<div
+											className="p-2 rounded text-xs flex items-start gap-2"
+											style={{
+												backgroundColor: theme.colors.error + '20',
+												color: theme.colors.error,
+											}}
+										>
+											<AlertTriangle className="w-3 h-3 flex-shrink-0 mt-0.5" />
+											<span>{adoError}</span>
 										</div>
 									)}
 								</div>

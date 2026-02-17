@@ -205,23 +205,23 @@ export const AGENT_CAPABILITIES: Record<string, AgentCapabilities> = {
 	'gemini-cli': {
 		supportsResume: false,
 		supportsReadOnlyMode: false,
-		supportsJsonOutput: false,
-		supportsSessionId: false,
+		supportsJsonOutput: false, // Parser supports JSON when present, but don't require it
+		supportsSessionId: true, // Parsed when Gemini includes session identifiers
 		supportsImageInput: true, // Gemini supports multimodal
 		supportsImageInputOnResume: false, // Not yet investigated
 		supportsSlashCommands: false,
 		supportsSessionStorage: false,
 		supportsCostTracking: false,
 		supportsUsageStats: false,
-		supportsBatchMode: false,
-		requiresPromptToStart: false, // Not yet investigated
-		supportsStreaming: true, // Likely streams
-		supportsResultMessages: false,
-		supportsModelSelection: false, // Not yet investigated
+		supportsBatchMode: true,
+		requiresPromptToStart: true, // Uses prompt flag mode
+		supportsStreaming: true,
+		supportsResultMessages: false, // Exit fallback emits accumulated streamed text
+		supportsModelSelection: true, // --model
 		supportsStreamJsonInput: false,
-		supportsThinkingDisplay: false, // Not yet investigated
-		supportsContextMerge: false, // Not yet investigated - PLACEHOLDER
-		supportsContextExport: false, // Not yet investigated - PLACEHOLDER
+		supportsThinkingDisplay: true, // Streams intermediate chunks line-by-line
+		supportsContextMerge: true, // Can receive merged context via prompt composition
+		supportsContextExport: false, // No stable session storage integration yet
 	},
 
 	/**

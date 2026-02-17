@@ -1,6 +1,8 @@
 import { ipcMain, BrowserWindow } from 'electron';
 import Store from 'electron-store';
 import * as os from 'os';
+import * as fs from 'fs/promises';
+import * as path from 'path';
 import { ProcessManager } from '../../process-manager';
 import { AgentDetector } from '../../agents';
 import { logger } from '../../utils/logger';
@@ -27,6 +29,28 @@ import { powerManager } from '../../power-manager';
 import { MaestroSettings } from './persistence';
 
 const LOG_CONTEXT = '[ProcessManager]';
+const GEMINI_CONTEXT_FILENAME = 'GEMINI.md';
+const GEMINI_CONTEXT_TEMPLATE = `# Gemini Session Context
+
+This session is managed by Maestro.
+
+## Constraints
+- Work only inside this repository/worktree unless explicitly asked.
+- Follow project instructions in AGENTS.md / CLAUDE.md when present.
+- Ask before destructive operations.
+`;
+
+async function ensureGeminiContextFile(worktreeRoot: string): Promise<void> {
+	const geminiFilePath = path.join(worktreeRoot, GEMINI_CONTEXT_FILENAME);
+	try {
+		await fs.access(geminiFilePath);
+		return;
+	} catch {
+		// Missing file - create a basic context file.
+	}
+
+	await fs.writeFile(geminiFilePath, GEMINI_CONTEXT_TEMPLATE, 'utf8');
+}
 
 /**
  * Helper to create handler options with consistent context
@@ -264,6 +288,42 @@ export function registerProcessHandlers(deps: ProcessHandlerDependencies): void 
 					config.sessionCustomContextWindow
 				);
 
+				// Gemini CLI session isolation:
+				// Gemini stores conversation state in .gemini/ under the working directory.
+				// Use a per-session cwd so parallel tabs/sessions don't overwrite each other.
+				// Preserve project context by adding --context <project-root>.
+				let effectiveCwd = config.cwd;
+				if (config.toolType === 'gemini-cli') {
+					const isSshGeminiSession = !!config.sessionSshRemoteConfig?.enabled;
+					const isAdoWorktreePath =
+						config.cwd.includes('-ado-worktrees') || config.cwd.includes(`${path.sep}ado-`);
+					const geminiSessionCwd = path.join(
+						config.cwd,
+						'.maestro',
+						'gemini-sessions',
+						config.sessionId
+					);
+					effectiveCwd = isAdoWorktreePath ? config.cwd : geminiSessionCwd;
+
+					// Local sessions: ensure local session cwd exists and a worktree-local GEMINI.md file is present.
+					// SSH sessions use remote paths, so local filesystem writes are skipped.
+					if (!isSshGeminiSession) {
+						if (!isAdoWorktreePath) {
+							await fs.mkdir(geminiSessionCwd, { recursive: true });
+						}
+						await ensureGeminiContextFile(config.cwd);
+					}
+
+					logger.info(`Configured Gemini session-isolated cwd`, LOG_CONTEXT, {
+						sessionId: config.sessionId,
+						toolType: config.toolType,
+						projectCwd: config.cwd,
+						effectiveCwd,
+						createdGeminiContextFile: !isSshGeminiSession,
+						isAdoWorktreePath,
+					});
+				}
+
 				// ========================================================================
 				// Command Resolution: Apply session-level custom path override if set
 				// This allows users to override the detected agent path per-session
@@ -401,7 +461,7 @@ export function registerProcessHandlers(deps: ProcessHandlerDependencies): void 
 						const sshCommand = await buildSshCommandWithStdin(sshResult.config, {
 							command: remoteCommand,
 							args: sshArgs,
-							cwd: config.cwd,
+							cwd: config.toolType === 'gemini-cli' ? config.cwd : effectiveCwd,
 							env: effectiveCustomEnvVars,
 							// prompt is not passed as CLI arg - it goes via stdinInput
 							stdinInput,
@@ -438,7 +498,7 @@ export function registerProcessHandlers(deps: ProcessHandlerDependencies): void 
 							sshBinary: sshCommand.command,
 							sshArgsCount: sshCommand.args.length,
 							remoteCommand,
-							remoteCwd: config.cwd,
+							remoteCwd: config.toolType === 'gemini-cli' ? config.cwd : effectiveCwd,
 							promptLength: config.prompt?.length,
 							stdinScriptLength: sshCommand.stdinScript?.length,
 							hasImages,
@@ -463,7 +523,7 @@ export function registerProcessHandlers(deps: ProcessHandlerDependencies): void 
 					// When using SSH, use user's home directory as local cwd
 					// The remote working directory is embedded in the SSH stdin script
 					// This fixes ENOENT errors when session.cwd is a remote-only path
-					cwd: sshRemoteUsed ? os.homedir() : config.cwd,
+					cwd: sshRemoteUsed ? os.homedir() : effectiveCwd,
 					// When using SSH, disable PTY (SSH provides its own terminal handling)
 					requiresPty: sshRemoteUsed ? false : agent?.requiresPty,
 					// For SSH, prompt is included in the stdin script, not passed separately

@@ -1081,7 +1081,7 @@ interface SessionListProps {
 	setDirectorNotesOpen: (open: boolean) => void;
 	setQuickActionOpen: (open: boolean) => void;
 	toggleGroup: (groupId: string) => void;
-	handleDragStart: (sessionId: string) => void;
+	handleDragStart: (sessionId: string, event: React.DragEvent<HTMLDivElement>) => void;
 	handleDragOver: (e: React.DragEvent) => void;
 	handleDropOnGroup: (groupId: string) => void;
 	handleDropOnUngrouped: () => void;
@@ -1553,9 +1553,9 @@ function SessionListInner(props: SessionListProps) {
 	}, [sessions, setActiveSessionId]);
 
 	const dragStartHandlers = useMemo(() => {
-		const map = new Map<string, () => void>();
+		const map = new Map<string, (event: React.DragEvent<HTMLDivElement>) => void>();
 		sessions.forEach((s) => {
-			map.set(s.id, () => handleDragStart(s.id));
+			map.set(s.id, (event: React.DragEvent<HTMLDivElement>) => handleDragStart(s.id, event));
 		});
 		return map;
 	}, [sessions, handleDragStart]);
