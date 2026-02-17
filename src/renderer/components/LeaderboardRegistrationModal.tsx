@@ -808,7 +808,7 @@ export function LeaderboardRegistrationModal({
 				<div className="p-5 space-y-4 overflow-y-auto">
 					{/* Info text */}
 					<p className="text-sm" style={{ color: theme.colors.textDim }}>
-						Join the global Maestro leaderboard at{' '}
+						Join the global Guru leaderboard at{' '}
 						<button
 							onClick={() => window.maestro.shell.openExternal('https://runmaestro.ai')}
 							className="inline-flex items-center gap-1 hover:underline"

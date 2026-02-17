@@ -233,11 +233,11 @@ export function useMainKeyboardHandler(): UseMainKeyboardHandlerReturn {
 					trackShortcut('moveToGroup');
 				}
 			} else if (ctx.isShortcut(e, 'cyclePrev')) {
-				// Cycle to previous Maestro session (global shortcut)
+				// Cycle to previous Guru session (global shortcut)
 				ctx.cycleSession('prev');
 				trackShortcut('cyclePrev');
 			} else if (ctx.isShortcut(e, 'cycleNext')) {
-				// Cycle to next Maestro session (global shortcut)
+				// Cycle to next Guru session (global shortcut)
 				ctx.cycleSession('next');
 				trackShortcut('cycleNext');
 			} else if (ctx.isShortcut(e, 'navBack')) {

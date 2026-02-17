@@ -109,7 +109,7 @@ ${docList}
 **Total tasks completed:** ${totalTasksCompleted}
 
 ---
-*This PR was automatically created by Maestro Auto Run.*`;
+*This PR was automatically created by Guru Auto Run.*`;
 		},
 		[]
 	);

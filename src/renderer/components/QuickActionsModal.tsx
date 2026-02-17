@@ -862,7 +862,7 @@ export function QuickActionsModal(props: QuickActionsModalProps) {
 		},
 		{
 			id: 'about',
-			label: 'About Maestro',
+			label: 'About Guru',
 			action: () => {
 				setAboutModalOpen(true);
 				setQuickActionOpen(false);
@@ -870,8 +870,8 @@ export function QuickActionsModal(props: QuickActionsModalProps) {
 		},
 		{
 			id: 'website',
-			label: 'Maestro Website',
-			subtext: 'Open the Maestro website',
+			label: 'Guru Website',
+			subtext: 'Open the Guru website',
 			action: () => {
 				window.maestro.shell.openExternal('https://runmaestro.ai/');
 				setQuickActionOpen(false);
@@ -880,7 +880,7 @@ export function QuickActionsModal(props: QuickActionsModalProps) {
 		{
 			id: 'docs',
 			label: 'Documentation and User Guide',
-			subtext: 'Open the Maestro documentation',
+			subtext: 'Open the Guru documentation',
 			action: () => {
 				window.maestro.shell.openExternal('https://docs.runmaestro.ai/');
 				setQuickActionOpen(false);
@@ -889,7 +889,7 @@ export function QuickActionsModal(props: QuickActionsModalProps) {
 		{
 			id: 'discord',
 			label: 'Join Discord',
-			subtext: 'Join the Maestro community',
+			subtext: 'Join the Guru community',
 			action: () => {
 				window.maestro.shell.openExternal('https://runmaestro.ai/discord');
 				setQuickActionOpen(false);
@@ -1011,7 +1011,7 @@ export function QuickActionsModal(props: QuickActionsModalProps) {
 			? [
 					{
 						id: 'openSymphony',
-						label: 'Maestro Symphony',
+						label: 'Guru Symphony',
 						shortcut: shortcuts.openSymphony,
 						subtext: 'Contribute to open source projects',
 						action: () => {

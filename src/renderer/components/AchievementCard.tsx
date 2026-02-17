@@ -483,7 +483,7 @@ export function AchievementCard({
 			'https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png'
 		);
 
-		// Load Maestro wand icon (local asset, doesn't need IPC fetch)
+		// Load Guru wand icon (local asset, doesn't need IPC fetch)
 		const wandIconImage = await new Promise<HTMLImageElement | null>((resolve) => {
 			const img = new Image();
 			img.onload = () => resolve(img);
@@ -555,12 +555,12 @@ export function AchievementCard({
 			ctx.lineWidth = 3;
 			ctx.stroke();
 
-			// Add Maestro wand badge in the bottom-right corner
+			// Add Guru wand badge in the bottom-right corner
 			const badgeRadius = 18;
 			const badgeX = iconX + iconRadius - 6;
 			const badgeY = iconY + iconRadius - 6;
 
-			// Draw the actual Maestro wand icon in a circular clip
+			// Draw the actual Guru wand icon in a circular clip
 			if (wandIconImage) {
 				ctx.save();
 				ctx.beginPath();
@@ -619,7 +619,7 @@ export function AchievementCard({
 		if (hasPersonalization && displayName) {
 			ctx.fillText(displayName.toUpperCase(), width / 2, titleY);
 		} else {
-			ctx.fillText('MAESTRO ACHIEVEMENTS', width / 2, titleY);
+			ctx.fillText('GURU ACHIEVEMENTS', width / 2, titleY);
 		}
 
 		// Badge info area
@@ -967,7 +967,7 @@ export function AchievementCard({
 				<div className="flex items-center gap-2">
 					<Trophy className="w-4 h-4" style={{ color: '#FFD700' }} />
 					<span className="text-sm font-bold" style={{ color: theme.colors.textMain }}>
-						Maestro Achievements
+						Guru Achievements
 					</span>
 				</div>
 
@@ -1023,12 +1023,12 @@ export function AchievementCard({
 
 			{/* Current badge display */}
 			<div className="flex items-center gap-4 mb-4">
-				{/* Maestro icon with circular progress ring */}
+				{/* Guru icon with circular progress ring */}
 				<div className="relative flex-shrink-0" style={{ width: 72, height: 72 }}>
 					{/* Circular progress ring - 11 segments */}
 					<BadgeProgressRing currentLevel={currentLevel} size={72} theme={theme} />
 
-					{/* Inner circle with Maestro icon - always use dark bg with light silhouette for visibility */}
+					{/* Inner circle with Guru icon - always use dark bg with light silhouette for visibility */}
 					<div
 						className="absolute rounded-full flex items-center justify-center overflow-hidden"
 						style={{

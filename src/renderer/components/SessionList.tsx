@@ -556,7 +556,7 @@ function HamburgerMenuContent({
 							Introductory Tour
 						</div>
 						<div className="text-xs" style={{ color: theme.colors.textDim }}>
-							Learn how to use Maestro
+							Learn how to use Guru
 						</div>
 					</div>
 				</button>
@@ -688,7 +688,7 @@ function HamburgerMenuContent({
 				<Music className="w-5 h-5" style={{ color: theme.colors.accent }} />
 				<div className="flex-1">
 					<div className="text-sm font-medium" style={{ color: theme.colors.textMain }}>
-						Maestro Symphony
+						Guru Symphony
 					</div>
 					<div className="text-xs" style={{ color: theme.colors.textDim }}>
 						Contribute to open source
@@ -737,7 +737,7 @@ function HamburgerMenuContent({
 				<Globe className="w-5 h-5" style={{ color: theme.colors.accent }} />
 				<div className="flex-1">
 					<div className="text-sm font-medium" style={{ color: theme.colors.textMain }}>
-						Maestro Website
+						Guru Website
 					</div>
 					<div className="text-xs" style={{ color: theme.colors.textDim }}>
 						Visit runmaestro.ai
@@ -790,7 +790,7 @@ function HamburgerMenuContent({
 				<Info className="w-5 h-5" style={{ color: theme.colors.accent }} />
 				<div className="flex-1">
 					<div className="text-sm font-medium" style={{ color: theme.colors.textMain }}>
-						About Maestro
+						About Guru
 					</div>
 					<div className="text-xs" style={{ color: theme.colors.textDim }}>
 						Version, Credits, Stats
@@ -1998,7 +1998,7 @@ function SessionListInner(props: SessionListProps) {
 								className="font-bold tracking-widest text-lg"
 								style={{ color: theme.colors.textMain }}
 							>
-								MAESTRO
+								GURU
 							</h1>
 							{/* Badge Level Indicator */}
 							{autoRunStats && autoRunStats.currentBadgeLevel > 0 && (
@@ -2076,14 +2076,14 @@ function SessionListInner(props: SessionListProps) {
 													{tunnelStatus === 'connected' ? (
 														<span className="text-blue-400">
 															{' '}
-															Remote tunnel active — access Maestro from anywhere, even outside your
+															Remote tunnel active — access Guru from anywhere, even outside your
 															network.
 														</span>
 													) : (
 														<span>
 															{' '}
 															Scan the QR code on your local network, or enable remote access to
-															control Maestro from anywhere.
+															control Guru from anywhere.
 														</span>
 													)}
 												</div>

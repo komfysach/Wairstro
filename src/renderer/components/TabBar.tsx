@@ -1567,7 +1567,7 @@ const FileTab = memo(function FileTab({
 
 /**
  * TabBar component for displaying AI session tabs.
- * Shows tabs for each Claude Code conversation within a Maestro session.
+ * Shows tabs for each Claude Code conversation within a Guru session.
  * Appears only in AI mode (hidden in terminal mode).
  */
 function TabBarInner({

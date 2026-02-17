@@ -304,7 +304,7 @@ export function StandingOvationOverlay({
 		ctx.font = 'bold 12px system-ui';
 		ctx.fillStyle = textDim;
 		ctx.textAlign = 'center';
-		ctx.fillText('MAESTRO • Agent Orchestration Command Center', width / 2, height - 20);
+		ctx.fillText('GURU • Agent Orchestration Command Center', width / 2, height - 20);
 
 		return canvas;
 	}, [badge, cumulativeTimeMs, recordTimeMs, isNewRecord, purpleAccent, theme.colors]);
@@ -429,7 +429,7 @@ export function StandingOvationOverlay({
 						</p>
 					</div>
 
-					{/* Maestro silhouette */}
+					{/* Guru silhouette */}
 					<div className="flex justify-center py-4">
 						<div
 							className="relative"
@@ -477,7 +477,7 @@ export function StandingOvationOverlay({
 							}}
 						>
 							<p className="text-xs mb-1" style={{ color: theme.colors.textDim }}>
-								Example Maestro
+								Example Guru
 							</p>
 							<p className="font-medium" style={{ color: theme.colors.textMain }}>
 								{badge.exampleConductor.name}

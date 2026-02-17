@@ -301,7 +301,7 @@ export const useAgentStore = create<AgentStore>()((set, get) => ({
 				// Process a message - spawn agent with the message text
 				let effectivePrompt = isImageOnlyMessage ? DEFAULT_IMAGE_ONLY_PROMPT : item.text!;
 
-				// For NEW sessions (no agentSessionId), prepend Maestro system prompt
+				// For NEW sessions (no agentSessionId), prepend Guru system prompt
 				const isNewSession = !tabAgentSessionId;
 				if (isNewSession && maestroSystemPrompt) {
 					let gitBranch: string | undefined;
@@ -390,7 +390,7 @@ export const useAgentStore = create<AgentStore>()((set, get) => ({
 						conductorProfile: deps.conductorProfile,
 					});
 
-					// For NEW sessions, prepend Maestro system prompt
+					// For NEW sessions, prepend Guru system prompt
 					const isNewSessionForCommand = !tabAgentSessionId;
 					let promptForAgent = substitutedPrompt;
 					if (isNewSessionForCommand && maestroSystemPrompt) {

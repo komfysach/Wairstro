@@ -125,11 +125,11 @@ export function AgentCreationDialog({
 				window.maestro.fs
 					.homeDir()
 					.then((homeDir) => {
-						setWorkingDirectory(`${homeDir}/Maestro-Symphony/${owner}-${repoName}`);
+						setWorkingDirectory(`${homeDir}/Guru-Symphony/${owner}-${repoName}`);
 					})
 					.catch(() => {
 						// Fallback to tilde (will be expanded in process-manager)
-						setWorkingDirectory(`~/Maestro-Symphony/${owner}-${repoName}`);
+						setWorkingDirectory(`~/Guru-Symphony/${owner}-${repoName}`);
 					});
 			}
 		}
@@ -571,7 +571,7 @@ export function AgentCreationDialog({
 								onChange={(e) => setWorkingDirectory(e.target.value)}
 								className="flex-1 px-3 py-2 rounded border bg-transparent outline-none text-sm focus:ring-1"
 								style={{ borderColor: theme.colors.border, color: theme.colors.textMain }}
-								placeholder="~/Maestro-Symphony/owner-repo"
+								placeholder="~/Guru-Symphony/owner-repo"
 							/>
 							<button
 								onClick={handleSelectFolder}

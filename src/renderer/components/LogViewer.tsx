@@ -375,7 +375,7 @@ export function LogViewer({
 			>
 				<div className="flex items-center gap-3">
 					<h2 className="text-lg font-bold" style={{ color: theme.colors.textMain }}>
-						Maestro System Logs
+						Guru System Logs
 					</h2>
 					<span className="text-xs opacity-50" style={{ color: theme.colors.textDim }}>
 						{filteredLogs.length} {filteredLogs.length === 1 ? 'entry' : 'entries'}
@@ -728,7 +728,7 @@ export function LogViewer({
 			{showClearConfirm && (
 				<ConfirmModal
 					theme={theme}
-					message="Are you sure you want to clear all Maestro system logs? This action cannot be undone."
+					message="Are you sure you want to clear all Guru system logs? This action cannot be undone."
 					onConfirm={handleClearLogs}
 					onClose={() => setShowClearConfirm(false)}
 				/>

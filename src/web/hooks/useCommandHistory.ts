@@ -1,5 +1,5 @@
 /**
- * useCommandHistory hook for Maestro mobile web interface
+ * useCommandHistory hook for Guru mobile web interface
  *
  * Manages command history storage and retrieval with localStorage persistence.
  * Provides methods to add, remove, and navigate through command history.

@@ -1161,19 +1161,19 @@ export function MarketplaceModal({
 											</h4>
 											<p className="text-xs mb-2" style={{ color: theme.colors.textDim }}>
 												Want to share your playbook with the community? Submit a pull request to the
-												Maestro-Playbooks repository:
+												Guru-Playbooks repository:
 											</p>
 											<button
 												onClick={() => {
 													window.maestro.shell.openExternal(
-														'https://github.com/RunMaestro/Maestro-Playbooks'
+														'https://github.com/RunMaestro/Guru-Playbooks'
 													);
 													setShowHelp(false);
 												}}
 												className="text-xs hover:opacity-80 transition-colors"
 												style={{ color: theme.colors.accent }}
 											>
-												github.com/RunMaestro/Maestro-Playbooks
+												github.com/RunMaestro/Guru-Playbooks
 											</button>
 											<div
 												className="mt-3 pt-3 border-t"
@@ -1194,7 +1194,7 @@ export function MarketplaceModal({
 								<button
 									onClick={() => {
 										window.maestro.shell.openExternal(
-											'https://github.com/RunMaestro/Maestro-Playbooks'
+											'https://github.com/RunMaestro/Guru-Playbooks'
 										);
 									}}
 									className="px-2 py-1 rounded hover:bg-white/10 transition-colors flex items-center gap-1.5 text-xs"

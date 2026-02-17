@@ -344,7 +344,7 @@ export function OpenSpecCommandsPanel({ theme }: OpenSpecCommandsPanelProps) {
 													color: theme.colors.accent,
 												}}
 											>
-												Maestro
+												Guru
 											</span>
 										)}
 										{cmd.isModified && (

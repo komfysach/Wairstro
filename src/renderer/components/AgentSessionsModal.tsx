@@ -24,8 +24,8 @@ interface AgentSession {
 	firstMessage: string;
 	messageCount: number;
 	sizeBytes: number;
-	sessionName?: string; // Named session from Maestro
-	starred?: boolean; // Starred status from Maestro
+	sessionName?: string; // Named session from Guru
+	starred?: boolean; // Starred status from Guru
 }
 
 interface SessionMessage {

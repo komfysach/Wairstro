@@ -11,7 +11,7 @@
  * - Import operations (download playbook to Auto Run folder)
  * - Document preview fetching (README, individual documents)
  *
- * The marketplace data is fetched from the Maestro-Playbooks GitHub repository
+ * The marketplace data is fetched from the Guru-Playbooks GitHub repository
  * and cached locally for 5 minutes to reduce API calls.
  */
 

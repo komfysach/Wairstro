@@ -1,5 +1,5 @@
 /**
- * Button component for Maestro web interface
+ * Button component for Guru web interface
  *
  * A reusable button component that supports multiple variants, sizes, and states.
  * Uses theme colors via CSS custom properties for consistent styling.
@@ -83,7 +83,7 @@ function LoadingSpinner({ size }: { size: ButtonSize }) {
 }
 
 /**
- * Button component for the Maestro web interface
+ * Button component for the Guru web interface
  *
  * @example
  * ```tsx

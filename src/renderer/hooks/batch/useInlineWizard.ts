@@ -134,9 +134,9 @@ export interface InlineWizardState {
 	currentDocumentIndex: number;
 	/** The Claude agent session ID (from session_id in output) - used to switch tab after wizard completes */
 	agentSessionId: string | null;
-	/** Subfolder name where documents were saved (e.g., "Maestro-Marketing") - used for tab naming after wizard completes */
+	/** Subfolder name where documents were saved (e.g., "Guru-Marketing") - used for tab naming after wizard completes */
 	subfolderName: string | null;
-	/** Full path to the subfolder where documents are saved (e.g., "/path/Auto Run Docs/Maestro-Marketing") */
+	/** Full path to the subfolder where documents are saved (e.g., "/path/Auto Run Docs/Guru-Marketing") */
 	subfolderPath: string | null;
 	/** User-configured Auto Run folder path (overrides default projectPath/Auto Run Docs) */
 	autoRunFolderPath: string | null;
@@ -1353,9 +1353,9 @@ export function useInlineWizard(): UseInlineWizardReturn {
 							current: finalDocs.length,
 							total: finalDocs.length,
 						},
-						// Store the subfolder name for tab naming (e.g., "Maestro-Marketing")
+						// Store the subfolder name for tab naming (e.g., "Guru-Marketing")
 						subfolderName: result.subfolderName || null,
-						// Store the full subfolder path for document loading (e.g., "/path/Auto Run Docs/Maestro-Marketing")
+						// Store the full subfolder path for document loading (e.g., "/path/Auto Run Docs/Guru-Marketing")
 						subfolderPath: result.subfolderPath || null,
 					}));
 

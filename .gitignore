@@ -54,3 +54,12 @@ yarn-error.log*
 .vscode/
 .VSCodeCounter
 .qodo
+
+# Build
+build/
+
+# Release
+release/
+
+# Scripts
+scripts/

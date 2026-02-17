@@ -30,7 +30,7 @@ interface AgentSelectionScreenProps {
 export interface AgentTile {
 	id: string;
 	name: string;
-	supported: boolean; // Whether Maestro supports this agent (only Claude for now)
+	supported: boolean; // Whether Guru supports this agent (only Claude for now)
 	description: string;
 	brandColor?: string; // Brand color for the logo
 }
@@ -666,7 +666,7 @@ export function AgentSelectionScreen({ theme }: AgentSelectionScreenProps): JSX.
 	const handleTileClick = useCallback(
 		(tile: AgentTile, index: number) => {
 			const detected = detectedAgents.find((a) => a.id === tile.id);
-			// Only allow selection if agent is both supported by Maestro AND detected on system
+			// Only allow selection if agent is both supported by Guru AND detected on system
 			if (tile.supported && detected?.available) {
 				setSelectedAgent(tile.id as any);
 				setFocusedTileIndex(index);
@@ -1070,7 +1070,7 @@ export function AgentSelectionScreen({ theme }: AgentSelectionScreenProps): JSX.
 			{/* Section 1: Header + Name/Location Row */}
 			<div className="flex flex-col items-center gap-4">
 				<h3 className="text-2xl font-semibold" style={{ color: theme.colors.textMain }}>
-					Create a Maestro Agent
+					Create a Guru Agent
 				</h3>
 
 				{/* Name + Location Row */}

@@ -1,9 +1,9 @@
 /**
- * Maestro Mobile Web Service Worker
+ * Guru Mobile Web Service Worker
  *
  * Provides offline capability for the mobile web interface.
  * When offline, displays a disconnected state to inform the user
- * that they cannot communicate with the Maestro desktop app.
+ * that they cannot communicate with the Guru desktop app.
  *
  * Strategy:
  * - Cache essential app shell (HTML, CSS, JS, icons) on install
@@ -95,7 +95,7 @@ self.addEventListener('fetch', (event) => {
         return new Response(
           JSON.stringify({
             error: 'offline',
-            message: 'You are offline. Please reconnect to use Maestro.',
+            message: 'You are offline. Please reconnect to use Guru.',
           }),
           {
             status: 503,

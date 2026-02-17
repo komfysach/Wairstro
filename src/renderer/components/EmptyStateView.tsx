@@ -42,6 +42,11 @@ export function EmptyStateView({
 }: EmptyStateViewProps) {
 	const [menuOpen, setMenuOpen] = useState(false);
 	const menuRef = useRef<HTMLDivElement>(null);
+	const guruBrand = {
+		deepBlue: '#123b6f',
+		brightBlue: '#255d98',
+		cream: '#fff5d9',
+	};
 
 	// Close menu when clicking outside
 	useClickOutside(menuRef, () => setMenuOpen(false), menuOpen);
@@ -70,12 +75,12 @@ export function EmptyStateView({
 			>
 				{/* Left: Logo and Name */}
 				<div className="flex items-center gap-2">
-					<Wand2 className="w-5 h-5" style={{ color: theme.colors.accent }} />
+					<Wand2 className="w-5 h-5" style={{ color: guruBrand.brightBlue }} />
 					<h1
 						className="font-bold tracking-widest text-lg"
 						style={{ color: theme.colors.textMain }}
 					>
-						MAESTRO
+						GURU
 					</h1>
 				</div>
 
@@ -107,7 +112,7 @@ export function EmptyStateView({
 									}}
 									className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md hover:bg-white/10 transition-colors text-left"
 								>
-									<Wand2 className="w-5 h-5" style={{ color: theme.colors.accent }} />
+									<Wand2 className="w-5 h-5" style={{ color: guruBrand.brightBlue }} />
 									<div className="flex-1">
 										<div className="text-sm font-medium" style={{ color: theme.colors.textMain }}>
 											New Agent Wizard
@@ -135,7 +140,7 @@ export function EmptyStateView({
 										}}
 										className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md hover:bg-white/10 transition-colors text-left"
 									>
-										<Compass className="w-5 h-5" style={{ color: theme.colors.accent }} />
+										<Compass className="w-5 h-5" style={{ color: guruBrand.brightBlue }} />
 										<div className="flex-1">
 											<div className="text-sm font-medium" style={{ color: theme.colors.textMain }}>
 												Take a Tour
@@ -227,7 +232,7 @@ export function EmptyStateView({
 									<Globe className="w-5 h-5" style={{ color: theme.colors.textDim }} />
 									<div className="flex-1">
 										<div className="text-sm font-medium" style={{ color: theme.colors.textMain }}>
-											Maestro Website
+											Guru Website
 										</div>
 										<div className="text-xs" style={{ color: theme.colors.textDim }}>
 											Visit runmaestro.ai
@@ -265,7 +270,7 @@ export function EmptyStateView({
 									<Info className="w-5 h-5" style={{ color: theme.colors.textDim }} />
 									<div className="flex-1">
 										<div className="text-sm font-medium" style={{ color: theme.colors.textMain }}>
-											About Maestro
+											About Guru
 										</div>
 										<div className="text-xs" style={{ color: theme.colors.textDim }}>
 											Version, Credits, Stats
@@ -287,7 +292,10 @@ export function EmptyStateView({
 					<button
 						onClick={onNewAgent}
 						className="flex items-center justify-center gap-3 px-8 py-4 rounded-lg text-base font-bold transition-colors hover:opacity-90 min-w-[180px]"
-						style={{ backgroundColor: theme.colors.accent, color: theme.colors.accentForeground }}
+						style={{
+							background: `linear-gradient(135deg, ${guruBrand.brightBlue} 0%, ${guruBrand.deepBlue} 100%)`,
+							color: guruBrand.cream,
+						}}
 					>
 						<Bot className="w-5 h-5" />
 						New Agent
@@ -295,7 +303,10 @@ export function EmptyStateView({
 					<button
 						onClick={onOpenWizard}
 						className="flex items-center justify-center gap-3 px-8 py-4 rounded-lg text-base font-bold transition-colors hover:opacity-90 min-w-[180px]"
-						style={{ backgroundColor: theme.colors.accent, color: theme.colors.accentForeground }}
+						style={{
+							background: `linear-gradient(135deg, ${guruBrand.brightBlue} 0%, ${guruBrand.deepBlue} 100%)`,
+							color: guruBrand.cream,
+						}}
 					>
 						<Wand2 className="w-5 h-5" />
 						Wizard

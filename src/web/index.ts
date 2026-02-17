@@ -1,8 +1,8 @@
 /**
- * Maestro Web Interface
+ * Guru Web Interface
  *
  * This module contains shared components, hooks, and utilities
- * for the Maestro web interface (both mobile and desktop web).
+ * for the Guru web interface (both mobile and desktop web).
  */
 
 // Components

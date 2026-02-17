@@ -6,7 +6,7 @@
  * - Customize moderator settings (CLI args, path, ENV vars) via expandable panel
  * - Enter a name for the group chat
  *
- * Only shows agents that are both supported by Maestro and detected on the system.
+ * Only shows agents that are both supported by Guru and detected on the system.
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react';
@@ -309,7 +309,7 @@ export function NewGroupChatModal({
 					A Group Chat lets you collaborate with multiple AI agents in a single conversation. The{' '}
 					<span style={{ color: theme.colors.textMain }}>moderator</span> manages the conversation
 					flow, deciding when to involve other agents. You can{' '}
-					<span style={{ color: theme.colors.accent }}>@mention</span> any agent defined in Maestro
+					<span style={{ color: theme.colors.accent }}>@mention</span> any agent defined in Guru
 					to bring them into the discussion. We're still working on this feature, but right now
 					Claude appears to be the best performing moderator.
 				</div>

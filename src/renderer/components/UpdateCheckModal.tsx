@@ -104,7 +104,7 @@ export function UpdateCheckModal({ theme, onClose }: UpdateCheckModalProps) {
 				assetsReady: false,
 				versionsBehind: 0,
 				releases: [],
-				releasesUrl: 'https://github.com/RunMaestro/Maestro/releases',
+				releasesUrl: 'https://github.com/RunMaestro/Guru/releases',
 				error: error instanceof Error ? error.message : 'Failed to check for updates',
 			});
 		} finally {
@@ -545,13 +545,13 @@ export function UpdateCheckModal({ theme, onClose }: UpdateCheckModalProps) {
 								You're up to date!
 							</div>
 							<div className="text-xs font-mono" style={{ color: theme.colors.textDim }}>
-								Maestro v{result?.currentVersion || __APP_VERSION__}
+								Guru v{result?.currentVersion || __APP_VERSION__}
 							</div>
 						</div>
 						<button
 							onClick={() =>
 								window.maestro.shell.openExternal(
-									result?.releasesUrl || 'https://github.com/RunMaestro/Maestro/releases'
+									result?.releasesUrl || 'https://github.com/RunMaestro/Guru/releases'
 								)
 							}
 							className="flex items-center gap-2 text-xs hover:underline mt-2"

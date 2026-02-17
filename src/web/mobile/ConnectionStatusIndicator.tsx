@@ -1,5 +1,5 @@
 /**
- * ConnectionStatusIndicator component for Maestro mobile web
+ * ConnectionStatusIndicator component for Guru mobile web
  *
  * A persistent, compact banner that shows connection status and provides
  * retry functionality. Displays as a dismissible banner when connection

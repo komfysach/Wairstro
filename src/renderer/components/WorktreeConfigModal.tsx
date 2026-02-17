@@ -305,7 +305,7 @@ export function WorktreeConfigModal({
 								Watch for new worktrees
 							</div>
 							<p className="text-[10px]" style={{ color: theme.colors.textDim }}>
-								Auto-detect worktrees created outside Maestro
+								Auto-detect worktrees created outside Guru
 							</p>
 						</div>
 						<button

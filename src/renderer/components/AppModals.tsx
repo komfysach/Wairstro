@@ -1602,7 +1602,7 @@ export interface AppAgentModalsProps {
  * - AgentErrorModal: Display agent errors with recovery options (agents and group chats)
  * - MergeSessionModal: Merge current context into another session
  * - TransferProgressModal: Show progress during cross-agent context transfer
- * - SendToAgentModal: Send session context to another Maestro session
+ * - SendToAgentModal: Send session context to another Guru session
  */
 export function AppAgentModals({
 	theme,

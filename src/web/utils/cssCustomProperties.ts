@@ -1,5 +1,5 @@
 /**
- * CSS Custom Properties Generator for Maestro Web Interface
+ * CSS Custom Properties Generator for Guru Web Interface
  *
  * Converts theme colors to CSS custom properties (CSS variables) that can be
  * injected into the DOM. This allows dynamic theme switching in the web interface.

@@ -122,9 +122,9 @@ export const tourSteps: TourStepConfig[] = [
 		id: 'history-tab',
 		title: 'History & Tracking',
 		description:
-			'The History tab tracks all AI interactions in your session. Auto Run entries are tracked automatically, and separate from manual interactions. You can toggle history per-message using the "History" bubble (with the clock icon) in the input area. Configure the default value under Settings → General.\n\nSwitch between the list view and the details view to drill into any entry. From the details view you can also resume the session where that entry took place.\n\nHistory also serves as memory for all Maestro agents—they know how to locate and parse the history file, giving them context about prior work. Press {{goToHistory}} to jump here.',
+			'The History tab tracks all AI interactions in your session. Auto Run entries are tracked automatically, and separate from manual interactions. You can toggle history per-message using the "History" bubble (with the clock icon) in the input area. Configure the default value under Settings → General.\n\nSwitch between the list view and the details view to drill into any entry. From the details view you can also resume the session where that entry took place.\n\nHistory also serves as memory for all Guru agents—they know how to locate and parse the history file, giving them context about prior work. Press {{goToHistory}} to jump here.',
 		descriptionGeneric:
-			'The History tab tracks all AI interactions in your session. Auto Run entries are tracked automatically, and separate from manual interactions. You can toggle history per-message using the "History" bubble (with the clock icon) in the input area. Configure the default value under Settings → General.\n\nSwitch between the list view and the details view to drill into any entry. From the details view you can also resume the session where that entry took place.\n\nHistory also serves as memory for all Maestro agents—they know how to locate and parse the history file, giving them context about prior work. Press {{goToHistory}} to jump here.',
+			'The History tab tracks all AI interactions in your session. Auto Run entries are tracked automatically, and separate from manual interactions. You can toggle history per-message using the "History" bubble (with the clock icon) in the input area. Configure the default value under Settings → General.\n\nSwitch between the list view and the details view to drill into any entry. From the details view you can also resume the session where that entry took place.\n\nHistory also serves as memory for all Guru agents—they know how to locate and parse the history file, giving them context about prior work. Press {{goToHistory}} to jump here.',
 		wide: true,
 		selector: '[data-tour="history-tab"]',
 		position: 'left',
@@ -146,9 +146,9 @@ export const tourSteps: TourStepConfig[] = [
 		id: 'remote-control',
 		title: 'Remote Control',
 		description:
-			'The LIVE/OFFLINE indicator controls a built-in web interface for remote access. Toggle it on to generate a local URL and QR code—scan it with your phone to control Maestro from the couch, the kitchen, or anywhere on your network.\n\nIf you have Cloudflare Tunnel (cloudflared) installed, one click opens a secure tunnel—no API keys, no login, no configuration. Access Maestro from anywhere, even outside your home network.',
+			'The LIVE/OFFLINE indicator controls a built-in web interface for remote access. Toggle it on to generate a local URL and QR code—scan it with your phone to control Guru from the couch, the kitchen, or anywhere on your network.\n\nIf you have Cloudflare Tunnel (cloudflared) installed, one click opens a secure tunnel—no API keys, no login, no configuration. Access Guru from anywhere, even outside your home network.',
 		descriptionGeneric:
-			'The LIVE/OFFLINE indicator controls a built-in web interface for remote access. Toggle it on to generate a local URL and QR code—scan it with your phone to control Maestro from anywhere on your network.\n\nIf you have Cloudflare Tunnel (cloudflared) installed, one click opens a secure tunnel—no API keys, no login, no configuration. Access Maestro from anywhere, even outside your home network.',
+			'The LIVE/OFFLINE indicator controls a built-in web interface for remote access. Toggle it on to generate a local URL and QR code—scan it with your phone to control Guru from anywhere on your network.\n\nIf you have Cloudflare Tunnel (cloudflared) installed, one click opens a secure tunnel—no API keys, no login, no configuration. Access Guru from anywhere, even outside your home network.',
 		wide: true,
 		selector: '[data-tour="remote-control"]',
 		position: 'right',
@@ -219,9 +219,9 @@ export const tourSteps: TourStepConfig[] = [
 		id: 'keyboard-shortcuts',
 		title: 'Keyboard Shortcuts',
 		description:
-			"Maestro is keyboard-first. Press {{help}} anytime to see all available shortcuts. You're now ready to build amazing things!",
+			"Guru is keyboard-first. Press {{help}} anytime to see all available shortcuts. You're now ready to build amazing things!",
 		descriptionGeneric:
-			"Maestro is keyboard-first. Press {{help}} anytime to see all available shortcuts. You're ready to go!",
+			"Guru is keyboard-first. Press {{help}} anytime to see all available shortcuts. You're ready to go!",
 		selector: null, // Center screen, no specific element
 		position: 'center',
 		uiActions: [],

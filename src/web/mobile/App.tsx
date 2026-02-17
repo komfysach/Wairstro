@@ -1,5 +1,5 @@
 /**
- * Maestro Web Remote Control
+ * Guru Web Remote Control
  *
  * Lightweight interface for controlling sessions from mobile/tablet devices.
  * Focused on quick command input and session monitoring.
@@ -55,7 +55,7 @@ function getActiveTabFromSession(session: Session | null | undefined): AITabData
 
 /**
  * Header component for the mobile app
- * Compact single-line header showing: Maestro | Session Name | Claude ID | Status | Cost | Context
+ * Compact single-line header showing: Guru | Session Name | Claude ID | Status | Cost | Context
  */
 interface MobileHeaderProps {
 	activeSession?: Session | null;
@@ -101,7 +101,7 @@ function MobileHeader({ activeSession }: MobileHeaderProps) {
 				gap: '8px',
 			}}
 		>
-			{/* Left: Maestro logo with wand icon */}
+			{/* Left: Guru logo with wand icon */}
 			<div
 				onClick={isSession ? goToDashboard : undefined}
 				style={{
@@ -140,7 +140,7 @@ function MobileHeader({ activeSession }: MobileHeaderProps) {
 						color: colors.textMain,
 					}}
 				>
-					Maestro
+					Guru
 				</span>
 			</div>
 
@@ -830,7 +830,7 @@ export default function MobileApp() {
 						You're Offline
 					</h2>
 					<p style={{ fontSize: '14px', color: colors.textDim, marginBottom: '12px' }}>
-						No internet connection. Maestro requires a network connection to communicate with your
+						No internet connection. Guru requires a network connection to communicate with your
 						desktop app.
 					</p>
 					<p style={{ fontSize: '12px', color: colors.textDim }}>
@@ -856,7 +856,7 @@ export default function MobileApp() {
 						Connection Lost
 					</h2>
 					<p style={{ fontSize: '14px', color: colors.textDim, marginBottom: '12px' }}>
-						{error || 'Unable to connect to Maestro desktop app.'}
+						{error || 'Unable to connect to Guru desktop app.'}
 					</p>
 					<p style={{ fontSize: '12px', color: colors.textDim, marginBottom: '12px' }}>
 						Reconnecting in {reconnectCountdown}s...
@@ -894,7 +894,7 @@ export default function MobileApp() {
 					}}
 				>
 					<h2 style={{ fontSize: '16px', marginBottom: '8px', color: colors.textMain }}>
-						Connecting to Maestro...
+						Connecting to Guru...
 					</h2>
 					<p style={{ fontSize: '14px', color: colors.textDim }}>
 						Please wait while we establish a connection to your desktop app.
@@ -1117,7 +1117,7 @@ export default function MobileApp() {
 					{/* Show help text only when disconnected/connecting */}
 					{connectionState !== 'connected' && connectionState !== 'authenticated' && (
 						<p style={{ fontSize: '12px', color: colors.textDim }}>
-							Make sure Maestro desktop app is running
+							Make sure Guru desktop app is running
 						</p>
 					)}
 				</div>

@@ -1,5 +1,5 @@
 // Tab helper functions for AI multi-tab support
-// These helpers manage AITab state within Maestro sessions
+// These helpers manage AITab state within Guru sessions
 
 import {
 	Session,
@@ -114,7 +114,7 @@ export function hasActiveWizard(tab: AITab): boolean {
  *
  * This helper consolidates the tab filtering logic used by navigation functions.
  *
- * @param session - The Maestro session containing tabs
+ * @param session - The Guru session containing tabs
  * @param showUnreadOnly - If true, filter to only unread tabs and tabs with drafts
  * @returns Array of navigable AITabs (may be empty if session has no tabs or filter excludes all)
  *
@@ -143,7 +143,7 @@ export function getNavigableTabs(session: Session, showUnreadOnly = false): AITa
  * Returns the tab matching activeTabId, or the first tab if not found.
  * Returns undefined if the session has no tabs.
  *
- * @param session - The Maestro session
+ * @param session - The Guru session
  * @returns The active AITab or undefined if no tabs exist
  */
 export function getActiveTab(session: Session): AITab | undefined {
@@ -183,7 +183,7 @@ export interface CreateTabResult {
  * Create a new AI tab for a session.
  * The new tab is appended to the session's aiTabs array and set as the active tab.
  *
- * @param session - The Maestro session to add the tab to
+ * @param session - The Guru session to add the tab to
  * @param options - Optional tab configuration (agentSessionId, logs, name, starred)
  * @returns Object containing the new tab and updated session
  *
@@ -276,7 +276,7 @@ export interface CloseTabResult {
  * When showUnreadOnly is true, prioritizes switching to the next unread tab.
  * If closing the last tab, a fresh new tab is created to replace it.
  *
- * @param session - The Maestro session containing the tab
+ * @param session - The Guru session containing the tab
  * @param tabId - The ID of the tab to close
  * @param showUnreadOnly - If true, prioritize switching to the next unread tab
  * @param options - Optional close options (e.g., skipHistory for wizard tabs)
@@ -418,7 +418,7 @@ export interface ReopenTabResult {
  * The tab is restored at its original index position if possible, otherwise appended to the end.
  * The reopened tab becomes the active tab.
  *
- * @param session - The Maestro session
+ * @param session - The Guru session
  * @returns Object containing the reopened tab and updated session, or null if no closed tabs exist
  *
  * @example
@@ -503,7 +503,7 @@ export interface CloseFileTabResult {
  * Close a file preview tab and add it to the unified closed tab history.
  * When the closed tab was active, selects the next tab in unifiedTabOrder.
  *
- * @param session - The Maestro session containing the file tab
+ * @param session - The Guru session containing the file tab
  * @param tabId - The ID of the file tab to close
  * @returns Object containing the closed tab entry and updated session, or null if tab not found
  *
@@ -606,7 +606,7 @@ export function closeFileTab(session: Session, tabId: string): CloseFileTabResul
  * Note: This only adds to the unified history - the existing closeTab function already
  * handles the legacy closedTabHistory for backwards compatibility.
  *
- * @param session - The Maestro session
+ * @param session - The Guru session
  * @param aiTab - The AI tab being closed
  * @param unifiedIndex - The tab's position in unifiedTabOrder
  * @returns Updated session with the tab added to unified history
@@ -653,7 +653,7 @@ export interface ReopenUnifiedClosedTabResult {
  * The tab is restored at its original unified index position if possible.
  * The reopened tab becomes the active tab.
  *
- * @param session - The Maestro session
+ * @param session - The Guru session
  * @returns Object containing the reopened tab info and updated session, or null if no closed tabs exist
  *
  * @example
@@ -833,7 +833,7 @@ export interface SetActiveTabResult {
  * Set the active AI tab for a session.
  * Changes which tab is currently displayed and receives input.
  *
- * @param session - The Maestro session
+ * @param session - The Guru session
  * @param tabId - The ID of the tab to make active
  * @returns Object containing the active tab and updated session, or null if tab not found
  *
@@ -877,10 +877,10 @@ export function setActiveTab(session: Session, tabId: string): SetActiveTabResul
 
 /**
  * Get the tab that is currently in write mode (busy state) for a session.
- * In write-mode locking, only one tab can be busy at a time per Maestro session
+ * In write-mode locking, only one tab can be busy at a time per Guru session
  * to prevent file clobbering when multiple Claude sessions write to the same project.
  *
- * @param session - The Maestro session
+ * @param session - The Guru session
  * @returns The busy AITab or undefined if no tab is in write mode
  *
  * @example
@@ -906,7 +906,7 @@ export function getWriteModeTab(session: Session): AITab | undefined {
  * This is useful for the busy tab indicator which needs to show ALL busy tabs,
  * not just the first one found.
  *
- * @param session - The Maestro session
+ * @param session - The Guru session
  * @returns Array of busy AITabs (empty if none are busy)
  *
  * @example
@@ -931,7 +931,7 @@ export function getBusyTabs(session: Session): AITab[] {
  * Wraps around to the first tab if currently on the last tab.
  * When showUnreadOnly is true, only cycles through unread tabs and tabs with drafts.
  *
- * @param session - The Maestro session
+ * @param session - The Guru session
  * @param showUnreadOnly - If true, only navigate through unread tabs and tabs with drafts
  * @returns Object containing the new active tab and updated session, or null if less than 2 tabs
  *
@@ -993,7 +993,7 @@ export function navigateToNextTab(
  * Wraps around to the last tab if currently on the first tab.
  * When showUnreadOnly is true, only cycles through unread tabs and tabs with drafts.
  *
- * @param session - The Maestro session
+ * @param session - The Guru session
  * @param showUnreadOnly - If true, only navigate through unread tabs and tabs with drafts
  * @returns Object containing the new active tab and updated session, or null if less than 2 tabs
  *
@@ -1055,7 +1055,7 @@ export function navigateToPrevTab(
  * Used for Cmd+1 through Cmd+8 shortcuts.
  * When showUnreadOnly is true, navigates within the filtered list (unread + drafts).
  *
- * @param session - The Maestro session
+ * @param session - The Guru session
  * @param index - The 0-based index of the tab to navigate to
  * @param showUnreadOnly - If true, navigate within unread tabs and tabs with drafts
  * @returns Object containing the new active tab and updated session, or null if index out of bounds
@@ -1107,7 +1107,7 @@ export function navigateToTabByIndex(
  * Used for Cmd+0 shortcut.
  * When showUnreadOnly is true, navigates to the last tab in the filtered list (unread + drafts).
  *
- * @param session - The Maestro session
+ * @param session - The Guru session
  * @param showUnreadOnly - If true, navigate to last unread/draft tab
  * @returns Object containing the new active tab and updated session, or null if no tabs
  *
@@ -1145,7 +1145,7 @@ export interface NavigateToUnifiedTabResult {
  * Used for Cmd+1 through Cmd+9 shortcuts to jump to tabs by position.
  * Works with both AI tabs and file preview tabs in the unified tab system.
  *
- * @param session - The Maestro session
+ * @param session - The Guru session
  * @param index - The 0-based index in unifiedTabOrder
  * @returns Object with the tab type, id, and updated session, or null if index out of bounds
  *
@@ -1230,7 +1230,7 @@ export function navigateToUnifiedTabByIndex(
  * Navigate to the last tab in the unified tab order.
  * Used for Cmd+0 shortcut.
  *
- * @param session - The Maestro session
+ * @param session - The Guru session
  * @returns Object with the tab type, id, and updated session, or null if no tabs
  */
 export function navigateToLastUnifiedTab(session: Session): NavigateToUnifiedTabResult | null {
@@ -1246,7 +1246,7 @@ export function navigateToLastUnifiedTab(session: Session): NavigateToUnifiedTab
  * Get the current index in the unified tab order.
  * Returns the index of the currently active tab (file tab if active, otherwise AI tab).
  *
- * @param session - The Maestro session
+ * @param session - The Guru session
  * @returns The index in unifiedTabOrder, or -1 if not found
  */
 function getCurrentUnifiedTabIndex(session: Session): number {
@@ -1275,7 +1275,7 @@ function getCurrentUnifiedTabIndex(session: Session): number {
  * Note: The showUnreadOnly parameter is included for API compatibility but
  * only filters AI tabs - file tabs are always included in navigation.
  *
- * @param session - The Maestro session
+ * @param session - The Guru session
  * @param showUnreadOnly - If true, skip AI tabs that are not unread and don't have drafts
  * @returns Object with the tab type, id, and updated session, or null if no navigation possible
  *
@@ -1335,7 +1335,7 @@ export function navigateToNextUnifiedTab(
  * Note: The showUnreadOnly parameter is included for API compatibility but
  * only filters AI tabs - file tabs are always included in navigation.
  *
- * @param session - The Maestro session
+ * @param session - The Guru session
  * @param showUnreadOnly - If true, skip AI tabs that are not unread and don't have drafts
  * @returns Object with the tab type, id, and updated session, or null if no navigation possible
  *
@@ -1400,7 +1400,7 @@ export interface CreateTabAtPositionOptions extends CreateTabOptions {
  * Create a new AI tab at a specific position in the session's tab list.
  * The new tab is inserted immediately after the specified tab.
  *
- * @param session - The Maestro session to add the tab to
+ * @param session - The Guru session to add the tab to
  * @param options - Tab configuration including position (afterTabId)
  * @returns Object containing the new tab and updated session, or null on error
  *
@@ -1472,7 +1472,7 @@ export interface CreateMergedSessionResult {
 }
 
 /**
- * Create a new Maestro session pre-populated with merged context logs.
+ * Create a new Guru session pre-populated with merged context logs.
  * This is used when merging multiple sessions/tabs into a unified context
  * or when transferring context to a different agent type.
  *

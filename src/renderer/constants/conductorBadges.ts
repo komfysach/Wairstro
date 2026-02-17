@@ -154,7 +154,7 @@ export const CONDUCTOR_BADGES: ConductorBadge[] = [
 	{
 		id: 'maestro-emeritus',
 		level: 8,
-		name: 'Maestro Emeritus',
+		name: 'Guru Emeritus',
 		shortName: 'Emeritus',
 		description:
 			'An honorific status for legendary figures who shaped an orchestra. Still guest-conducts, but with legacy-level reverence.',
@@ -172,7 +172,7 @@ export const CONDUCTOR_BADGES: ConductorBadge[] = [
 	{
 		id: 'world-maestro',
 		level: 9,
-		name: 'World Maestro',
+		name: 'World Guru',
 		shortName: 'World',
 		description:
 			'Conducts top orchestras globally. Commands rarefied fees and has a distinctive interpretive "voice" recognized worldwide.',
@@ -190,7 +190,7 @@ export const CONDUCTOR_BADGES: ConductorBadge[] = [
 	{
 		id: 'grand-maestro',
 		level: 10,
-		name: 'Grand Maestro',
+		name: 'Grand Guru',
 		shortName: 'Grand',
 		description:
 			'Among the top 20 living conductors. Near-universal critical acclaim, regularly leads elite orchestras worldwide. Known for landmark recordings and signature interpretations.',

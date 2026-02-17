@@ -76,7 +76,7 @@ export function NotificationsPanel({
 				<button
 					onClick={() =>
 						window.maestro.notification.show(
-							'Maestro',
+							'Guru',
 							'Test notification - notifications are working!'
 						)
 					}
@@ -145,7 +145,7 @@ export function NotificationsPanel({
 									setTestError(null);
 									try {
 										const result = await window.maestro.notification.speak(
-											"Howdy, I'm Maestro, here to conduct your agentic tools into a well-tuned symphony.",
+											"Howdy, I'm Guru, here to conduct your agentic tools into a well-tuned symphony.",
 											audioFeedbackCommand
 										);
 										console.log('[Notification] Speak result:', result);

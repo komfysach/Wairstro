@@ -1,5 +1,5 @@
 /**
- * Web interface components for Maestro
+ * Web interface components for Guru
  *
  * Shared components used by both mobile and desktop web interfaces.
  */

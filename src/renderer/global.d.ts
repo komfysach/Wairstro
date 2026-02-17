@@ -1922,7 +1922,7 @@ interface MaestroAPI {
 			deltaMs?: number;
 			deltaRuns?: number;
 			// Installation tracking for multi-device differentiation
-			installationId?: string; // Unique GUID per Maestro installation (auto-injected by main process)
+			installationId?: string; // Unique GUID per Guru installation (auto-injected by main process)
 			clientTotalTimeMs?: number; // Client's self-proclaimed total time (for discrepancy detection)
 		}) => Promise<{
 			success: boolean;

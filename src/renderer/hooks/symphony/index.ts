@@ -1,5 +1,5 @@
 /**
- * Maestro Symphony Hooks
+ * Guru Symphony Hooks
  *
  * Central exports for all Symphony-related React hooks.
  */

@@ -1,7 +1,7 @@
 /**
  * SymphonyModal
  *
- * Unified modal for Maestro Symphony feature with four tabs:
+ * Unified modal for Guru Symphony feature with four tabs:
  * - Projects: Browse repositories with runmaestro.ai labeled issues
  * - Active: Manage in-progress contributions
  * - History: View completed contributions
@@ -552,7 +552,7 @@ function RepositoryDetailView({
 					<div className="flex items-center gap-2">
 						<Music className="w-5 h-5" style={{ color: theme.colors.accent }} />
 						<h2 className="text-lg font-semibold" style={{ color: theme.colors.textMain }}>
-							Maestro Symphony: {repo.name}
+							Guru Symphony: {repo.name}
 						</h2>
 					</div>
 				</div>
@@ -1398,7 +1398,7 @@ export function SymphonyModal({
 				blocksLowerLayers: true,
 				capturesFocus: true,
 				focusTrap: 'strict',
-				ariaLabel: 'Maestro Symphony',
+				ariaLabel: 'Guru Symphony',
 				onEscape: () => {
 					if (showHelpRef.current) {
 						setShowHelp(false);
@@ -1740,7 +1740,7 @@ export function SymphonyModal({
 									className="text-lg font-semibold"
 									style={{ color: theme.colors.textMain }}
 								>
-									Maestro Symphony
+									Guru Symphony
 								</h2>
 								{/* Help button */}
 								<div className="relative">
@@ -1748,7 +1748,7 @@ export function SymphonyModal({
 										ref={helpButtonRef}
 										onClick={() => setShowHelp(!showHelp)}
 										className="p-1 rounded hover:bg-white/10 transition-colors"
-										title="About Maestro Symphony"
+										title="About Guru Symphony"
 										aria-label="Help"
 									>
 										<HelpCircle className="w-4 h-4" style={{ color: theme.colors.textDim }} />
@@ -1765,10 +1765,10 @@ export function SymphonyModal({
 												className="text-sm font-semibold mb-2"
 												style={{ color: theme.colors.textMain }}
 											>
-												About Maestro Symphony
+												About Guru Symphony
 											</h3>
 											<p className="text-xs mb-3" style={{ color: theme.colors.textDim }}>
-												Symphony connects Maestro users with open source projects seeking
+												Symphony connects Guru users with open source projects seeking
 												AI-assisted contributions. Browse projects, find issues labeled with{' '}
 												<code
 													className="px-1 py-0.5 rounded text-xs"

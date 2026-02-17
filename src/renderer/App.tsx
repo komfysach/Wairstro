@@ -1470,7 +1470,13 @@ function MaestroConsoleInner() {
 
 	// Check GitHub CLI availability for gist publishing
 	useEffect(() => {
-		window.maestro.git
+		const gitApi = window.maestro?.git;
+		if (!gitApi) {
+			setGhCliAvailable(false);
+			return;
+		}
+
+		gitApi
 			.checkGhCli()
 			.then((status) => {
 				setGhCliAvailable(status.installed && status.authenticated);
@@ -3048,7 +3054,7 @@ You are taking over this conversation. Based on the context above, provide a bri
 					const baseArgs = agent.args ?? [];
 					const commandToUse = agent.path || agent.command;
 
-					// Build the full prompt with Maestro system prompt for new sessions
+					// Build the full prompt with Guru system prompt for new sessions
 					let effectivePrompt = contextMessage;
 
 					// Get git branch for template substitution
@@ -3062,7 +3068,7 @@ You are taking over this conversation. Based on the context above, provide a bri
 						}
 					}
 
-					// Prepend Maestro system prompt since this is a new session
+					// Prepend Guru system prompt since this is a new session
 					if (maestroSystemPrompt) {
 						const substitutedSystemPrompt = substituteTemplateVariables(maestroSystemPrompt, {
 							session: targetSession,
@@ -5633,7 +5639,7 @@ You are taking over this conversation. Based on the context above, provide a bri
 					autoRunFolderPath: tabWizardState.projectPath
 						? `${tabWizardState.projectPath}/Auto Run Docs`
 						: undefined,
-					// Full path to subfolder where documents are saved (e.g., "/path/Auto Run Docs/Maestro-Marketing")
+					// Full path to subfolder where documents are saved (e.g., "/path/Auto Run Docs/Guru-Marketing")
 					subfolderPath: tabWizardState.subfolderPath ?? undefined,
 					agentSessionId: tabWizardState.agentSessionId ?? undefined,
 					// Track the subfolder name for tab naming after wizard completes
@@ -6191,7 +6197,7 @@ You are taking over this conversation. Based on the context above, provide a bri
 	useActivityTracker(activeSessionId, setSessions);
 
 	// Initialize global hands-on time tracker (persists to settings)
-	// Tracks total time user spends actively using Maestro (5-minute idle timeout)
+	// Tracks total time user spends actively using Guru (5-minute idle timeout)
 	useHandsOnTimeTracker(updateGlobalStats);
 
 	// Track elapsed time for active auto-runs and update achievement stats every minute
@@ -12009,7 +12015,7 @@ You are taking over this conversation. Based on the context above, provide a bri
 								className="text-xs select-none opacity-50"
 								style={{ color: theme.colors.textDim }}
 							>
-								Maestro Group Chat:{' '}
+								Guru Group Chat:{' '}
 								{groupChats.find((c) => c.id === activeGroupChatId)?.name || 'Unknown'}
 							</span>
 						) : (
@@ -13120,7 +13126,7 @@ You are taking over this conversation. Based on the context above, provide a bri
 					/>
 				)}
 
-				{/* --- MAESTRO WIZARD (onboarding wizard for new users) --- */}
+				{/* --- GURU WIZARD (onboarding wizard for new users) --- */}
 				{/* PERF: Only mount wizard component when open to avoid running hooks/effects */}
 				{wizardState.isOpen && (
 					<MaestroWizard

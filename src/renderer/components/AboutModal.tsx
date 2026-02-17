@@ -123,7 +123,7 @@ export function AboutModal({
 		>
 			<div className="flex items-center gap-2">
 				<h2 className="text-sm font-bold" style={{ color: theme.colors.textMain }}>
-					About Maestro
+					About Guru
 				</h2>
 				<button
 					onClick={() => window.maestro.shell.openExternal('https://runmaestro.ai')}
@@ -167,7 +167,7 @@ export function AboutModal({
 	return (
 		<Modal
 			theme={theme}
-			title="About Maestro"
+			title="About Guru"
 			priority={MODAL_PRIORITIES.ABOUT}
 			onClose={handleEscape}
 			width={450}
@@ -184,7 +184,7 @@ export function AboutModal({
 								className="text-2xl font-bold tracking-widest"
 								style={{ color: theme.colors.textMain }}
 							>
-								MAESTRO
+								GURU
 							</h1>
 							<span className="text-xs font-mono" style={{ color: theme.colors.textDim }}>
 								v{__APP_VERSION__}
@@ -330,7 +330,7 @@ export function AboutModal({
 					{/* Project Link */}
 					<button
 						onClick={() =>
-							window.maestro.shell.openExternal('https://github.com/RunMaestro/Maestro')
+							window.maestro.shell.openExternal('https://github.com/RunMaestro/Guru')
 						}
 						className="flex-1 flex items-center justify-between p-3 rounded border hover:bg-white/5 transition-colors"
 						style={{ borderColor: theme.colors.border }}

@@ -118,7 +118,7 @@ export function QuitConfirmModal({
 						className="text-base font-semibold"
 						style={{ color: theme.colors.textMain }}
 					>
-						Quit Maestro?
+						Quit Guru?
 					</h2>
 				</div>
 

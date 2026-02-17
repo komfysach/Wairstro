@@ -58,7 +58,7 @@ import { remarkFileLinks, buildFileTreeIndices } from '../utils/remarkFileLinks'
 
 interface AutoRunProps {
 	theme: Theme;
-	sessionId: string; // Maestro session ID for per-session attachment storage
+	sessionId: string; // Guru session ID for per-session attachment storage
 
 	// SSH Remote context (for remote sessions)
 	sshRemoteId?: string; // SSH remote config ID - when set, all fs/autorun operations use SSH

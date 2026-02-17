@@ -1,5 +1,5 @@
 /**
- * Unread Badge Hook for Maestro Mobile Web
+ * Unread Badge Hook for Guru Mobile Web
  *
  * Manages unread response counts and updates the app badge
  * using the Navigator Badge API (PWA feature).

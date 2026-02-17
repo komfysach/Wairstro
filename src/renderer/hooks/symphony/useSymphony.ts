@@ -1,7 +1,7 @@
 /**
  * useSymphony Hook
  *
- * Primary hook for managing the Maestro Symphony feature.
+ * Primary hook for managing the Guru Symphony feature.
  * Handles registry fetching, GitHub Issues browsing, and contribution state.
  */
 

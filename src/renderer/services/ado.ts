@@ -125,7 +125,7 @@ export const adoService = {
 	getApi: () => {
 		const api = window.maestro?.ado;
 		if (!api) {
-			throw new Error('ADO bridge is unavailable. Restart Maestro to load the latest preload script.');
+			throw new Error('ADO bridge is unavailable. Restart Guru to load the latest preload script.');
 		}
 		return api;
 	},
@@ -164,7 +164,7 @@ export const adoService = {
 				};
 				if (typeof api.getCurrentSprintDebug !== 'function') {
 					throw new Error(
-						'ADO debug API is unavailable in the current preload bridge. Restart Maestro to load the latest build.'
+						'ADO debug API is unavailable in the current preload bridge. Restart Guru to load the latest build.'
 					);
 				}
 				return api.getCurrentSprintDebug();
@@ -188,7 +188,7 @@ export const adoService = {
 				};
 				if (typeof api.runAgentTask !== 'function') {
 					throw new Error(
-						'ADO run task API is unavailable in the current preload bridge. Restart Maestro to load the latest build.'
+						'ADO run task API is unavailable in the current preload bridge. Restart Guru to load the latest build.'
 					);
 				}
 				return api.runAgentTask(payload);

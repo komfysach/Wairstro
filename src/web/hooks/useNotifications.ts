@@ -1,5 +1,5 @@
 /**
- * Notification Hook for Maestro Mobile Web
+ * Notification Hook for Guru Mobile Web
  *
  * Handles notification permission requests and push notification
  * functionality for the mobile web interface.

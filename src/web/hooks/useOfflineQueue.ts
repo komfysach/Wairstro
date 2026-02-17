@@ -1,5 +1,5 @@
 /**
- * useOfflineQueue hook for Maestro web interface
+ * useOfflineQueue hook for Guru web interface
  *
  * Provides offline command queueing functionality that stores commands
  * typed while offline and automatically sends them when reconnected.

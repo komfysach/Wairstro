@@ -1,5 +1,5 @@
 /**
- * View State Persistence for Maestro Web Interface
+ * View State Persistence for Guru Web Interface
  *
  * Saves and restores UI state to localStorage so the view persists across refreshes.
  * Includes: active views, session selection, scroll positions, and UI toggles.

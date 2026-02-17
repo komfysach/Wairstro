@@ -20,7 +20,7 @@ import type { Theme, AgentConfig, AgentConfigOption } from '../../types';
 // Counter for generating stable IDs for env vars
 let envVarIdCounter = 0;
 
-// Built-in environment variables that Maestro sets automatically
+// Built-in environment variables that Guru sets automatically
 const BUILT_IN_ENV_VARS: { key: string; description: string; value: string }[] = [
 	{
 		key: 'MAESTRO_SESSION_RESUMED',

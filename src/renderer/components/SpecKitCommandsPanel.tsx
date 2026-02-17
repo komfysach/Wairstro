@@ -342,7 +342,7 @@ export function SpecKitCommandsPanel({ theme }: SpecKitCommandsPanelProps) {
 													color: theme.colors.accent,
 												}}
 											>
-												Maestro
+												Guru
 											</span>
 										)}
 										{cmd.isModified && (

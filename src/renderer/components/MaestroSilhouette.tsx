@@ -12,7 +12,7 @@ interface MaestroSilhouetteProps {
 }
 
 /**
- * Maestro conductor silhouette component
+ * Guru conductor silhouette component
  * Uses PNG assets for the authentic conductor graphic
  * - dark variant: black silhouette (for light backgrounds)
  * - light variant: white silhouette (for dark backgrounds)
@@ -28,7 +28,7 @@ export function MaestroSilhouette({
 	return (
 		<img
 			src={imageSrc}
-			alt="Maestro conductor silhouette"
+			alt="Guru conductor silhouette"
 			className={className}
 			style={{
 				width: size,

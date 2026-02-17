@@ -1192,7 +1192,7 @@ export const SettingsModal = memo(function SettingsModal(props: SettingsModalPro
 									About Me
 								</label>
 								<p className="text-xs opacity-50 mb-2">
-									Tell us a little about yourself so that agents created under Maestro know how to
+									Tell us a little about yourself so that agents created under Guru know how to
 									work and communicate with you. As the conductor, you orchestrate the symphony of
 									AI agents. (Optional, max 1000 characters)
 								</p>
@@ -1831,7 +1831,7 @@ export const SettingsModal = memo(function SettingsModal(props: SettingsModalPro
 								icon={Download}
 								sectionLabel="Updates"
 								title="Check for updates on startup"
-								description="Automatically check for new Maestro versions when the app starts"
+								description="Automatically check for new Guru versions when the app starts"
 								checked={props.checkForUpdatesOnStartup}
 								onChange={props.setCheckForUpdatesOnStartup}
 								theme={theme}
@@ -1853,7 +1853,7 @@ export const SettingsModal = memo(function SettingsModal(props: SettingsModalPro
 								icon={Bug}
 								sectionLabel="Privacy"
 								title="Send anonymous crash reports"
-								description="Help improve Maestro by automatically sending crash reports. No personal data is collected. Changes take effect after restart."
+								description="Help improve Guru by automatically sending crash reports. No personal data is collected. Changes take effect after restart."
 								checked={props.crashReportingEnabled}
 								onChange={props.setCrashReportingEnabled}
 								theme={theme}
@@ -2074,7 +2074,7 @@ export const SettingsModal = memo(function SettingsModal(props: SettingsModalPro
 												Enable WakaTime tracking
 											</p>
 											<p className="text-xs opacity-50 mt-0.5">
-												Track coding activity in Maestro sessions via WakaTime.
+												Track coding activity in Guru sessions via WakaTime.
 											</p>
 										</div>
 										<button
@@ -2320,11 +2320,11 @@ export const SettingsModal = memo(function SettingsModal(props: SettingsModalPro
 											Settings folder
 										</p>
 										<p className="text-xs opacity-60 mt-0.5">
-											Choose where Maestro stores settings, sessions, and groups. Use a synced
+											Choose where Guru stores settings, sessions, and groups. Use a synced
 											folder (iCloud Drive, Dropbox, OneDrive) to share across devices.
 										</p>
 										<p className="text-xs opacity-50 mt-1 italic">
-											Note: Only run Maestro on one device at a time to avoid sync conflicts.
+											Note: Only run Guru on one device at a time to avoid sync conflicts.
 										</p>
 									</div>
 
@@ -2481,7 +2481,7 @@ export const SettingsModal = memo(function SettingsModal(props: SettingsModalPro
 											}}
 										>
 											<RotateCcw className="w-3 h-3" />
-											Restart Maestro for changes to take effect
+											Restart Guru for changes to take effect
 										</div>
 									)}
 								</div>
@@ -3208,7 +3208,7 @@ export const SettingsModal = memo(function SettingsModal(props: SettingsModalPro
 											Director's Notes
 										</h3>
 										<p className="text-xs mb-6" style={{ color: theme.colors.textDim }}>
-											Director's Notes provides a unified view of your work across all Maestro
+											Director's Notes provides a unified view of your work across all Guru
 											sessions, with AI-generated summaries of accomplishments, challenges, and next
 											steps.
 										</p>

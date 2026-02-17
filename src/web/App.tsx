@@ -1,5 +1,5 @@
 /**
- * Maestro Web Interface App
+ * Guru Web Interface App
  *
  * Remote control interface for mobile/tablet devices.
  * Provides session monitoring and command input from anywhere on your network.
@@ -41,7 +41,7 @@ export function useOfflineStatus(): boolean {
 }
 
 /**
- * Context for Maestro mode (dashboard vs session)
+ * Context for Guru mode (dashboard vs session)
  */
 interface MaestroModeContextValue {
 	/** Whether we're viewing the dashboard (all live sessions) */
@@ -74,7 +74,7 @@ const MaestroModeContext = createContext<MaestroModeContextValue>({
 });
 
 /**
- * Hook to access Maestro mode context
+ * Hook to access Guru mode context
  */
 export function useMaestroMode(): MaestroModeContextValue {
 	return useContext(MaestroModeContext);
@@ -105,7 +105,7 @@ export function useDesktopTheme(): ThemeUpdateContextValue {
 }
 
 /**
- * Build the Maestro mode context based on injected config.
+ * Build the Guru mode context based on injected config.
  */
 export function createMaestroModeContextValue(config: MaestroConfig): MaestroModeContextValue {
 	const baseUrl = `${window.location.origin}/${config.securityToken}`;
@@ -168,12 +168,12 @@ function PlaceholderApp() {
 				backgroundColor: 'var(--color-background)',
 			}}
 		>
-			<h1 style={{ marginBottom: '16px', fontSize: '24px' }}>Maestro Web</h1>
+			<h1 style={{ marginBottom: '16px', fontSize: '24px' }}>Guru Web</h1>
 			<p style={{ marginBottom: '8px', color: 'var(--color-text-muted)' }}>
 				Remote control interface
 			</p>
 			<p style={{ fontSize: '14px', color: 'var(--color-text-muted)' }}>
-				Connect to your Maestro desktop app to get started
+				Connect to your Guru desktop app to get started
 			</p>
 		</div>
 	);

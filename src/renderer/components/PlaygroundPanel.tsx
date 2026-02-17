@@ -1253,7 +1253,7 @@ ${staggerDelays.map((delay, i) => `svg.wand-sparkle-active path:nth-child(${i + 
 													className="font-bold tracking-widest text-3xl"
 													style={{ color: theme.colors.textMain }}
 												>
-													MAESTRO
+													GURU
 												</span>
 												<span className="text-xs" style={{ color: theme.colors.textDim }}>
 													{batonActive ? 'Animation active' : 'Animation paused'}
@@ -1291,7 +1291,7 @@ ${staggerDelays.map((delay, i) => `svg.wand-sparkle-active path:nth-child(${i + 
 														className="font-bold tracking-widest text-lg"
 														style={{ color: theme.colors.textMain }}
 													>
-														MAESTRO
+														GURU
 													</span>
 												</div>
 											</div>

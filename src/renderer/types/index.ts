@@ -1,4 +1,4 @@
-// Type definitions for Maestro renderer
+// Type definitions for Guru renderer
 
 // Re-export context merge types
 export * from './contextMerge';
@@ -142,11 +142,11 @@ export interface SessionWizardState {
 	totalDocuments?: number;
 	/** Folder path for Auto Run docs (base folder, e.g., "/path/Auto Run Docs") */
 	autoRunFolderPath?: string;
-	/** Full path to the subfolder where documents are saved (e.g., "/path/Auto Run Docs/Maestro-Marketing") */
+	/** Full path to the subfolder where documents are saved (e.g., "/path/Auto Run Docs/Guru-Marketing") */
 	subfolderPath?: string;
 	/** The Claude agent session ID (from session_id in output) - used to switch tab after wizard completes */
 	agentSessionId?: string;
-	/** Subfolder name where documents were saved (e.g., "Maestro-Marketing") - used for tab naming */
+	/** Subfolder name where documents were saved (e.g., "Guru-Marketing") - used for tab naming */
 	subfolderName?: string;
 
 	// Thinking display state
@@ -364,7 +364,7 @@ export interface AutoRunStats {
 	badgeHistory: BadgeUnlockRecord[]; // History of badge unlocks with timestamps
 }
 
-// Maestro usage peak statistics (survives app restarts)
+// Guru usage peak statistics (survives app restarts)
 // These track maximum usage peaks for achievement display
 export interface MaestroUsageStats {
 	maxAgents: number; // Maximum number of agents active at once
@@ -405,7 +405,7 @@ export interface OnboardingStats {
 	averageTasksPerPhase: number; // Average tasks per document
 }
 
-// AI Tab for multi-tab support within a Maestro session
+// AI Tab for multi-tab support within a Guru session
 // Each tab represents a separate AI agent conversation (Claude Code, OpenCode, etc.)
 export interface AITab {
 	id: string; // Unique tab ID (generated UUID)
@@ -816,7 +816,7 @@ export interface SpecKitCommand {
 	command: string; // e.g., '/speckit.constitution'
 	description: string;
 	prompt: string;
-	isCustom: boolean; // true only for 'implement' (our Maestro-specific version)
+	isCustom: boolean; // true only for 'implement' (our Guru-specific version)
 	isModified: boolean; // true if user has edited
 }
 
@@ -834,7 +834,7 @@ export interface OpenSpecCommand {
 	command: string; // e.g., '/openspec.proposal'
 	description: string;
 	prompt: string;
-	isCustom: boolean; // true for 'help' and 'implement' (Maestro-specific)
+	isCustom: boolean; // true for 'help' and 'implement' (Guru-specific)
 	isModified: boolean; // true if user has edited
 }
 
@@ -865,7 +865,7 @@ export interface LeaderboardRegistration {
 	clientToken?: string; // Client-generated token for polling auth status
 	authToken?: string; // 64-character token received after email confirmation
 	// Keyboard mastery data
-	keyboardMasteryLevel?: number; // 0-4 (Beginner to Maestro)
+	keyboardMasteryLevel?: number; // 0-4 (Beginner to Guru)
 	keyboardMasteryLevelName?: string; // Level name
 	keyboardMasteryPercentage?: number; // 0-100
 }
@@ -883,7 +883,7 @@ export type KeyboardMasteryLevel = 'beginner' | 'student' | 'performer' | 'virtu
 
 export interface KeyboardMasteryStats {
 	usedShortcuts: string[]; // Array of shortcut IDs that have been used
-	currentLevel: number; // 0-4 (Beginner to Keyboard Maestro)
+	currentLevel: number; // 0-4 (Beginner to Keyboard Guru)
 	lastLevelUpTimestamp: number; // When user last leveled up
 	lastAcknowledgedLevel: number; // Last level user dismissed celebration for
 }

@@ -1,5 +1,5 @@
 /**
- * useWebSocket hook for Maestro web interface
+ * useWebSocket hook for Guru web interface
  *
  * Provides WebSocket connection management for the web interface,
  * handling connection, reconnection, and message handling.
@@ -37,7 +37,7 @@ export interface UsageStats {
 }
 
 /**
- * AI Tab data for multi-tab support within a Maestro session
+ * AI Tab data for multi-tab support within a Guru session
  */
 export interface AITabData {
 	id: string;
@@ -447,7 +447,7 @@ function buildWebSocketUrl(baseUrl?: string, sessionId?: string): string {
 }
 
 /**
- * useWebSocket hook for managing WebSocket connections to the Maestro server
+ * useWebSocket hook for managing WebSocket connections to the Guru server
  *
  * @example
  * ```tsx

@@ -158,7 +158,7 @@ export function useInputProcessing(deps: UseInputProcessingDeps): UseInputProces
 				const isTerminalMode = activeSession.inputMode === 'terminal';
 
 				// Handle built-in /history command (only in AI mode)
-				// This is intercepted here because it requires Maestro to handle the synopsis generation
+				// This is intercepted here because it requires Guru to handle the synopsis generation
 				// rather than passing through to the agent (which may not support it or require special permissions)
 				if (!isTerminalMode && commandText === '/history' && onHistoryCommand) {
 					setInputValue('');
@@ -931,8 +931,8 @@ export function useInputProcessing(deps: UseInputProcessingDeps): UseInputProces
 							});
 						}
 
-						// For NEW sessions (no agentSessionId), prepend Maestro system prompt
-						// This introduces Maestro and sets directory restrictions for the agent
+						// For NEW sessions (no agentSessionId), prepend Guru system prompt
+						// This introduces Guru and sets directory restrictions for the agent
 						const isNewSession = !tabAgentSessionId;
 						if (isNewSession && maestroSystemPrompt) {
 							// Get git branch for template substitution

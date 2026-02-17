@@ -454,7 +454,7 @@ export function useAgentExecution(deps: UseAgentExecutionDeps): UseAgentExecutio
 	 * Spawn a background synopsis agent that resumes an old agent session.
 	 * Used for generating summaries without affecting main session state.
 	 *
-	 * @param sessionId - The Maestro session ID (for logging/tracking)
+	 * @param sessionId - The Guru session ID (for logging/tracking)
 	 * @param cwd - Working directory for the agent
 	 * @param resumeAgentSessionId - The agent session ID to resume
 	 * @param prompt - The prompt to send to the resumed session

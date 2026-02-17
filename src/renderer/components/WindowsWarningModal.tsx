@@ -96,7 +96,7 @@ export function WindowsWarningModal({
 					}}
 				>
 					<p className="text-sm leading-relaxed" style={{ color: theme.colors.textMain }}>
-						Windows support in Maestro is actively being improved. You may encounter more bugs
+						Windows support in Guru is actively being improved. You may encounter more bugs
 						compared to Mac and Linux versions. We're working on it!
 					</p>
 				</div>
@@ -157,7 +157,7 @@ export function WindowsWarningModal({
 					<button
 						type="button"
 						onClick={() =>
-							window.maestro.shell.openExternal('https://github.com/RunMaestro/Maestro/issues')
+							window.maestro.shell.openExternal('https://github.com/RunMaestro/Guru/issues')
 						}
 						className="w-full flex items-start gap-3 p-3 rounded-lg border hover:bg-white/5 transition-colors text-left"
 						style={{ borderColor: theme.colors.border }}

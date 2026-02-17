@@ -1,5 +1,5 @@
 /**
- * Maestro Web Config
+ * Guru Web Config
  *
  * Configuration injected by the server into window.__MAESTRO_CONFIG__
  * This tells the React app about the security token and current context.
@@ -30,7 +30,7 @@ declare global {
 }
 
 /**
- * Get the Maestro config from window
+ * Get the Guru config from window
  * Returns default values if not injected (for development)
  */
 export function getMaestroConfig(): MaestroConfig {

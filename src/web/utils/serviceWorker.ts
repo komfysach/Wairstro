@@ -1,7 +1,7 @@
 /**
  * Service Worker Registration Utility
  *
- * Handles registration and lifecycle management of the Maestro
+ * Handles registration and lifecycle management of the Guru
  * mobile web service worker for offline capability.
  */
 import { webLogger } from './logger';

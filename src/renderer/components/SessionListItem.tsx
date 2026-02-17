@@ -6,7 +6,7 @@
  * - Quick resume button (visible on hover)
  * - Session name with inline rename capability
  * - First message preview
- * - Session origin pill (MAESTRO, AUTO, CLI)
+ * - Session origin pill (GURU, AUTO, CLI)
  * - Session ID pill
  * - Stats (time, messages, size, cost)
  * - Content search match info (when searching)
@@ -218,9 +218,9 @@ export function SessionListItem({
 						<span
 							className="text-[10px] font-bold px-1.5 py-0.5 rounded"
 							style={{ backgroundColor: theme.colors.accent + '30', color: theme.colors.accent }}
-							title="User-initiated through Maestro"
+							title="User-initiated through Guru"
 						>
-							MAESTRO
+							GURU
 						</span>
 					)}
 					{session.origin === 'auto' && (

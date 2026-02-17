@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Maestro - Agent Orchestration Command Center</title>
+    <title>Guru - Agent Orchestration Command Center</title>
 
     <!-- Preload fonts to prevent FOUT (Flash of Unstyled Text) -->
     <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
@@ -30,7 +30,7 @@
         font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
-        background-color: #1a1a2e;
+        background: radial-gradient(circle at 22% 18%, #021120 0%, #05172f 45%, #0a284f 100%);
       }
 
       /* Initial splash screen styles */
@@ -41,7 +41,7 @@
         align-items: center;
         justify-content: center;
         z-index: 9999;
-        background-color: #1a1a2e;
+        background: radial-gradient(circle at 22% 18%, #090327 0%, #040630 45%, #190a4f 100%);
         transition: opacity 0.5s ease-out;
         /* Account for 40px title bar (pt-10) so content aligns with app layout */
         padding-top: 40px;
@@ -63,8 +63,9 @@
       .splash-logo {
         width: 180px;
         height: 180px;
-        border-radius: 24px;
-        box-shadow: 0 25px 50px -12px rgba(139, 92, 246, 0.4);
+        border-radius: 38px;
+        box-shadow: 0 24px 48px -12px rgba(5, 20, 40, 0.58);
+        border: 1px solid rgba(255, 246, 214, 0.28);
         overflow: hidden;
       }
 
@@ -79,14 +80,14 @@
         font-weight: 700;
         font-size: 36px;
         letter-spacing: 0.25em;
-        color: #ffffff;
-        text-shadow: 0 2px 10px rgba(139, 92, 246, 0.3);
+        color: #fff8de;
+        text-shadow: 0 2px 12px rgba(7, 25, 45, 0.55);
       }
 
       .splash-progress-container {
         width: 280px;
         height: 6px;
-        background-color: rgba(255, 255, 255, 0.1);
+        background-color: rgba(255, 248, 222, 0.18);
         border-radius: 9999px;
         overflow: hidden;
         position: relative;
@@ -98,8 +99,8 @@
         left: 0;
         height: 100%;
         border-radius: 9999px;
-        background: linear-gradient(90deg, #8b5cf6 0%, #a78bfa 50%, #c4b5fd 100%);
-        box-shadow: 0 0 10px rgba(139, 92, 246, 0.5);
+        background: linear-gradient(90deg, #c4b9f1 0%, #7b6fd9 45%, #e0d9ff 100%);
+        box-shadow: 0 0 14px rgba(241, 223, 185, 0.45);
         transition: width 0.15s ease-out;
         width: 0%;
       }
@@ -108,7 +109,7 @@
         font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
         font-size: 14px;
         letter-spacing: 0.05em;
-        color: rgba(255, 255, 255, 0.5);
+        color: rgba(255, 248, 222, 0.78);
       }
     </style>
   </head>
@@ -118,11 +119,11 @@
       <div class="splash-container">
         <!-- Logo container with app icon -->
         <div class="splash-logo">
-          <img src="/icon.png" alt="Maestro" />
+          <img src="/icon.png" alt="Guru" />
         </div>
 
-        <!-- Maestro title -->
-        <h1 class="splash-title">MAESTRO</h1>
+        <!-- Guru title -->
+        <h1 class="splash-title">GURU</h1>
 
         <!-- Progress bar -->
         <div class="splash-progress-container">

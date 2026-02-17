@@ -6,7 +6,7 @@
  * This utility wraps clipboard.writeText with proper error handling to prevent
  * unhandled exceptions from reaching Sentry.
  *
- * Fixes MAESTRO-4Z
+ * Fixes GURU-4Z
  */
 
 /**

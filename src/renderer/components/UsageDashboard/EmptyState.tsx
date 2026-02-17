@@ -3,7 +3,7 @@
  *
  * Displays a friendly empty state message when no usage data exists.
  * Used in the Usage Dashboard to indicate that the user should start
- * using Maestro to generate stats.
+ * using Guru to generate stats.
  *
  * Features:
  * - Theme-aware styling with inline styles
@@ -20,14 +20,14 @@ interface EmptyStateProps {
 	theme: Theme;
 	/** Optional custom title (default: "No usage data yet") */
 	title?: string;
-	/** Optional custom message (default: "Start using Maestro to see your stats!") */
+	/** Optional custom message (default: "Start using Guru to see your stats!") */
 	message?: string;
 }
 
 export function EmptyState({
 	theme,
 	title = 'No usage data yet',
-	message = 'Start using Maestro to see your stats!',
+	message = 'Start using Guru to see your stats!',
 }: EmptyStateProps) {
 	return (
 		<div

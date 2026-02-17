@@ -95,7 +95,7 @@ function getSessionDisplayName(session: Session, namedSessions?: Record<string, 
 		return agentSessionId.substring(0, 8).toUpperCase();
 	}
 
-	// Fall back to Maestro session name
+	// Fall back to Guru session name
 	return session.name;
 }
 
@@ -131,7 +131,7 @@ const SessionRow = memo(
 						className="w-2 h-2 rounded-full shrink-0 animate-pulse"
 						style={{ backgroundColor: theme.colors.warning }}
 					/>
-					{/* Maestro session name (from left bar) + Tab name */}
+					{/* Guru session name (from left bar) + Tab name */}
 					<span className="text-xs truncate">
 						<span className="font-medium">{maestroName}</span>
 						<span style={{ color: theme.colors.textDim }}> / </span>
@@ -362,7 +362,7 @@ function ThinkingStatusPillInner({
 					style={{ backgroundColor: theme.colors.warning }}
 				/>
 
-				{/* Maestro session name - always visible, not clickable */}
+				{/* Guru session name - always visible, not clickable */}
 				<span
 					className="text-xs font-medium shrink-0"
 					style={{ color: theme.colors.textMain }}

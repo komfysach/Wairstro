@@ -1,5 +1,5 @@
 /**
- * Maestro Web Interface Entry Point
+ * Guru Web Interface Entry Point
  */
 
 import { createRoot } from 'react-dom/client';
