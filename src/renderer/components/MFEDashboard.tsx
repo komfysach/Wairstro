@@ -10,13 +10,26 @@ import {
 	Play,
 	Terminal,
 	Search,
+	Brain,
 } from 'lucide-react';
 import type { Theme } from '../types';
 import { mfeService, type MfePackageInfo, type MfePackageRole, type MfeProposal } from '../services/mfe';
-import type { AdoSprintWorkItem } from '../services/ado';
+import { adoService, type AdoSprintWorkItem } from '../services/ado';
+import { signalService, type SignalState } from '../services/signal';
 import { ProposedTaskCard } from './ProposedTaskCard';
 import { SprintProvider, useSprintContext } from '../contexts/SprintContext';
 import { MfeFocusWorkspace, type QuickAddDraft } from './MfeFocusWorkspace';
+import { FileContextPickerModal } from './FileContextPickerModal';
+import { SprintCommandCenterModal } from './SprintCommandCenterModal';
+import { notifyToast } from '../stores/notificationStore';
+import { useSessionStore } from '../stores/sessionStore';
+import type {
+	OrchestratorState,
+	SprintExecutionPlan,
+	SprintExecutionResult,
+	WorkerActionType,
+} from '../../shared/orchestrator-types';
+import { getTaskProfileIcon, resolveTaskProfile } from '../../shared/task-routing';
 
 export interface MFEDashboardAssignPayload {
 	packageName: string;
@@ -50,6 +63,14 @@ interface MFEDashboardProps {
 	onDropWorkItem?: (payload: MFEDashboardWorkItemPayload) => void;
 	onExecuteTask?: (payload: MFEDashboardExecutePayload) => Promise<MFEDashboardExecuteResult>;
 	onViewAgentTerminal?: (sessionId: string, tabId: string) => void;
+	onEnsureWorkerAgent?: (payload: {
+		packageName: string;
+		packagePath: string;
+		action: WorkerActionType;
+		suggestedName: string;
+		suggestedType: string;
+		existingSessionId?: string;
+	}) => Promise<{ sessionId: string; name: string }>;
 	onClose?: () => void;
 }
 
@@ -95,6 +116,12 @@ function proposalId(pkgPath: string, proposal: MfeProposal, index: number): stri
 		.replace(/[^a-z0-9]+/g, '-')
 		.replace(/^-+|-+$/g, '');
 	return `${pkgPath}::${slug || index}`;
+}
+
+function shortFileName(filePath: string): string {
+	const normalized = filePath.replace(/\\/g, '/');
+	const segments = normalized.split('/');
+	return segments[segments.length - 1] || normalized;
 }
 
 function parseDroppedAgentId(event: React.DragEvent<HTMLDivElement>): string | null {
@@ -163,14 +190,24 @@ function MfeTaskCard({
 					? executionState.error || 'Execution failed'
 					: 'Ready';
 	const canExecute = executionState.status !== 'initializing' && executionState.status !== 'running';
+	const taskProfile = resolveTaskProfile(workItem.tags || []);
 
 	return (
 		<div
 			className="rounded border px-2 py-2 space-y-2"
 			style={{ borderColor: theme.colors.border, backgroundColor: `${theme.colors.accent}14` }}
 		>
-			<div className="text-[11px] font-semibold" style={{ color: theme.colors.textMain }} title={workItem.title}>
+			<div
+				className="text-[11px] font-semibold flex items-center gap-1.5"
+				style={{ color: theme.colors.textMain }}
+				title={workItem.title}
+			>
+				<span className="text-[12px]" title={`Task Profile: ${taskProfile}`}>
+					{getTaskProfileIcon(taskProfile)}
+				</span>
+				<span className="truncate">
 				{workItem.id > 0 ? `#${workItem.id}` : 'Planned'} {workItem.title}
+				</span>
 			</div>
 			<div className="text-[10px]" style={{ color: theme.colors.textDim }}>
 				{statusLabel}
@@ -412,6 +449,7 @@ function MFEDashboardContent({
 	onDropWorkItem,
 	onExecuteTask,
 	onViewAgentTerminal,
+	onEnsureWorkerAgent,
 	onClose,
 }: MFEDashboardProps) {
 	const { focusedMfeId, setFocusedMfeId } = useSprintContext();
@@ -424,11 +462,40 @@ function MFEDashboardContent({
 	const [proposalScanStates, setProposalScanStates] = useState<Record<string, ProposalScanState>>({});
 	const [rejectingProposalIds, setRejectingProposalIds] = useState<Record<string, Set<string>>>({});
 	const [taskStates, setTaskStates] = useState<Record<string, TaskExecutionState>>({});
+	const [attachContextTicketId, setAttachContextTicketId] = useState<number | null>(null);
+	const [commandCenterOpen, setCommandCenterOpen] = useState(false);
+	const [orchestratorState, setOrchestratorState] = useState<OrchestratorState>('ready');
+	const [orchestrationPlan, setOrchestrationPlan] = useState<SprintExecutionPlan | null>(null);
+	const [orchestrationExecution, setOrchestrationExecution] = useState<SprintExecutionResult | null>(null);
+	const [orchestrationError, setOrchestrationError] = useState<string | null>(null);
+	const [signalState, setSignalState] = useState<SignalState>({ locks: {}, announcements: [] });
 	const proposalToPlannedIdCounter = useRef(-1);
+	const sessions = useSessionStore((state) => state.sessions);
 
 	useEffect(() => {
 		setAssignments(initialAssignments);
 	}, [initialAssignments]);
+
+	useEffect(() => {
+		let mounted = true;
+		void signalService
+			.getState()
+			.then((state) => {
+				if (mounted) setSignalState(state);
+			})
+			.catch(() => {
+				// Live signals are optional in this view.
+			});
+
+		const unsubscribe = signalService.onStateUpdated((state) => {
+			if (mounted) setSignalState(state);
+		});
+
+		return () => {
+			mounted = false;
+			unsubscribe();
+		};
+	}, []);
 
 	const scanWorkspace = useCallback(async () => {
 		if (!monorepoRoot) {
@@ -504,6 +571,23 @@ function MFEDashboardContent({
 			return a.id - b.id;
 		});
 	}, [workItemAssignments]);
+
+	const signalTickerItems = useMemo(() => {
+		const lockItems = Object.entries(signalState.locks).map(([filePath, agentId]) => ({
+			id: `lock:${filePath}:${agentId}`,
+			kind: 'lock' as const,
+			message: `🔒 ${agentId} locked ${shortFileName(filePath)}`,
+		}));
+		const announcementItems = [...signalState.announcements]
+			.slice(-12)
+			.reverse()
+			.map((entry, index) => ({
+				id: `announcement:${entry.timestamp}:${index}`,
+				kind: 'announcement' as const,
+				message: `📢 ${entry.agentId}: ${entry.message}`,
+			}));
+		return [...lockItems, ...announcementItems];
+	}, [signalState]);
 
 	const unlinkWorkItem = useCallback((packagePath: string, workItemId: number) => {
 		setWorkItemAssignments((prev) => {
@@ -593,6 +677,83 @@ function MFEDashboardContent({
 		[grouped, runTask, workItemAssignments]
 	);
 
+	const startSprint = useCallback(async () => {
+		if (!monorepoRoot) {
+			setOrchestrationError('Monorepo root is required to start sprint orchestration.');
+			setCommandCenterOpen(true);
+			setOrchestratorState('error');
+			return;
+		}
+
+		setCommandCenterOpen(true);
+		setOrchestrationError(null);
+		setOrchestrationPlan(null);
+		setOrchestrationExecution(null);
+		setOrchestratorState('planning');
+
+		try {
+			const plan = await adoService.generateSprintPlan({
+				monorepoRoot,
+			});
+			setOrchestrationPlan(plan);
+			if (plan.contextRefreshed) {
+				notifyToast({
+					type: 'info',
+					title: '♻️ Orchestrator context refreshed',
+					message: 'Previous planning history was condensed and restored.',
+				});
+			}
+			setOrchestratorState('delegating');
+
+			const execution = await adoService.executeSprintPlan(plan);
+			setOrchestrationExecution(execution);
+
+			const nextAssignments: Record<string, string> = {};
+			for (const worker of execution.workers) {
+				let ensuredSessionId = worker.workerSessionId;
+				if (onEnsureWorkerAgent) {
+					const ensured = await onEnsureWorkerAgent({
+						packageName: worker.packageName,
+						packagePath: worker.packagePath,
+						action: worker.action,
+						suggestedName: worker.workerName,
+						suggestedType: worker.workerType,
+						existingSessionId: worker.workerSessionId,
+					});
+					ensuredSessionId = ensured.sessionId;
+				}
+				if (ensuredSessionId) {
+					nextAssignments[worker.packagePath] = ensuredSessionId;
+				}
+			}
+
+			setAssignments((prev) => ({ ...prev, ...nextAssignments }));
+			setWorkItemAssignments((prev) => {
+				const next = { ...prev };
+				for (const pkg of plan.packages) {
+					const mappedItems: AdoSprintWorkItem[] = pkg.tasks.map((task) => ({
+						id: task.id,
+						title: task.title,
+						description: task.description,
+						acceptanceCriteria: task.acceptanceCriteria,
+						state: task.state,
+						tags: task.tags,
+						url: task.url,
+					}));
+					next[pkg.packagePath] = mappedItems;
+				}
+				return next;
+			});
+
+			setOrchestratorState('ready');
+		} catch (error) {
+			setOrchestratorState('error');
+			setOrchestrationError(
+				error instanceof Error ? error.message : 'Sprint orchestration failed.'
+			);
+		}
+	}, [monorepoRoot, onEnsureWorkerAgent]);
+
 	const scanForProposals = useCallback(async (pkg: MfePackageInfo) => {
 		setProposalScanStates((prev) => ({
 			...prev,
@@ -670,6 +831,87 @@ function MFEDashboardContent({
 		}, 220);
 	}, []);
 
+	const getThoughtStreamForWorkItem = useCallback(
+		(workItem: AdoSprintWorkItem, state: TaskExecutionState): string => {
+			if (!state.sessionId || !state.tabId) return 'No active session/tab found for this task.';
+			const session = sessions.find((candidate) => candidate.id === state.sessionId);
+			if (!session) return 'Session not found.';
+			const tab = session.aiTabs.find((candidate) => candidate.id === state.tabId);
+			if (!tab) return 'Tab not found.';
+			const text = tab.logs
+				.filter((log) => log.source !== 'user')
+				.map((log) => log.text)
+				.join('\n')
+				.trim();
+			if (!text) {
+				return `No agent thought stream available yet for #${workItem.id}.`;
+			}
+			return text;
+		},
+		[sessions]
+	);
+
+	const getDevLogsForWorkItem = useCallback(
+		async (workItem: AdoSprintWorkItem) => {
+			const rawPreviewContext = (await window.maestro.settings.get('kanbanPreviewContextByTicket')) as
+				| Record<string, { worktreePath?: string; mfeName?: string; updatedAt?: number }>
+				| undefined;
+			const context = rawPreviewContext?.[String(workItem.id)];
+			if (!context?.worktreePath || !context?.mfeName) {
+				return [{ source: 'stderr' as const, text: 'No preview context found. Start preview first.' }];
+			}
+			return adoService.getDevServerLogs({
+				worktreePath: context.worktreePath,
+				mfeName: context.mfeName,
+				lineCount: 120,
+			});
+		},
+		[]
+	);
+
+	const attachContextItem = useMemo(() => {
+		if (attachContextTicketId === null) return null;
+		for (const items of Object.values(workItemAssignments)) {
+			const found = items.find((item) => item.id === attachContextTicketId);
+			if (found) return found;
+		}
+		return null;
+	}, [attachContextTicketId, workItemAssignments]);
+
+	const handleSaveAttachedContext = useCallback(
+		async (selectedPaths: string[]) => {
+			if (!attachContextItem) return;
+			try {
+				if (attachContextItem.id > 0) {
+					await adoService.updateWorkItemAttachedContext({
+						ticketId: attachContextItem.id,
+						attachedContextPaths: selectedPaths,
+					});
+				}
+				setWorkItemAssignments((prev) => {
+					const next: Record<string, AdoSprintWorkItem[]> = {};
+					for (const [packagePath, items] of Object.entries(prev)) {
+						next[packagePath] = items.map((item) =>
+							item.id === attachContextItem.id
+								? { ...item, attachedContextPaths: selectedPaths }
+								: item
+						);
+					}
+					return next;
+				});
+				setAttachContextTicketId(null);
+			} catch (error) {
+				notifyToast({
+					type: 'error',
+					title: 'Context Attach Failed',
+					message:
+						error instanceof Error ? error.message : 'Failed to update ADO attached context.',
+				});
+			}
+		},
+		[attachContextItem]
+	);
+
 	return (
 		<div className="h-full flex flex-col">
 			<div
@@ -685,6 +927,21 @@ function MFEDashboardContent({
 					</p>
 				</div>
 				<div className="flex items-center gap-2">
+					<button
+						onClick={() => {
+							void startSprint();
+						}}
+						disabled={isLoading || !monorepoRoot}
+						className="px-3 py-1.5 rounded text-xs font-semibold border flex items-center gap-1.5"
+						style={{
+							borderColor: theme.colors.accent,
+							color: theme.colors.accent,
+							opacity: isLoading ? 0.7 : 1,
+						}}
+					>
+						<Brain className="w-3.5 h-3.5" />
+						Start Sprint
+					</button>
 					<button
 						onClick={scanWorkspace}
 						disabled={isLoading || !monorepoRoot}
@@ -905,12 +1162,64 @@ function MFEDashboardContent({
 									onViewAgentTerminal?.(state.sessionId, state.tabId);
 								}
 							}}
+							onGetAgentThoughtStream={(workItem, state) => getThoughtStreamForWorkItem(workItem, state)}
+							onGetDevServerLogs={getDevLogsForWorkItem}
+							onAttachContext={(workItem) => setAttachContextTicketId(workItem.id)}
 							onRemoveWorkItem={(workItemId) => {
 								unlinkWorkItem(focusedPackage.rootPath, workItemId);
 							}}
 						/>
 					) : null}
 				</div>
+			</div>
+			<FileContextPickerModal
+				theme={theme}
+				isOpen={Boolean(attachContextItem)}
+				monorepoRoot={monorepoRoot}
+				title={
+					attachContextItem
+						? `Attach Context • #${attachContextItem.id} ${attachContextItem.title}`
+						: 'Attach Context'
+				}
+				initialSelectedPaths={attachContextItem?.attachedContextPaths || []}
+				onClose={() => setAttachContextTicketId(null)}
+				onSave={(paths) => {
+					void handleSaveAttachedContext(paths);
+				}}
+			/>
+
+			<SprintCommandCenterModal
+				theme={theme}
+				isOpen={commandCenterOpen}
+				state={orchestratorState}
+				plan={orchestrationPlan}
+				execution={orchestrationExecution}
+				error={orchestrationError}
+				onClose={() => setCommandCenterOpen(false)}
+			/>
+			<div
+				className="px-4 py-2 border-t flex items-center gap-2 overflow-x-auto whitespace-nowrap text-[11px]"
+				style={{ borderColor: theme.colors.border, backgroundColor: theme.colors.bgSidebar }}
+			>
+				<span className="font-semibold" style={{ color: theme.colors.textDim }}>
+					Live Signals
+				</span>
+				{signalTickerItems.length === 0 ? (
+					<span style={{ color: theme.colors.textDim }}>No active locks or announcements.</span>
+				) : (
+					signalTickerItems.map((item) => (
+						<span
+							key={item.id}
+							className="px-2 py-0.5 rounded border"
+							style={{
+								borderColor: item.kind === 'lock' ? '#EAB308' : '#EF4444',
+								color: item.kind === 'lock' ? '#EAB308' : '#EF4444',
+							}}
+						>
+							{item.message}
+						</span>
+					))
+				)}
 			</div>
 		</div>
 	);

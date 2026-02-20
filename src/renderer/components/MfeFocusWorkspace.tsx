@@ -4,6 +4,8 @@ import type { Theme } from '../types';
 import type { AdoSprintWorkItem } from '../services/ado';
 import type { MfePackageInfo, MfeProposal } from '../services/mfe';
 
+const DESIGN_CONTEXT_SETTINGS_KEY = 'kanbanDesignContextByTicket';
+
 export type FocusWorkspaceMode = 'planning' | 'execution';
 
 export type FocusTaskExecutionState = {
@@ -14,6 +16,12 @@ export type FocusTaskExecutionState = {
 };
 
 export type FocusProposedTaskItem = MfeProposal & { id: string };
+type TerminalMode = 'thought' | 'dev-logs';
+
+export interface FocusDevLogLine {
+	source: 'stdout' | 'stderr';
+	text: string;
+}
 
 export interface QuickAddDraft {
 	title: string;
@@ -33,8 +41,21 @@ interface MfeFocusWorkspaceProps {
 	onQuickAdd: (draft: QuickAddDraft) => void;
 	onLinkWorkItem: (workItem: AdoSprintWorkItem) => void;
 	onRemoveWorkItem: (workItemId: number) => void;
+	onAttachContext?: (workItem: AdoSprintWorkItem) => void;
 	onExecuteTask: (workItem: AdoSprintWorkItem) => void;
 	onViewTaskTerminal: (workItem: AdoSprintWorkItem) => void;
+	onGetAgentThoughtStream?: (
+		workItem: AdoSprintWorkItem,
+		state: FocusTaskExecutionState
+	) => string;
+	onGetDevServerLogs?: (workItem: AdoSprintWorkItem) => Promise<FocusDevLogLine[]>;
+}
+
+interface DesignContextEntry {
+	url: string;
+	verifiedNodeName?: string;
+	imagePath?: string;
+	imageUrl?: string;
 }
 
 function stripHtml(input: string): string {
@@ -97,14 +118,23 @@ export function MfeFocusWorkspace({
 	onQuickAdd,
 	onLinkWorkItem,
 	onRemoveWorkItem,
+	onAttachContext,
 	onExecuteTask,
 	onViewTaskTerminal,
+	onGetAgentThoughtStream,
+	onGetDevServerLogs,
 }: MfeFocusWorkspaceProps) {
 	const [mode, setMode] = useState<FocusWorkspaceMode>('planning');
 	const [quickAddTitle, setQuickAddTitle] = useState('');
 	const [quickAddDescription, setQuickAddDescription] = useState('');
 	const [quickAddAcceptanceCriteria, setQuickAddAcceptanceCriteria] = useState('');
 	const [drawerOpen, setDrawerOpen] = useState(true);
+	const [designContextByTicket, setDesignContextByTicket] = useState<Record<number, DesignContextEntry>>({});
+	const [referenceImageSrcByTicket, setReferenceImageSrcByTicket] = useState<Record<number, string>>({});
+	const [terminalMode, setTerminalMode] = useState<TerminalMode>('thought');
+	const [selectedTerminalTicketId, setSelectedTerminalTicketId] = useState<number | null>(null);
+	const [devLogByTicket, setDevLogByTicket] = useState<Record<number, FocusDevLogLine[]>>({});
+	const [devLogLoading, setDevLogLoading] = useState(false);
 
 	useEffect(() => {
 		const onKeyDown = (event: KeyboardEvent) => {
@@ -119,7 +149,141 @@ export function MfeFocusWorkspace({
 		};
 	}, [onBack]);
 
+	useEffect(() => {
+		window.maestro.settings
+			.get(DESIGN_CONTEXT_SETTINGS_KEY)
+			.then((value) => {
+				const rawMap = value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
+				const normalized: Record<number, DesignContextEntry> = {};
+				for (const [ticketIdText, entry] of Object.entries(rawMap)) {
+					const ticketId = Number(ticketIdText);
+					if (!Number.isFinite(ticketId) || ticketId <= 0) continue;
+					if (!entry || typeof entry !== 'object') continue;
+					const typedEntry = entry as Record<string, unknown>;
+					const url = typeof typedEntry.url === 'string' ? typedEntry.url : '';
+					if (!url.trim()) continue;
+					normalized[ticketId] = {
+						url,
+						verifiedNodeName:
+							typeof typedEntry.verifiedNodeName === 'string' ? typedEntry.verifiedNodeName : undefined,
+						imagePath: typeof typedEntry.imagePath === 'string' ? typedEntry.imagePath : undefined,
+						imageUrl: typeof typedEntry.imageUrl === 'string' ? typedEntry.imageUrl : undefined,
+					};
+				}
+				setDesignContextByTicket(normalized);
+			})
+			.catch(() => {
+				// Figma reference preview is optional.
+			});
+	}, [activeItems]);
+
+	useEffect(() => {
+		const imageCandidates = activeItems
+			.map((item) => ({ id: item.id, imagePath: designContextByTicket[item.id]?.imagePath }))
+			.filter((entry): entry is { id: number; imagePath: string } => Boolean(entry.imagePath?.trim()));
+		if (imageCandidates.length === 0) {
+			setReferenceImageSrcByTicket({});
+			return;
+		}
+
+		let cancelled = false;
+		Promise.all(
+			imageCandidates.map(async ({ id, imagePath }) => {
+				try {
+					const dataUrl = await window.maestro.fs.readFile(imagePath);
+					if (!dataUrl.startsWith('data:')) return null;
+					return { id, dataUrl };
+				} catch {
+					return null;
+				}
+			})
+		).then((results) => {
+			if (cancelled) return;
+			const next: Record<number, string> = {};
+			for (const entry of results) {
+				if (!entry) continue;
+				next[entry.id] = entry.dataUrl;
+			}
+			setReferenceImageSrcByTicket(next);
+		});
+
+		return () => {
+			cancelled = true;
+		};
+	}, [activeItems, designContextByTicket]);
+
 	const globalBacklogLookup = useMemo(() => new Set(activeItems.map((item) => item.id)), [activeItems]);
+	const referenceDesigns = useMemo(
+		() =>
+			activeItems
+				.map((item) => {
+					const designContext = designContextByTicket[item.id];
+					const imageSrc = referenceImageSrcByTicket[item.id];
+					if (!imageSrc) return null;
+					return {
+						item,
+						designContext,
+						imageSrc,
+					};
+				})
+				.filter(
+					(entry): entry is { item: AdoSprintWorkItem; designContext: DesignContextEntry; imageSrc: string } =>
+						Boolean(entry)
+				),
+		[activeItems, designContextByTicket, referenceImageSrcByTicket]
+	);
+	const primaryReferenceDesign = referenceDesigns[0];
+	const runningItems = useMemo(
+		() =>
+			activeItems.filter((item) => {
+				const state = taskStates[taskKey(mfePackage.rootPath, item.id)];
+				return state?.status === 'running';
+			}),
+		[activeItems, mfePackage.rootPath, taskStates]
+	);
+	const selectedTerminalItem = useMemo(
+		() => runningItems.find((item) => item.id === selectedTerminalTicketId) || runningItems[0] || null,
+		[runningItems, selectedTerminalTicketId]
+	);
+	const selectedTerminalState = selectedTerminalItem
+		? taskStates[taskKey(mfePackage.rootPath, selectedTerminalItem.id)] || { status: 'idle' as const }
+		: ({ status: 'idle' } as FocusTaskExecutionState);
+	const thoughtStreamText = selectedTerminalItem
+		? onGetAgentThoughtStream?.(selectedTerminalItem, selectedTerminalState) || 'No agent thought stream available.'
+		: 'Select a running task to inspect terminal output.';
+
+	useEffect(() => {
+		if (!selectedTerminalItem) return;
+		if (!onGetDevServerLogs) return;
+		if (terminalMode !== 'dev-logs') return;
+
+		let cancelled = false;
+		setDevLogLoading(true);
+		onGetDevServerLogs(selectedTerminalItem)
+			.then((lines) => {
+				if (cancelled) return;
+				setDevLogByTicket((prev) => ({
+					...prev,
+					[selectedTerminalItem.id]: lines,
+				}));
+			})
+			.catch(() => {
+				if (cancelled) return;
+				setDevLogByTicket((prev) => ({
+					...prev,
+					[selectedTerminalItem.id]: [
+						{ source: 'stderr', text: 'Unable to load dev server logs for this task.' },
+					],
+				}));
+			})
+			.finally(() => {
+				if (!cancelled) setDevLogLoading(false);
+			});
+
+		return () => {
+			cancelled = true;
+		};
+	}, [onGetDevServerLogs, selectedTerminalItem, terminalMode]);
 
 	return (
 		<div className="h-full flex flex-col">
@@ -201,6 +365,18 @@ export function MfeFocusWorkspace({
 											Acceptance Criteria: {renderLongText(item.acceptanceCriteria)}
 										</div>
 										<div className="flex items-center gap-2 pt-1">
+											<button
+												type="button"
+												onClick={() => onAttachContext?.(item)}
+												disabled={!onAttachContext}
+												className="px-2 py-1 rounded text-[11px] border font-semibold disabled:opacity-60"
+												style={{ borderColor: theme.colors.border, color: theme.colors.textMain }}
+											>
+												📎 Attach Context
+												{Array.isArray(item.attachedContextPaths) && item.attachedContextPaths.length > 0
+													? ` (${item.attachedContextPaths.length})`
+													: ''}
+											</button>
 											{state.status === 'running' && state.sessionId && state.tabId ? (
 												<button
 													type="button"
@@ -434,68 +610,168 @@ export function MfeFocusWorkspace({
 							</div>
 						</div>
 					) : (
-						<div className="flex-1 min-h-0 rounded border p-3 overflow-y-auto" style={{ borderColor: theme.colors.border }}>
-							<div className="text-xs font-semibold mb-2" style={{ color: theme.colors.textMain }}>
-								Live Task Console Routing
-							</div>
-							<div className="text-[11px] mb-3" style={{ color: theme.colors.textDim }}>
-								Open the running tab for this MFE to watch stdout/stderr in real-time.
-							</div>
-							<div className="space-y-2">
-								{activeItems.length === 0 ? (
-									<div className="text-xs" style={{ color: theme.colors.textDim }}>
-										No linked tasks yet.
+						<div className="flex-1 min-h-0 grid grid-cols-1 xl:grid-cols-[1.25fr_1fr] gap-3">
+							<div className="min-h-0 rounded border p-3 flex flex-col gap-3" style={{ borderColor: theme.colors.border }}>
+								<div className="text-xs font-semibold mb-2" style={{ color: theme.colors.textMain }}>
+									Live Task Console Routing
+								</div>
+								<div className="text-[11px] mb-3" style={{ color: theme.colors.textDim }}>
+									Open the running tab for this MFE to watch stdout/stderr in real-time.
+								</div>
+								<div className="space-y-2 overflow-y-auto">
+									{activeItems.length === 0 ? (
+										<div className="text-xs" style={{ color: theme.colors.textDim }}>
+											No linked tasks yet.
+										</div>
+									) : (
+										activeItems.map((item) => {
+											const state =
+												taskStates[taskKey(mfePackage.rootPath, item.id)] || ({ status: 'idle' } as FocusTaskExecutionState);
+											return (
+												<div
+													key={`exec-${item.id}`}
+													className="rounded border p-2.5 flex items-center justify-between gap-2"
+													style={{ borderColor: theme.colors.border, backgroundColor: theme.colors.bgActivity }}
+												>
+													<div className="min-w-0">
+														<div className="text-xs font-semibold truncate" style={{ color: theme.colors.textMain }}>
+															#{item.id} {item.title}
+														</div>
+														<div className="text-[11px]" style={{ color: theme.colors.textDim }}>
+															State: {state.status}
+														</div>
+													</div>
+													<div className="flex items-center gap-2">
+														<button
+															type="button"
+															onClick={() => setSelectedTerminalTicketId(item.id)}
+															className="px-2 py-1 rounded text-[11px] font-semibold border"
+															style={{ borderColor: theme.colors.border, color: theme.colors.textMain }}
+														>
+															Inspect
+														</button>
+														<button
+															type="button"
+															onClick={() => onExecuteTask(item)}
+															disabled={!assignedAgentName || state.status === 'initializing'}
+															className="px-2 py-1 rounded text-[11px] font-semibold border disabled:opacity-60"
+															style={{ borderColor: theme.colors.accent, color: theme.colors.accent }}
+														>
+															Run
+														</button>
+														<button
+															type="button"
+															onClick={() => onViewTaskTerminal(item)}
+															disabled={!state.sessionId || !state.tabId}
+															className="px-2 py-1 rounded text-[11px] font-semibold border inline-flex items-center gap-1 disabled:opacity-60"
+															style={{ borderColor: theme.colors.border, color: theme.colors.textMain }}
+														>
+															<Terminal className="w-3.5 h-3.5" />
+															Console
+														</button>
+														<button
+															type="button"
+															onClick={() => onRemoveWorkItem(item.id)}
+															className="px-2 py-1 rounded text-[11px] font-semibold border"
+															style={{ borderColor: theme.colors.border, color: theme.colors.textDim }}
+														>
+															Remove
+														</button>
+													</div>
+												</div>
+											);
+										})
+									)}
+								</div>
+								<div className="min-h-[220px] rounded border p-2.5 flex flex-col" style={{ borderColor: theme.colors.border }}>
+									<div className="flex items-center justify-between gap-2 mb-2">
+										<div className="text-xs font-semibold" style={{ color: theme.colors.textMain }}>
+											Agent Terminal
+										</div>
+										<div className="flex items-center gap-1 rounded border p-1" style={{ borderColor: theme.colors.border }}>
+											<button
+												type="button"
+												onClick={() => setTerminalMode('thought')}
+												className="px-2 py-1 rounded text-[11px] font-semibold"
+												style={{
+													backgroundColor: terminalMode === 'thought' ? `${theme.colors.accent}20` : 'transparent',
+													color: terminalMode === 'thought' ? theme.colors.accent : theme.colors.textDim,
+												}}
+											>
+												Agent Thought Stream
+											</button>
+											<button
+												type="button"
+												onClick={() => setTerminalMode('dev-logs')}
+												className="px-2 py-1 rounded text-[11px] font-semibold"
+												style={{
+													backgroundColor: terminalMode === 'dev-logs' ? `${theme.colors.accent}20` : 'transparent',
+													color: terminalMode === 'dev-logs' ? theme.colors.accent : theme.colors.textDim,
+												}}
+											>
+												Dev Server Logs
+											</button>
+										</div>
 									</div>
-								) : (
-									activeItems.map((item) => {
-										const state =
-											taskStates[taskKey(mfePackage.rootPath, item.id)] || ({ status: 'idle' } as FocusTaskExecutionState);
-										return (
+									<div className="text-[11px] mb-2" style={{ color: theme.colors.textDim }}>
+										{selectedTerminalItem
+											? `Task #${selectedTerminalItem.id} • ${selectedTerminalItem.title}`
+											: 'No running task selected'}
+									</div>
+									<div
+										className="flex-1 min-h-0 rounded border overflow-auto p-2 font-mono text-[11px] space-y-1"
+										style={{ borderColor: theme.colors.border, backgroundColor: theme.colors.bgActivity }}
+									>
+										{terminalMode === 'thought' ? (
+											<pre className="whitespace-pre-wrap break-words m-0" style={{ color: theme.colors.textMain }}>
+												{thoughtStreamText}
+											</pre>
+										) : devLogLoading ? (
+											<div style={{ color: theme.colors.textDim }}>Loading dev server logs...</div>
+										) : (
+											(devLogByTicket[selectedTerminalItem?.id || -1] || []).map((line, idx) => (
+												<div
+													key={`${selectedTerminalItem?.id || 'none'}-${idx}`}
+													className="whitespace-pre-wrap break-words"
+													style={{
+														color:
+															line.source === 'stderr' ? theme.colors.error : theme.colors.textMain,
+													}}
+												>
+													{line.text}
+												</div>
+											))
+										)}
+									</div>
+								</div>
+							</div>
+							<div className="min-h-0 rounded border p-3 flex flex-col" style={{ borderColor: theme.colors.border }}>
+								<div className="text-xs font-semibold mb-2" style={{ color: theme.colors.textMain }}>
+									Reference Design
+								</div>
+								{primaryReferenceDesign ? (
+									<>
+										<div className="text-[11px] mb-2" style={{ color: theme.colors.textDim }}>
+											#{primaryReferenceDesign.item.id} {primaryReferenceDesign.item.title}
+											{primaryReferenceDesign.designContext.verifiedNodeName
+												? ` • ${primaryReferenceDesign.designContext.verifiedNodeName}`
+												: ''}
+										</div>
 											<div
-												key={`exec-${item.id}`}
-												className="rounded border p-2.5 flex items-center justify-between gap-2"
+												className="flex-1 min-h-0 rounded border p-1"
 												style={{ borderColor: theme.colors.border, backgroundColor: theme.colors.bgActivity }}
 											>
-												<div className="min-w-0">
-													<div className="text-xs font-semibold truncate" style={{ color: theme.colors.textMain }}>
-														#{item.id} {item.title}
-													</div>
-													<div className="text-[11px]" style={{ color: theme.colors.textDim }}>
-														State: {state.status}
-													</div>
-												</div>
-												<div className="flex items-center gap-2">
-													<button
-														type="button"
-														onClick={() => onExecuteTask(item)}
-														disabled={!assignedAgentName || state.status === 'initializing'}
-														className="px-2 py-1 rounded text-[11px] font-semibold border disabled:opacity-60"
-														style={{ borderColor: theme.colors.accent, color: theme.colors.accent }}
-													>
-														Run
-													</button>
-													<button
-														type="button"
-														onClick={() => onViewTaskTerminal(item)}
-														disabled={!state.sessionId || !state.tabId}
-														className="px-2 py-1 rounded text-[11px] font-semibold border inline-flex items-center gap-1 disabled:opacity-60"
-														style={{ borderColor: theme.colors.border, color: theme.colors.textMain }}
-													>
-														<Terminal className="w-3.5 h-3.5" />
-														Console
-													</button>
-													<button
-														type="button"
-														onClick={() => onRemoveWorkItem(item.id)}
-														className="px-2 py-1 rounded text-[11px] font-semibold border"
-														style={{ borderColor: theme.colors.border, color: theme.colors.textDim }}
-													>
-														Remove
-													</button>
-												</div>
-											</div>
-										);
-									})
+												<img
+													src={primaryReferenceDesign.imageSrc}
+													alt="Reference design"
+													className="w-full h-full object-contain rounded"
+												/>
+										</div>
+									</>
+								) : (
+									<div className="text-xs" style={{ color: theme.colors.textDim }}>
+										Attach and verify a Figma link on a Kanban card to show its design reference here.
+									</div>
 								)}
 							</div>
 						</div>

@@ -138,7 +138,7 @@ export function SprintBacklogPanel({ theme }: SprintBacklogPanelProps) {
 	return (
 		<>
 			<div className="h-full flex flex-col gap-4">
-				<div className="rounded border p-3 space-y-3" style={{ borderColor: theme.colors.border }}>
+				<div className="rounded border p-3 mt-3 space-y-3" style={{ borderColor: theme.colors.border }}>
 					<div className="text-xs font-semibold uppercase" style={{ color: theme.colors.textDim }}>
 						Azure DevOps
 					</div>

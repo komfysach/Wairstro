@@ -175,6 +175,7 @@ export const AGENT_DEFINITIONS: AgentDefinition[] = [
 		command: 'gemini',
 		args: [],
 		promptArgs: (prompt: string) => ['-p', prompt],
+		imageArgs: (imagePath: string) => ['-f', imagePath],
 		// Keep prompts as positional flag args, not "-- <prompt>" separator.
 		noPromptSeparator: true,
 		// Preserve project context while allowing per-session cwd isolation.

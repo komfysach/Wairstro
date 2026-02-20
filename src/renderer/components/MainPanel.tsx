@@ -18,6 +18,7 @@ import {
 	ArrowDown,
 	FileEdit,
 	List,
+	LayoutDashboard,
 	AlertCircle,
 	X,
 	GitPullRequest,
@@ -173,6 +174,7 @@ interface MainPanelProps {
 	toggleInputMode: () => void;
 	processInput: () => void;
 	handleInterrupt: () => void;
+	onSendAgentInput?: (message: string) => Promise<void> | void;
 	handleInputKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
 	handlePaste: (e: React.ClipboardEvent<HTMLTextAreaElement>) => void;
 	handleDrop: (e: React.DragEvent<HTMLElement>) => void;
@@ -181,6 +183,7 @@ interface MainPanelProps {
 	onDeleteLog?: (logId: string) => number | null;
 	onRemoveQueuedItem?: (itemId: string) => void;
 	onOpenQueueBrowser?: () => void;
+	onOpenMfeDashboard?: () => void;
 
 	// Auto mode props
 	batchRunState?: BatchRunState; // For display (may be from any session with active batch)
@@ -431,6 +434,7 @@ export const MainPanel = React.memo(
 			toggleInputMode,
 			processInput,
 			handleInterrupt,
+			onSendAgentInput,
 			handleInputKeyDown,
 			handlePaste,
 			handleDrop,
@@ -1531,6 +1535,13 @@ export const MainPanel = React.memo(
 											<List className="w-4 h-4" style={{ color: theme.colors.textDim }} />
 										</button>
 									)}
+									<button
+										onClick={() => props.onOpenMfeDashboard?.()}
+										className="p-2 rounded hover:bg-white/5"
+										title="Open MFE Dashboard"
+									>
+										<LayoutDashboard className="w-4 h-4" style={{ color: theme.colors.textDim }} />
+									</button>
 
 									{!rightPanelOpen && (
 										<button
@@ -1858,6 +1869,7 @@ export const MainPanel = React.memo(
 											toggleInputMode={toggleInputMode}
 											processInput={processInput}
 											handleInterrupt={handleInterrupt}
+											onSendAgentInput={onSendAgentInput}
 											onInputFocus={handleInputFocus}
 											onInputBlur={props.onInputBlur}
 											isAutoModeActive={isCurrentSessionAutoMode}

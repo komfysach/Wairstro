@@ -104,6 +104,11 @@ export const FIXED_SHORTCUTS: Record<string, Shortcut> = {
 		label: "Search Director's Notes",
 		keys: ['Meta', 'f'],
 	},
+	kanbanQuickAdd: {
+		id: 'kanbanQuickAdd',
+		label: 'Kanban Quick Add',
+		keys: ['Ctrl', 'n'],
+	},
 	filePreviewBack: {
 		id: 'filePreviewBack',
 		label: 'File Preview: Go Back',

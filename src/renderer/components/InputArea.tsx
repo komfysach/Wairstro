@@ -78,6 +78,7 @@ interface InputAreaProps {
 	toggleInputMode: () => void;
 	processInput: () => void;
 	handleInterrupt: () => void;
+	onSendAgentInput?: (message: string) => Promise<void> | void;
 	onInputFocus: () => void;
 	onInputBlur?: () => void;
 	// Auto mode props
@@ -187,6 +188,7 @@ export const InputArea = React.memo(function InputArea(props: InputAreaProps) {
 		toggleInputMode,
 		processInput,
 		handleInterrupt,
+		onSendAgentInput,
 		onInputFocus,
 		onInputBlur,
 		isAutoModeActive = false,
@@ -291,6 +293,11 @@ export const InputArea = React.memo(function InputArea(props: InputAreaProps) {
 
 	// Filter slash commands based on input and current mode
 	const isTerminalMode = session.inputMode === 'terminal';
+	const isGeminiInteractiveChat =
+		session.inputMode === 'ai' &&
+		String(session.toolType) === 'gemini-cli' &&
+		(session.state === 'busy' || session.state === 'waiting_input') &&
+		!!onSendAgentInput;
 
 	// thinkingSessions is now passed directly from App.tsx (pre-filtered) for better performance
 
@@ -354,6 +361,17 @@ export const InputArea = React.memo(function InputArea(props: InputAreaProps) {
 			.reverse()
 			.slice(0, 10);
 	}, [currentCommandHistory, commandHistoryFilterLower]);
+
+	const submitGeminiIntervention = () => {
+		if (!onSendAgentInput) return;
+		const intervention = inputValue.trim();
+		if (!intervention) {
+			handleInterrupt();
+			return;
+		}
+		void onSendAgentInput(intervention);
+		setInputValue('');
+	};
 
 	// Auto-resize textarea to match content height.
 	// Fires on tab switch AND inputValue changes (handles external updates like session restore,
@@ -914,7 +932,22 @@ export const InputArea = React.memo(function InputArea(props: InputAreaProps) {
 										textarea.style.height = `${Math.min(textarea.scrollHeight, 176)}px`;
 									});
 								}}
-								onKeyDown={handleInputKeyDown}
+								onKeyDown={(e) => {
+									if (
+										isGeminiInteractiveChat &&
+										e.key === 'Enter' &&
+										!e.shiftKey &&
+										!e.metaKey &&
+										!e.ctrlKey &&
+										!e.altKey
+									) {
+										e.preventDefault();
+										e.stopPropagation();
+										submitGeminiIntervention();
+										return;
+									}
+									handleInputKeyDown(e);
+								}}
 								onPaste={handlePaste}
 								onDrop={(e) => {
 									e.stopPropagation();
@@ -1138,15 +1171,29 @@ export const InputArea = React.memo(function InputArea(props: InputAreaProps) {
 					{/* Send button - always visible. Stop button is now in ThinkingStatusPill */}
 					<button
 						type="button"
-						onClick={() => processInput()}
-						className="p-2 rounded-md shadow-sm transition-all hover:opacity-90 cursor-pointer"
+						onClick={() => (isGeminiInteractiveChat ? submitGeminiIntervention() : processInput())}
+						className="p-2 rounded-md shadow-sm transition-all hover:opacity-90 cursor-pointer min-w-[74px]"
 						style={{
 							backgroundColor: theme.colors.accent,
 							color: theme.colors.accentForeground,
 						}}
-						title={session.inputMode === 'terminal' ? 'Run command (Enter)' : 'Send message'}
+						title={
+							isGeminiInteractiveChat
+								? inputValue.trim()
+									? 'Send intervention to running Gemini process'
+									: 'Interrupt running Gemini process'
+								: session.inputMode === 'terminal'
+									? 'Run command (Enter)'
+									: 'Send message'
+						}
 					>
-						<ArrowUp className="w-4 h-4" />
+						{isGeminiInteractiveChat ? (
+							<span className="text-xs font-semibold">
+								{inputValue.trim() ? 'Send' : 'Interrupt'}
+							</span>
+						) : (
+							<ArrowUp className="w-4 h-4" />
+						)}
 					</button>
 				</div>
 			</div>

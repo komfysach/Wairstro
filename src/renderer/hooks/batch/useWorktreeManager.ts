@@ -24,8 +24,8 @@ export interface WorktreeConfig {
 	createPROnCompletion?: boolean;
 	/** Target branch for the PR (falls back to default branch) */
 	prTargetBranch?: string;
-	/** Path to gh CLI binary (if not in PATH) */
-	ghPath?: string;
+	/** Optional ADO work item ID to auto-link the PR */
+	workItemId?: string;
 	/** SSH remote ID for remote sessions (optional) */
 	sshRemoteId?: string;
 }
@@ -283,7 +283,7 @@ ${docList}
 	 *
 	 * - Gets default branch if prTargetBranch not specified
 	 * - Generates PR body with document list and task count
-	 * - Creates the PR using gh CLI
+	 * - Creates the PR using Azure CLI (az repos)
 	 */
 	const createPR = useCallback(
 		async (options: CreatePROptions): Promise<PRCreationResult> => {
@@ -306,13 +306,13 @@ ${docList}
 				const prTitle = `Auto Run: ${documents.length} document(s) processed`;
 				const prBody = generatePRBody(documents, totalCompletedTasks);
 
-				// Create the PR (pass ghPath if configured)
+				// Create the PR (link work item when provided)
 				const prResult = await window.maestro.git.createPR(
 					worktreePath,
 					baseBranch,
 					prTitle,
 					prBody,
-					worktree.ghPath
+					worktree.workItemId
 				);
 
 				if (prResult.success) {

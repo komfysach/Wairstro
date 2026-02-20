@@ -187,6 +187,7 @@ export interface UseMainPanelPropsDeps {
 	toggleInputMode: () => void;
 	processInput: () => void;
 	handleInterrupt: () => void;
+	handleSendAgentInput: (message: string) => Promise<void>;
 	handleInputKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
 	handlePaste: (e: React.ClipboardEvent<HTMLTextAreaElement>) => void;
 	handleDrop: (e: React.DragEvent<HTMLElement>) => void;
@@ -197,6 +198,7 @@ export interface UseMainPanelPropsDeps {
 	handleDeleteLog: (logId: string) => number | null;
 	handleRemoveQueuedItem: (itemId: string) => void;
 	handleOpenQueueBrowser: () => void;
+	handleOpenMfeDashboard: () => void;
 
 	// Tab management handlers
 	handleTabSelect: (tabId: string) => void;
@@ -390,6 +392,7 @@ export function useMainPanelProps(deps: UseMainPanelPropsDeps) {
 			toggleInputMode: deps.toggleInputMode,
 			processInput: deps.processInput,
 			handleInterrupt: deps.handleInterrupt,
+			onSendAgentInput: deps.handleSendAgentInput,
 			handleInputKeyDown: deps.handleInputKeyDown,
 			handlePaste: deps.handlePaste,
 			handleDrop: deps.handleDrop,
@@ -402,6 +405,7 @@ export function useMainPanelProps(deps: UseMainPanelPropsDeps) {
 			onDeleteLog: deps.handleDeleteLog,
 			onRemoveQueuedItem: deps.handleRemoveQueuedItem,
 			onOpenQueueBrowser: deps.handleOpenQueueBrowser,
+			onOpenMfeDashboard: deps.handleOpenMfeDashboard,
 			// Tab management handlers
 			onTabSelect: deps.handleTabSelect,
 			onTabClose: deps.handleTabClose,
@@ -633,6 +637,7 @@ export function useMainPanelProps(deps: UseMainPanelPropsDeps) {
 			deps.toggleInputMode,
 			deps.processInput,
 			deps.handleInterrupt,
+			deps.handleSendAgentInput,
 			deps.handleInputKeyDown,
 			deps.handlePaste,
 			deps.handleDrop,
@@ -643,6 +648,7 @@ export function useMainPanelProps(deps: UseMainPanelPropsDeps) {
 			deps.handleDeleteLog,
 			deps.handleRemoveQueuedItem,
 			deps.handleOpenQueueBrowser,
+			deps.handleOpenMfeDashboard,
 			deps.handleTabSelect,
 			deps.handleTabClose,
 			deps.handleNewTab,

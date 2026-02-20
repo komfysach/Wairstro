@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { X, GitBranch, FolderOpen, Plus, Loader2, AlertTriangle, Server } from 'lucide-react';
-import type { Theme, Session, GhCliStatus } from '../types';
+import type { Theme, Session, AdoCliStatus } from '../types';
 import { useLayerStack } from '../contexts/LayerStackContext';
 import { MODAL_PRIORITIES } from '../constants/modalPriorities';
 
@@ -58,8 +58,8 @@ export function WorktreeConfigModal({
 	const [error, setError] = useState<string | null>(null);
 	const canDisable = !!(session.worktreeConfig?.basePath || basePath.trim());
 
-	// gh CLI status
-	const [ghCliStatus, setGhCliStatus] = useState<GhCliStatus | null>(null);
+	// az CLI status
+	const [adoCliStatus, setAdoCliStatus] = useState<AdoCliStatus | null>(null);
 
 	// SSH remote awareness - check both runtime sshRemoteId and configured sessionSshRemoteConfig
 	// Note: sshRemoteId is only set after AI agent spawns. For terminal-only SSH sessions,
@@ -82,10 +82,10 @@ export function WorktreeConfigModal({
 		}
 	}, [isOpen, registerLayer, unregisterLayer]);
 
-	// Check gh CLI status and load config on open
+	// Check az CLI status and load config on open
 	useEffect(() => {
 		if (isOpen) {
-			checkGhCli();
+			checkAdoCli();
 			setBasePath(session.worktreeConfig?.basePath || '');
 			setWatchEnabled(session.worktreeConfig?.watchEnabled ?? true);
 			setNewBranchName('');
@@ -93,12 +93,12 @@ export function WorktreeConfigModal({
 		}
 	}, [isOpen, session.worktreeConfig]);
 
-	const checkGhCli = async () => {
+	const checkAdoCli = async () => {
 		try {
-			const status = await window.maestro.git.checkGhCli();
-			setGhCliStatus(status);
+			const status = await window.maestro.git.checkAdoCli();
+			setAdoCliStatus(status);
 		} catch {
-			setGhCliStatus({ installed: false, authenticated: false });
+			setAdoCliStatus({ installed: false, authenticated: false });
 		}
 	};
 
@@ -207,8 +207,8 @@ export function WorktreeConfigModal({
 
 				{/* Content */}
 				<div className="p-4 space-y-4 overflow-y-auto flex-1">
-					{/* gh CLI warning */}
-					{ghCliStatus !== null && !ghCliStatus.installed && (
+					{/* az CLI warning */}
+					{adoCliStatus !== null && !adoCliStatus.installed && (
 						<div
 							className="flex items-start gap-2 p-3 rounded border"
 							style={{
@@ -221,18 +221,18 @@ export function WorktreeConfigModal({
 								style={{ color: theme.colors.warning }}
 							/>
 							<div className="text-sm">
-								<p style={{ color: theme.colors.warning }}>GitHub CLI recommended</p>
+								<p style={{ color: theme.colors.warning }}>Azure CLI recommended</p>
 								<p className="mt-1" style={{ color: theme.colors.textDim }}>
 									Install{' '}
 									<button
 										type="button"
 										className="underline hover:opacity-80"
 										style={{ color: theme.colors.accent }}
-										onClick={() => window.maestro.shell.openExternal('https://cli.github.com')}
+										onClick={() => window.maestro.shell.openExternal('https://aka.ms/azure-cli')}
 									>
-										GitHub CLI
+										Azure CLI
 									</button>{' '}
-									for best worktree support.
+									for ADO pull-request automation.
 								</p>
 							</div>
 						</div>

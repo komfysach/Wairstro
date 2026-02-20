@@ -20,6 +20,10 @@ export interface ProcessSessionIdHandler {
 	(sessionId: string, agentSessionId: string): void;
 }
 
+export interface AgentTerminatedHandler {
+	(sessionId: string, reportPath: string): void;
+}
+
 /**
  * Result from process spawn operation.
  * Includes SSH remote info when the agent is executed on a remote host.
@@ -116,5 +120,9 @@ export const processService = {
 		) => void
 	): () => void {
 		return window.maestro.process.onToolExecution(handler);
+	},
+
+	onAgentTerminated(handler: AgentTerminatedHandler): () => void {
+		return window.maestro.process.onAgentTerminated(handler);
 	},
 };

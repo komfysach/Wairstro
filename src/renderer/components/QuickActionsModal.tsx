@@ -830,7 +830,7 @@ export function QuickActionsModal(props: QuickActionsModalProps) {
 			? [
 					{
 						id: 'createPR',
-						label: `Create Pull Request: ${activeSession.worktreeBranch}`,
+						label: `Create PR in ADO: ${activeSession.worktreeBranch}`,
 						subtext: 'Open PR from this worktree branch',
 						action: () => {
 							onOpenCreatePR(activeSession);

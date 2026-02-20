@@ -42,4 +42,9 @@ export function setupForwardingListeners(
 	processManager.on('command-exit', (sessionId: string, code: number) => {
 		safeSend('process:command-exit', sessionId, code);
 	});
+
+	// Handle worker agent termination reports
+	processManager.on('agent:terminated', (sessionId: string, reportPath: string) => {
+		safeSend('process:agent-terminated', sessionId, reportPath);
+	});
 }

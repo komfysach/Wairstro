@@ -21,6 +21,8 @@ import { FileExplorerPanel } from './FileExplorerPanel';
 import { HistoryPanel, HistoryPanelHandle } from './HistoryPanel';
 import { AutoRun, AutoRunHandle } from './AutoRun';
 import { SprintBacklogPanel } from './SprintBacklogPanel';
+import { KanbanBoard } from './KanbanBoard';
+import type { AdoBoardItem } from '../services/ado';
 import type { DocumentTaskCount } from './AutoRunDocumentSelector';
 import { AutoRunExpandedModal } from './AutoRunExpandedModal';
 import { formatShortcutKeys } from '../utils/shortcutFormatter';
@@ -144,6 +146,9 @@ interface RightPanelProps {
 	lastGraphFocusFile?: string;
 	/** Callback to open the last document graph */
 	onOpenLastDocumentGraph?: () => void;
+	onRunKanbanTicket?: (item: AdoBoardItem) => Promise<void>;
+	onQuickPrKanbanTicket?: (item: AdoBoardItem) => Promise<void>;
+	onMergeCompleteKanbanTicket?: (item: AdoBoardItem, prId?: number) => Promise<void>;
 }
 
 export const RightPanel = memo(
@@ -211,6 +216,9 @@ export const RightPanel = memo(
 			onFocusFileInGraph,
 			lastGraphFocusFile,
 			onOpenLastDocumentGraph,
+			onRunKanbanTicket,
+			onQuickPrKanbanTicket,
+			onMergeCompleteKanbanTicket,
 		} = props;
 
 		const historyPanelRef = useRef<HistoryPanelHandle>(null);
@@ -429,7 +437,7 @@ export const RightPanel = memo(
 
 				{/* Tab Header */}
 				<div className="flex border-b h-16" style={{ borderColor: theme.colors.border }}>
-					{['files', 'history', 'autorun', 'sprint'].map((tab) => (
+					{['files', 'history', 'autorun', 'sprint-planning', 'kanban-flow'].map((tab) => (
 						<button
 							key={tab}
 							onClick={() => setActiveRightTab(tab as RightPanelTab)}
@@ -442,8 +450,10 @@ export const RightPanel = memo(
 						>
 							{tab === 'autorun'
 								? 'Auto Run'
-								: tab === 'sprint'
+								: tab === 'sprint-planning'
 									? 'Sprint'
+									: tab === 'kanban-flow'
+										? 'Kanban'
 									: tab.charAt(0).toUpperCase() + tab.slice(1)}
 						</button>
 					))}
@@ -542,7 +552,16 @@ export const RightPanel = memo(
 						</div>
 					)}
 
-					{activeRightTab === 'sprint' && <SprintBacklogPanel theme={theme} />}
+					{activeRightTab === 'sprint-planning' && <SprintBacklogPanel theme={theme} />}
+					{activeRightTab === 'kanban-flow' && (
+						<KanbanBoard
+							theme={theme}
+							monorepoRoot={session?.projectRoot || session?.cwd || ''}
+							onRunTicket={onRunKanbanTicket}
+							onQuickPrTicket={onQuickPrKanbanTicket}
+							onMergeCompleteTicket={onMergeCompleteKanbanTicket}
+						/>
+					)}
 				</div>
 
 				{/* Auto Run Expanded Modal */}

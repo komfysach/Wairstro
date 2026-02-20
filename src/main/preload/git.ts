@@ -255,19 +255,53 @@ export function createGitApi() {
 			),
 
 		/**
-		 * Create a GitHub PR
+		 * Create an Azure DevOps PR
 		 */
 		createPR: (
 			worktreePath: string,
 			baseBranch: string,
 			title: string,
 			body: string,
-			ghPath?: string
+			workItemId?: string
 		): Promise<{
 			success: boolean;
+			prId?: number;
 			prUrl?: string;
 			error?: string;
-		}> => ipcRenderer.invoke('git:createPR', worktreePath, baseBranch, title, body, ghPath),
+		}> => ipcRenderer.invoke('git:createPR', worktreePath, baseBranch, title, body, workItemId),
+
+		/**
+		 * Complete an Azure DevOps PR and tear down its worktree/branch.
+		 */
+		completeAdoPrAndCleanup: (payload: {
+			prId: number;
+			branchName: string;
+			worktreePath: string;
+		}): Promise<{
+			success: boolean;
+			error?: string;
+		}> => ipcRenderer.invoke('git:completeAdoPrAndCleanup', payload),
+
+		/**
+		 * Check if an active ADO PR exists for a source branch
+		 */
+		getPrStatus: (
+			repoPath: string,
+			branchName: string
+		): Promise<{
+			exists: boolean;
+			prId?: number;
+			prUrl?: string;
+			title?: string;
+			sourceBranch?: string;
+			targetBranch?: string;
+		}> => ipcRenderer.invoke('git:getPrStatus', repoPath, branchName),
+
+		/**
+		 * Check Azure CLI install/auth status for ADO workflows
+		 */
+		checkAdoCli: (): Promise<{ installed: boolean; authenticated: boolean; error?: string }> =>
+			ipcRenderer.invoke('git:checkAdoCli'),
 
 		/**
 		 * Get the default branch of a repository

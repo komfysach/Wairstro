@@ -110,6 +110,7 @@ export interface ProcessManagerEvents {
 	data: (sessionId: string, data: string) => void;
 	stderr: (sessionId: string, data: string) => void;
 	exit: (sessionId: string, code: number) => void;
+	'agent:terminated': (sessionId: string, reportPath: string) => void;
 	'command-exit': (sessionId: string, code: number) => void;
 	usage: (sessionId: string, stats: UsageStats) => void;
 	'session-id': (sessionId: string, agentSessionId: string) => void;

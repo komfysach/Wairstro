@@ -120,6 +120,11 @@ export interface ToolExecutionEvent {
 	timestamp: number;
 }
 
+export interface AgentTerminatedEvent {
+	sessionId: string;
+	reportPath: string;
+}
+
 /**
  * SSH remote info
  */
@@ -145,6 +150,13 @@ export function createProcessApi() {
 		 */
 		write: (sessionId: string, data: string): Promise<boolean> =>
 			ipcRenderer.invoke('process:write', sessionId, data),
+
+		/**
+		 * Send interactive chat input to a running agent process.
+		 * Currently used for Gemini CLI live intervention while active.
+		 */
+		sendAgentInput: (agentId: string, message: string): Promise<boolean> =>
+			ipcRenderer.invoke('agent:send-input', agentId, message),
 
 		/**
 		 * Send interrupt signal (Ctrl+C) to a process
@@ -240,6 +252,16 @@ export function createProcessApi() {
 				callback(sessionId, toolEvent);
 			ipcRenderer.on('process:tool-execution', handler);
 			return () => ipcRenderer.removeListener('process:tool-execution', handler);
+		},
+
+		/**
+		 * Subscribe to worker agent termination events and memo report paths
+		 */
+		onAgentTerminated: (callback: (sessionId: string, reportPath: string) => void): (() => void) => {
+			const handler = (_: unknown, sessionId: string, reportPath: string) =>
+				callback(sessionId, reportPath);
+			ipcRenderer.on('process:agent-terminated', handler);
+			return () => ipcRenderer.removeListener('process:agent-terminated', handler);
 		},
 
 		/**

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { X, GitBranch, Loader2, AlertTriangle } from 'lucide-react';
-import type { Theme, Session, GhCliStatus } from '../types';
+import type { Theme, Session, AdoCliStatus } from '../types';
 import { useLayerStack } from '../contexts/LayerStackContext';
 import { MODAL_PRIORITIES } from '../constants/modalPriorities';
 
@@ -34,8 +34,8 @@ export function CreateWorktreeModal({
 	const [isCreating, setIsCreating] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 
-	// gh CLI status
-	const [ghCliStatus, setGhCliStatus] = useState<GhCliStatus | null>(null);
+	// az CLI status
+	const [adoCliStatus, setAdoCliStatus] = useState<AdoCliStatus | null>(null);
 
 	// Input ref for auto-focus
 	const inputRef = useRef<HTMLInputElement>(null);
@@ -55,10 +55,10 @@ export function CreateWorktreeModal({
 		}
 	}, [isOpen, registerLayer, unregisterLayer]);
 
-	// Check gh CLI status and reset state on open
+	// Check az CLI status and reset state on open
 	useEffect(() => {
 		if (isOpen) {
-			checkGhCli();
+			checkAdoCli();
 			setBranchName('');
 			setError(null);
 			// Auto-focus the input
@@ -66,12 +66,12 @@ export function CreateWorktreeModal({
 		}
 	}, [isOpen]);
 
-	const checkGhCli = async () => {
+	const checkAdoCli = async () => {
 		try {
-			const status = await window.maestro.git.checkGhCli();
-			setGhCliStatus(status);
+			const status = await window.maestro.git.checkAdoCli();
+			setAdoCliStatus(status);
 		} catch {
-			setGhCliStatus({ installed: false, authenticated: false });
+			setAdoCliStatus({ installed: false, authenticated: false });
 		}
 	};
 
@@ -144,8 +144,8 @@ export function CreateWorktreeModal({
 
 				{/* Content */}
 				<div className="p-4 space-y-4">
-					{/* gh CLI warning */}
-					{ghCliStatus !== null && !ghCliStatus.installed && (
+					{/* az CLI warning */}
+					{adoCliStatus !== null && !adoCliStatus.installed && (
 						<div
 							className="flex items-start gap-2 p-3 rounded border"
 							style={{
@@ -158,18 +158,18 @@ export function CreateWorktreeModal({
 								style={{ color: theme.colors.warning }}
 							/>
 							<div className="text-sm">
-								<p style={{ color: theme.colors.warning }}>GitHub CLI recommended</p>
+								<p style={{ color: theme.colors.warning }}>Azure CLI recommended</p>
 								<p className="mt-1" style={{ color: theme.colors.textDim }}>
 									Install{' '}
 									<button
 										type="button"
 										className="underline hover:opacity-80"
 										style={{ color: theme.colors.accent }}
-										onClick={() => window.maestro.shell.openExternal('https://cli.github.com')}
+										onClick={() => window.maestro.shell.openExternal('https://aka.ms/azure-cli')}
 									>
-										GitHub CLI
+										Azure CLI
 									</button>{' '}
-									for best worktree support.
+									for ADO pull-request automation.
 								</p>
 							</div>
 						</div>

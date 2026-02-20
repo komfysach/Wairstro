@@ -52,6 +52,8 @@ import { createDirectorNotesApi } from './directorNotes';
 import { createWakatimeApi } from './wakatime';
 import { createMfeApi } from './mfe';
 import { createAdoApi } from './ado';
+import { createSignalApi } from './signal';
+import { createMcpApi } from './mcp';
 
 // Expose protected methods that allow the renderer process to use
 // the ipcRenderer without exposing the entire object
@@ -196,6 +198,12 @@ contextBridge.exposeInMainWorld('maestro', {
 
 	// ADO API (Sprint planning integration)
 	ado: createAdoApi(),
+
+	// Signal API (worker coordination)
+	signal: createSignalApi(),
+
+	// MCP API (Model Context Protocol client bridge)
+	mcp: createMcpApi(),
 });
 
 // Re-export factory functions for external consumers (e.g., tests)
@@ -273,6 +281,10 @@ export {
 	createMfeApi,
 	// ADO
 	createAdoApi,
+	// Signal
+	createSignalApi,
+	// MCP
+	createMcpApi,
 };
 
 // Re-export types for TypeScript consumers
@@ -485,3 +497,11 @@ export type {
 	// From ado
 	AdoApi,
 } from './ado';
+export type {
+	// From signal
+	SignalApi,
+} from './signal';
+export type {
+	// From mcp
+	McpApi,
+} from './mcp';

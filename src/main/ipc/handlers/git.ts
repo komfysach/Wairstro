@@ -29,6 +29,8 @@ import {
 	getRepoRootRemote,
 } from '../../utils/remote-git';
 import { readDirRemote } from '../../utils/remote-fs';
+import { AdoGitService } from '../../services/ado-git-service';
+import { WorktreeManager } from '../../services/WorktreeManager';
 
 const LOG_CONTEXT = '[Git]';
 
@@ -89,6 +91,8 @@ const handlerOpts = (operation: string, logSuccess = false): CreateHandlerOption
 export function registerGitHandlers(deps: GitHandlerDependencies): void {
 	// Store the settings reference for SSH remote lookups
 	gitSettingsStore = deps.settingsStore;
+	const adoGitService = new AdoGitService(deps.settingsStore);
+	const worktreeManager = new WorktreeManager();
 	// Basic Git operations
 	// All handlers accept optional sshRemoteId and remoteCwd for remote execution
 
@@ -820,8 +824,7 @@ export function registerGitHandlers(deps: GitHandlerDependencies): void {
 		)
 	);
 
-	// Create a PR from the worktree branch to a base branch
-	// ghPath parameter allows specifying custom path to gh binary
+	// Create an ADO PR from the worktree branch to a base branch
 	ipcMain.handle(
 		'git:createPR',
 		withIpcErrorLogging(
@@ -831,48 +834,84 @@ export function registerGitHandlers(deps: GitHandlerDependencies): void {
 				baseBranch: string,
 				title: string,
 				body: string,
-				ghPath?: string
+				workItemId?: string
 			) => {
-				// Resolve gh CLI path (uses cached detection or custom path)
-				const ghCommand = await resolveGhPath(ghPath);
-				logger.debug(`Using gh CLI at: ${ghCommand}`, LOG_CONTEXT);
-
-				// First, push the current branch to origin
-				const pushResult = await execFileNoThrow(
+				const branchResult = await execFileNoThrow(
 					'git',
-					['push', '-u', 'origin', 'HEAD'],
+					['rev-parse', '--abbrev-ref', 'HEAD'],
 					worktreePath
 				);
-				if (pushResult.exitCode !== 0) {
-					return { success: false, error: `Failed to push branch: ${pushResult.stderr}` };
+				if (branchResult.exitCode !== 0) {
+					return { success: false, error: branchResult.stderr || 'Failed to read current branch' };
 				}
 
-				// Create the PR using gh CLI
-				const prResult = await execFileNoThrow(
-					ghCommand,
-					['pr', 'create', '--base', baseBranch, '--title', title, '--body', body],
-					worktreePath
-				);
-
-				if (prResult.exitCode !== 0) {
-					// Check if gh CLI is not installed
-					if (
-						prResult.stderr.includes('command not found') ||
-						prResult.stderr.includes('not recognized')
-					) {
-						return {
-							success: false,
-							error: 'GitHub CLI (gh) is not installed. Please install it to create PRs.',
-						};
-					}
-					return { success: false, error: prResult.stderr || 'Failed to create PR' };
+				try {
+					const result = await adoGitService.createPr({
+						repoPath: worktreePath,
+						sourceBranch: branchResult.stdout.trim(),
+						targetBranch: baseBranch,
+						title,
+						description: body,
+						workItemId,
+					});
+					return { success: true, prId: result.prId, prUrl: result.prUrl };
+				} catch (error) {
+					return {
+						success: false,
+						error: error instanceof Error ? error.message : 'Failed to create PR in Azure DevOps',
+					};
 				}
-
-				// The PR URL is typically in stdout
-				const prUrl = prResult.stdout.trim();
-				return { success: true, prUrl };
 			}
 		)
+	);
+
+	ipcMain.handle(
+		'git:completeAdoPrAndCleanup',
+		withIpcErrorLogging(
+			handlerOpts('completeAdoPrAndCleanup'),
+			async (payload: { prId: number; branchName: string; worktreePath: string }) => {
+				if (!payload || typeof payload !== 'object') {
+					return { success: false, error: 'Payload is required.' };
+				}
+				if (!payload.worktreePath?.trim()) {
+					return { success: false, error: 'worktreePath is required.' };
+				}
+				if (!payload.branchName?.trim()) {
+					return { success: false, error: 'branchName is required.' };
+				}
+				if (!Number.isInteger(payload.prId) || payload.prId <= 0) {
+					return { success: false, error: 'A valid prId is required.' };
+				}
+
+				try {
+					await adoGitService.completePr({
+						prId: payload.prId,
+						repoPath: payload.worktreePath,
+					});
+					await worktreeManager.cleanupWorktree(payload.branchName, payload.worktreePath);
+					return { success: true };
+				} catch (error) {
+					return {
+						success: false,
+						error:
+							error instanceof Error ? error.message : 'Failed to complete PR and clean up worktree.',
+					};
+				}
+			}
+		)
+	);
+
+	ipcMain.handle(
+		'git:getPrStatus',
+		withIpcErrorLogging(
+			handlerOpts('getPrStatus'),
+			async (repoPath: string, branchName: string) => adoGitService.getPrStatus(repoPath, branchName)
+		)
+	);
+
+	ipcMain.handle(
+		'git:checkAdoCli',
+		withIpcErrorLogging(handlerOpts('checkAdoCli'), async () => adoGitService.checkCliAuth())
 	);
 
 	// Check if GitHub CLI (gh) is installed and authenticated

@@ -45,7 +45,17 @@ export type {
 	AdoSprintWorkItem,
 	AdoCurrentSprintResponse,
 	AdoCurrentSprintDebug,
+	CaptureWorkerUiResult,
 } from './ado';
+export type {
+	GenerateSprintPlanInput,
+	SprintExecutionPlan,
+	SprintExecutionResult,
+} from '../../shared/orchestrator-types';
+
+// Signal coordination service
+export { signalService } from './signal';
+export type { SignalState, SignalAnnouncement, LockCheckResult } from './signal';
 
 // Agent routing service (ADO work item -> isolated worktree + agent run)
 export { AgentRouterService, agentRouterService } from './AgentRouterService';

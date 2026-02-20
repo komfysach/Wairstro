@@ -1,10 +1,10 @@
 import { useState, useRef } from 'react';
 import { GitBranch, AlertTriangle, Loader2, ChevronDown } from 'lucide-react';
-import type { Theme, WorktreeValidationState, GhCliStatus } from '../types';
+import type { Theme, WorktreeValidationState, AdoCliStatus } from '../types';
 import { useClickOutside } from '../hooks';
 
 // Re-export types for backward compatibility
-export type { WorktreeValidationState, GhCliStatus } from '../types';
+export type { WorktreeValidationState, AdoCliStatus } from '../types';
 
 /**
  * Props for GitWorktreeSection component
@@ -26,7 +26,7 @@ export interface GitWorktreeSectionProps {
 	// Validation and available data
 	worktreeValidation: WorktreeValidationState;
 	availableBranches: string[];
-	ghCliStatus: GhCliStatus | null;
+	ghCliStatus: AdoCliStatus | null;
 	// SSH remote support
 	sshRemoteId?: string;
 }
@@ -35,7 +35,7 @@ export interface GitWorktreeSectionProps {
  * GitWorktreeSection - Git worktree configuration UI for batch runs
  *
  * Features:
- * - Enable/disable worktree toggle with gh CLI availability check
+ * - Enable/disable worktree toggle with Azure CLI availability check
  * - Worktree path input with browse button
  * - Branch name input
  * - Worktree validation warnings (branch mismatch, different repo, uncommitted changes)
@@ -154,7 +154,7 @@ export function GitWorktreeSection({
 					</span>
 				</button>
 
-				{/* GitHub CLI not installed warning - shown inline with disabled toggle */}
+				{/* Azure CLI not installed warning - shown inline with disabled toggle */}
 				{ghCliStatus !== null && !ghCliStatus.installed && (
 					<div className="flex items-center gap-2 text-xs" style={{ color: theme.colors.textDim }}>
 						<AlertTriangle className="w-4 h-4 shrink-0" style={{ color: theme.colors.warning }} />
@@ -166,21 +166,21 @@ export function GitWorktreeSection({
 								style={{ color: theme.colors.accent }}
 								onClick={(e) => {
 									e.stopPropagation();
-									window.maestro.shell.openExternal('https://cli.github.com');
+									window.maestro.shell.openExternal('https://aka.ms/azure-cli');
 								}}
 							>
-								GitHub CLI
+								Azure CLI
 							</button>{' '}
 							to enable worktree features
 						</span>
 					</div>
 				)}
 
-				{/* Still checking gh CLI status */}
+				{/* Still checking Azure CLI status */}
 				{ghCliStatus === null && (
 					<div className="flex items-center gap-2 text-xs" style={{ color: theme.colors.textDim }}>
 						<Loader2 className="w-3 h-3 animate-spin" />
-						Checking GitHub CLI...
+						Checking Azure CLI...
 					</div>
 				)}
 			</div>

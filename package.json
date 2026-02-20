@@ -252,6 +252,7 @@
     "marked": "^17.0.1",
     "mermaid": "^11.12.1",
     "node-pty": "^1.1.0",
+    "playwright-core": "^1.57.0",
     "qrcode": "^1.5.4",
     "qrcode.react": "^4.2.0",
     "react-diff-view": "^3.3.2",

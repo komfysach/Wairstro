@@ -384,7 +384,7 @@ function SessionContextMenu({
 							style={{ color: theme.colors.accent }}
 						>
 							<GitPullRequest className="w-3.5 h-3.5" />
-							Create Pull Request
+							Create PR in ADO
 						</button>
 					)}
 					{onDeleteWorktree && (

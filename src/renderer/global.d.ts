@@ -201,11 +201,12 @@ interface MaestroAPI {
 		getAll: () => Promise<any[]>;
 		setAll: (groups: any[]) => Promise<boolean>;
 	};
-	process: {
-		spawn: (config: ProcessConfig) => Promise<{ pid: number; success: boolean }>;
-		write: (sessionId: string, data: string) => Promise<boolean>;
-		interrupt: (sessionId: string) => Promise<boolean>;
-		kill: (sessionId: string) => Promise<boolean>;
+		process: {
+			spawn: (config: ProcessConfig) => Promise<{ pid: number; success: boolean }>;
+			write: (sessionId: string, data: string) => Promise<boolean>;
+			sendAgentInput: (agentId: string, message: string) => Promise<boolean>;
+			interrupt: (sessionId: string) => Promise<boolean>;
+			kill: (sessionId: string) => Promise<boolean>;
 		resize: (sessionId: string, cols: number, rows: number) => Promise<boolean>;
 		runCommand: (config: {
 			sessionId: string;
@@ -239,6 +240,7 @@ interface MaestroAPI {
 				toolEvent: { toolName: string; state?: unknown; timestamp: number }
 			) => void
 		) => () => void;
+		onAgentTerminated: (callback: (sessionId: string, reportPath: string) => void) => () => void;
 		onSshRemote: (
 			callback: (
 				sessionId: string,
@@ -491,10 +493,35 @@ interface MaestroAPI {
 			baseBranch: string,
 			title: string,
 			body: string,
-			ghPath?: string
+			workItemId?: string
 		) => Promise<{
 			success: boolean;
+			prId?: number;
 			prUrl?: string;
+			error?: string;
+		}>;
+		completeAdoPrAndCleanup: (payload: {
+			prId: number;
+			branchName: string;
+			worktreePath: string;
+		}) => Promise<{
+			success: boolean;
+			error?: string;
+		}>;
+		getPrStatus: (
+			repoPath: string,
+			branchName: string
+		) => Promise<{
+			exists: boolean;
+			prId?: number;
+			prUrl?: string;
+			title?: string;
+			sourceBranch?: string;
+			targetBranch?: string;
+		}>;
+		checkAdoCli: () => Promise<{
+			installed: boolean;
+			authenticated: boolean;
 			error?: string;
 		}>;
 		getDefaultBranch: (cwd: string) => Promise<{
@@ -2704,8 +2731,65 @@ interface MaestroAPI {
 		validateApiKey: (key: string) => Promise<{ valid: boolean }>;
 	};
 
+	// MCP API (generic Model Context Protocol client bridge)
+	mcp: {
+		getSettings: () => Promise<{ figmaMcpEnabled: boolean; hasFigmaPat: boolean }>;
+		setSettings: (settings: { figmaMcpEnabled?: boolean; figmaPat?: string }) => Promise<{
+			figmaMcpEnabled: boolean;
+			hasFigmaPat: boolean;
+		}>;
+		connect: (payload: { command: string; args: string[] }) => Promise<{
+			connected: boolean;
+			serverInfo?: unknown;
+			capabilities?: unknown;
+		}>;
+		listTools: () => Promise<
+			Array<{
+				name: string;
+				description?: string;
+				inputSchema?: unknown;
+			}>
+		>;
+		verifyFigmaNode: (payload: { figmaUrl: string }) => Promise<{
+			fileKey: string;
+			nodeId: string;
+			nodeName: string;
+		}>;
+		exportFigmaImage: (payload: { figmaUrl: string }) => Promise<{
+			fileKey: string;
+			nodeId: string;
+			imagePath: string;
+			imageUrl: string;
+		}>;
+		callTool: (payload: { name: string; arguments?: Record<string, unknown> }) => Promise<unknown>;
+		disconnect: () => Promise<{ success: boolean }>;
+	};
+
 	// ADO API (Sprint planning integration)
 	ado: {
+		startPreview: (payload: {
+			worktreePath: string;
+			mfeName: string;
+		}) => Promise<{ success: boolean; port: number; url: string }>;
+		stopPreview: (payload: {
+			worktreePath: string;
+			mfeName: string;
+		}) => Promise<{ success: boolean; stopped: boolean }>;
+		getPreviewStatus: (payload: {
+			worktreePath: string;
+			mfeName: string;
+		}) => Promise<{ running: boolean; port?: number; url?: string }>;
+		getTerminalErrors: (payload: {
+			worktreePath: string;
+			mfeName: string;
+		}) => Promise<{ output: string }>;
+		getDevServerLogs: (payload: {
+			worktreePath: string;
+			mfeName: string;
+			lineCount?: number;
+		}) => Promise<{
+			lines: Array<{ source: 'stdout' | 'stderr'; text: string }>;
+		}>;
 		getSettings: () => Promise<{
 			organization: string;
 			project: string;
@@ -2726,10 +2810,66 @@ interface MaestroAPI {
 				title: string;
 				description: string;
 				acceptanceCriteria: string;
+				attachedContextPaths?: string[];
 				state: string;
 				tags: string[];
 				url: string;
 			}>;
+		}>;
+		getBoardSnapshot: (boardName?: string) => Promise<{
+			boardName: string;
+			columns: Array<{
+				name: string;
+				stateMappings: string[];
+				lane: 'To-Do' | 'Active' | 'Review' | 'Resolved' | 'Closed';
+			}>;
+			items: Array<{
+				id: number;
+				title: string;
+				description: string;
+				acceptanceCriteria: string;
+				attachedContextPaths?: string[];
+				state: string;
+				boardColumn: string;
+				tags: string[];
+				url: string;
+				lane: 'To-Do' | 'Active' | 'Review' | 'Resolved' | 'Closed';
+			}>;
+			debug?: {
+				resolvedTeam: string | null;
+				resolvedBoard: string;
+				columnsUrl: string;
+				wiqlUrl: string;
+				teamFieldValuesUrl?: string;
+				wiql: string;
+			};
+		}>;
+		moveItemToColumn: (payload: {
+			ticketId: number;
+			targetColumn: string;
+			boardName?: string;
+		}) => Promise<{ id: number; state: string; boardColumn: string }>;
+		updateWorkItemAttachedContext: (payload: {
+			ticketId: number;
+			attachedContextPaths: string[];
+		}) => Promise<{ id: number; attachedContextPaths: string[] }>;
+		createWorkItem: (payload: {
+			title: string;
+			type: 'User Story' | 'Bug' | 'Task';
+			description?: string;
+			areaPath?: string;
+			boardName?: string;
+			acceptanceCriteria?: string;
+		}) => Promise<{
+			id: number;
+			title: string;
+			description: string;
+			acceptanceCriteria: string;
+			state: string;
+			boardColumn: string;
+			tags: string[];
+			url: string;
+			lane: 'To-Do' | 'Active' | 'Review' | 'Resolved' | 'Closed';
 		}>;
 		getCurrentSprintDebug: () => Promise<{
 			organization: string;
@@ -2756,6 +2896,102 @@ interface MaestroAPI {
 			warnings?: string[];
 			error?: string;
 		}>;
+		generateSprintPlan: (input: { monorepoRoot: string; managerAgentType?: string }) => Promise<{
+			generatedAt: number;
+			manager: {
+				name: 'ManagerAgent';
+				agentType: string;
+				capabilities: ['root-readonly-fs', 'ado-api', 'agent-factory-control'];
+				systemPrompt: string;
+			};
+			packages: Array<{
+				packageKey: string;
+				packageName: string;
+				packagePath: string;
+				role: 'host' | 'remote' | 'shared';
+				tasks: Array<{
+					id: number;
+					title: string;
+					description: string;
+					acceptanceCriteria: string;
+					state: string;
+					tags: string[];
+					url: string;
+					complexity: 'Low' | 'Medium' | 'High';
+				}>;
+			}>;
+			unassigned: Array<{
+				id: number;
+				title: string;
+				description: string;
+				acceptanceCriteria: string;
+				state: string;
+				tags: string[];
+				url: string;
+				complexity: 'Low' | 'Medium' | 'High';
+			}>;
+			contextRefreshed?: boolean;
+		}>;
+		executeSprintPlan: (plan: {
+			generatedAt: number;
+			manager: {
+				name: 'ManagerAgent';
+				agentType: string;
+				capabilities: ['root-readonly-fs', 'ado-api', 'agent-factory-control'];
+				systemPrompt: string;
+			};
+			packages: Array<{
+				packageKey: string;
+				packageName: string;
+				packagePath: string;
+				role: 'host' | 'remote' | 'shared';
+				tasks: Array<{
+					id: number;
+					title: string;
+					description: string;
+					acceptanceCriteria: string;
+					state: string;
+					tags: string[];
+					url: string;
+					complexity: 'Low' | 'Medium' | 'High';
+				}>;
+			}>;
+			unassigned: Array<{
+				id: number;
+				title: string;
+				description: string;
+				acceptanceCriteria: string;
+				state: string;
+				tags: string[];
+				url: string;
+				complexity: 'Low' | 'Medium' | 'High';
+			}>;
+			contextRefreshed?: boolean;
+		}) => Promise<{
+			startedAt: number;
+			finishedAt: number;
+			workers: Array<{
+				packageKey: string;
+				packageName: string;
+				packagePath: string;
+				role: 'host' | 'remote' | 'shared';
+				action: 'reuse' | 'create';
+				workerSessionId?: string;
+				workerName: string;
+				workerType: string;
+				status: 'busy' | 'idle';
+				tasks: Array<{
+					id: number;
+					title: string;
+					description: string;
+					acceptanceCriteria: string;
+					state: string;
+					tags: string[];
+					url: string;
+					complexity: 'Low' | 'Medium' | 'High';
+				}>;
+			}>;
+		}>;
 		runAgentTask: (payload: {
 			sessionId: string;
 			tabId: string;
@@ -2778,6 +3014,10 @@ interface MaestroAPI {
 				adoTitle: string;
 				adoDescription?: string;
 				adoAcceptanceCriteria?: string;
+				attachedContextPaths?: string[];
+				figmaLink?: string;
+				figmaNodeName?: string;
+				uiTarget?: string;
 				prompt: string;
 			};
 			mfeConfig: {
@@ -2792,6 +3032,60 @@ interface MaestroAPI {
 			worktreeBranch: string;
 			processSessionId: string;
 		}>;
+		captureWorkerUi: (payload: {
+			processSessionId: string;
+			routeOrComponent: string;
+		}) => Promise<{
+			success: boolean;
+			snapshotPath: string;
+			url: string;
+			selector: string;
+		}>;
+		terminateWorkerAgent: (
+			processSessionId: string
+		) => Promise<{ success: boolean; reportPath: string }>;
+		auditTask: (payload: { taskId: string; repositoryRoot?: string }) => Promise<{
+			taskId: string;
+			verdict: 'AUDIT_PASS' | 'AUDIT_FAIL';
+			findings: string[];
+			branch: string;
+			generatedAt: number;
+		}>;
+	};
+
+	// Signal API (worker coordination)
+	signal: {
+		getState: () => Promise<{
+			locks: Record<string, string>;
+			announcements: Array<{
+				agentId: string;
+				message: string;
+				timestamp: number;
+			}>;
+		}>;
+		checkLocks: (filePaths: string[]) => Promise<
+			Array<{
+				filePath: string;
+				owner: string | null;
+			}>
+		>;
+		acquireLock: (agentId: string, filePath: string) => Promise<boolean>;
+		releaseLock: (agentId: string, filePath: string) => Promise<boolean>;
+		broadcast: (agentId: string, message: string) => Promise<{
+			agentId: string;
+			message: string;
+			timestamp: number;
+		} | null>;
+		onStateUpdated: (
+			handler: (state: {
+				locks: Record<string, string>;
+				announcements: Array<{
+					agentId: string;
+					message: string;
+					timestamp: number;
+				}>;
+			}) => void
+		) => () => void;
 	};
 
 	// MFE API (Rspack Module Federation workspace scanning)

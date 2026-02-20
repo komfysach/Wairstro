@@ -34,6 +34,7 @@ import {
 	Timer,
 	User,
 	Clapperboard,
+	Figma,
 } from 'lucide-react';
 import { useSettings } from '../hooks';
 import type {
@@ -63,6 +64,7 @@ import { SshRemoteIgnoreSection } from './Settings/SshRemoteIgnoreSection';
 import { AgentConfigPanel } from './shared/AgentConfigPanel';
 import { AGENT_TILES } from './Wizard/screens/AgentSelectionScreen';
 import { adoService } from '../services/ado';
+import { mcpService } from '../services/mcp';
 
 // Feature flags - set to true to enable dormant features
 const FEATURE_FLAGS = {
@@ -410,6 +412,12 @@ export const SettingsModal = memo(function SettingsModal(props: SettingsModalPro
 	} | null>(null);
 	const [wakatimeKeyValid, setWakatimeKeyValid] = useState<boolean | null>(null);
 	const [wakatimeKeyValidating, setWakatimeKeyValidating] = useState(false);
+	const [figmaMcpEnabled, setFigmaMcpEnabled] = useState(false);
+	const [figmaPat, setFigmaPat] = useState('');
+	const [figmaHasPat, setFigmaHasPat] = useState(false);
+	const [figmaPatDirty, setFigmaPatDirty] = useState(false);
+	const [figmaSaving, setFigmaSaving] = useState(false);
+	const [figmaError, setFigmaError] = useState<string | null>(null);
 	const [adoOrganization, setAdoOrganization] = useState('');
 	const [adoProject, setAdoProject] = useState('');
 	const [adoTeam, setAdoTeam] = useState('');
@@ -491,6 +499,22 @@ export const SettingsModal = memo(function SettingsModal(props: SettingsModalPro
 			})
 			.catch((error) => {
 				setAdoError(error instanceof Error ? error.message : 'Failed to load Azure DevOps settings');
+			});
+	}, [isOpen]);
+
+	useEffect(() => {
+		if (!isOpen) return;
+		mcpService
+			.getSettings()
+			.then((settings) => {
+				setFigmaMcpEnabled(settings.figmaMcpEnabled);
+				setFigmaHasPat(settings.hasFigmaPat);
+				setFigmaPat('');
+				setFigmaPatDirty(false);
+				setFigmaError(null);
+			})
+			.catch((error) => {
+				setFigmaError(error instanceof Error ? error.message : 'Failed to load Figma MCP settings');
 			});
 	}, [isOpen]);
 
@@ -2159,6 +2183,155 @@ export const SettingsModal = memo(function SettingsModal(props: SettingsModalPro
 											</p>
 										</div>
 									)}
+								</div>
+							</div>
+
+							{/* Figma MCP Integration */}
+							<div>
+								<label className="block text-xs font-bold opacity-70 uppercase mb-2 flex items-center gap-2">
+									<Figma className="w-3 h-3" />
+									Figma MCP
+								</label>
+								<div
+									className="p-3 rounded border space-y-3"
+									style={{ borderColor: theme.colors.border, backgroundColor: theme.colors.bgMain }}
+								>
+									<div className="flex items-center justify-between">
+										<div>
+											<p
+												className="text-sm flex items-center gap-2"
+												style={{ color: theme.colors.textMain }}
+											>
+												<Figma className="w-3.5 h-3.5 opacity-60" />
+												Enable Figma MCP
+											</p>
+											<p className="text-xs opacity-50 mt-0.5">
+												Allow Guru to connect to your Figma MCP server for design tool calls.
+											</p>
+										</div>
+										<button
+											onClick={() => {
+												const nextEnabled = !figmaMcpEnabled;
+												setFigmaMcpEnabled(nextEnabled);
+												setFigmaError(null);
+												mcpService
+													.setSettings({ figmaMcpEnabled: nextEnabled })
+													.then((result) => {
+														setFigmaMcpEnabled(result.figmaMcpEnabled);
+													})
+													.catch((error) => {
+														setFigmaMcpEnabled(!nextEnabled);
+														setFigmaError(
+															error instanceof Error
+																? error.message
+																: 'Failed to save Figma MCP settings'
+														);
+													});
+											}}
+											className="relative w-10 h-5 rounded-full transition-colors"
+											style={{
+												backgroundColor: figmaMcpEnabled
+													? theme.colors.accent
+													: theme.colors.bgActivity,
+											}}
+											role="switch"
+											aria-checked={figmaMcpEnabled}
+										>
+											<span
+												className={`absolute left-0 top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${
+													figmaMcpEnabled ? 'translate-x-5' : 'translate-x-0.5'
+												}`}
+											/>
+										</button>
+									</div>
+
+									<div>
+										<label className="block text-xs opacity-60 mb-1">
+											Figma Personal Access Token {figmaHasPat && !figmaPatDirty ? '(stored)' : ''}
+										</label>
+										<div
+											className="flex items-center border rounded px-3 py-2"
+											style={{
+												backgroundColor: theme.colors.bgMain,
+												borderColor: theme.colors.border,
+											}}
+										>
+											<Key className="w-4 h-4 mr-2 opacity-50" />
+											<input
+												type="password"
+												value={figmaPat}
+												onChange={(e) => {
+													setFigmaPat(e.target.value);
+													setFigmaPatDirty(true);
+													setFigmaError(null);
+												}}
+												className="bg-transparent flex-1 text-sm outline-none"
+												style={{ color: theme.colors.textMain }}
+												placeholder={
+													figmaHasPat && !figmaPatDirty
+														? 'Leave blank to keep current token'
+														: 'Enter Figma PAT'
+												}
+											/>
+											{figmaPat && (
+												<button
+													onClick={() => {
+														setFigmaPat('');
+														setFigmaPatDirty(true);
+													}}
+													className="ml-2 opacity-50 hover:opacity-100"
+													title="Clear token input"
+												>
+													<X className="w-3 h-3" />
+												</button>
+											)}
+										</div>
+										<p className="text-[10px] mt-1.5 opacity-50">
+											Token is encrypted at rest using OS secure storage.
+										</p>
+									</div>
+
+									{figmaError && (
+										<p className="text-xs" style={{ color: theme.colors.error }}>
+											{figmaError}
+										</p>
+									)}
+
+									<div className="flex items-center justify-end">
+										<button
+											onClick={() => {
+												setFigmaSaving(true);
+												setFigmaError(null);
+												mcpService
+													.setSettings({
+														figmaMcpEnabled,
+														figmaPat: figmaPatDirty ? figmaPat : undefined,
+													})
+													.then((result) => {
+														setFigmaMcpEnabled(result.figmaMcpEnabled);
+														setFigmaHasPat(result.hasFigmaPat);
+														setFigmaPat('');
+														setFigmaPatDirty(false);
+													})
+													.catch((error) => {
+														setFigmaError(
+															error instanceof Error
+																? error.message
+																: 'Failed to save Figma MCP settings'
+														);
+													})
+													.finally(() => setFigmaSaving(false));
+											}}
+											disabled={figmaSaving}
+											className="px-3 py-1.5 rounded text-xs font-semibold transition-colors disabled:opacity-60"
+											style={{
+												backgroundColor: theme.colors.accent,
+												color: theme.colors.bgMain,
+											}}
+										>
+											{figmaSaving ? 'Saving...' : 'Save Figma MCP Settings'}
+										</button>
+									</div>
 								</div>
 							</div>
 

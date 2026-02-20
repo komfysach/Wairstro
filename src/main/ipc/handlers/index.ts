@@ -55,6 +55,8 @@ import { registerDirectorNotesHandlers, DirectorNotesHandlerDependencies } from 
 import { registerWakatimeHandlers } from './wakatime';
 import { registerMfeHandlers } from './mfe';
 import { registerAdoHandlers } from './ado';
+import { registerSignalHandlers } from './signal';
+import { registerMcpHandlers, McpHandlerDependencies } from './mcp';
 import { AgentDetector } from '../../agents';
 import { ProcessManager } from '../../process-manager';
 import { WebServer } from '../../web-server';
@@ -101,6 +103,8 @@ export type { DirectorNotesHandlerDependencies };
 export { registerWakatimeHandlers };
 export { registerMfeHandlers };
 export { registerAdoHandlers };
+export { registerSignalHandlers };
+export { registerMcpHandlers };
 export type { AgentsHandlerDependencies };
 export type { ProcessHandlerDependencies };
 export type { PersistenceHandlerDependencies };
@@ -116,6 +120,7 @@ export type { SshRemoteHandlerDependencies };
 export type { GitHandlerDependencies };
 export type { SymphonyHandlerDependencies };
 export type { MaestroSettings, SessionsData, GroupsData };
+export type { McpHandlerDependencies };
 
 /**
  * Interface for agent configuration store data
@@ -286,6 +291,9 @@ export function registerAllHandlers(deps: HandlerDependencies): void {
 	});
 	// Register MFE workspace scanner handlers
 	registerMfeHandlers();
+	registerSignalHandlers({
+		getMainWindow: deps.getMainWindow,
+	});
 	// Register Azure DevOps handlers
 	registerAdoHandlers({
 		settingsStore: deps.settingsStore,

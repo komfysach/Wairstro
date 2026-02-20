@@ -20,6 +20,7 @@ import type {
 } from '../../types';
 import type { FileTreeChanges } from '../../utils/fileExplorer';
 import type { DocumentTaskCount } from '../../components/AutoRunDocumentSelector';
+import type { AdoBoardItem } from '../../services/ado';
 
 /**
  * Dependencies for computing RightPanel props.
@@ -137,6 +138,8 @@ export interface UseRightPanelPropsDeps {
 	// Document Graph handlers
 	handleFocusFileInGraph: (relativePath: string) => void;
 	handleOpenLastDocumentGraph: () => void;
+	handleRunKanbanTicket?: (item: AdoBoardItem) => Promise<void>;
+	handleQuickPrKanbanTicket?: (item: AdoBoardItem) => Promise<void>;
 }
 
 /**
@@ -231,6 +234,8 @@ export function useRightPanelProps(deps: UseRightPanelPropsDeps) {
 			onFocusFileInGraph: deps.handleFocusFileInGraph,
 			lastGraphFocusFile: deps.lastGraphFocusFilePath,
 			onOpenLastDocumentGraph: deps.handleOpenLastDocumentGraph,
+			onRunKanbanTicket: deps.handleRunKanbanTicket,
+			onQuickPrKanbanTicket: deps.handleQuickPrKanbanTicket,
 		}),
 		[
 			// Primitive dependencies for minimal re-computation
@@ -295,6 +300,8 @@ export function useRightPanelProps(deps: UseRightPanelPropsDeps) {
 			deps.handleMainPanelFileClick,
 			deps.handleFocusFileInGraph,
 			deps.handleOpenLastDocumentGraph,
+			deps.handleRunKanbanTicket,
+			deps.handleQuickPrKanbanTicket,
 			// Refs (stable, but included for completeness)
 			deps.fileTreeContainerRef,
 			deps.fileTreeFilterInputRef,

@@ -605,6 +605,35 @@ export function registerProcessHandlers(deps: ProcessHandlerDependencies): void 
 		})
 	);
 
+	// Send interactive input to a running Gemini agent process.
+	// This bypasses regular queueing so users can intervene while the agent is active.
+	ipcMain.handle(
+		'agent:send-input',
+		withIpcErrorLogging(handlerOpts('sendInput'), async (agentId: string, message: string) => {
+			const processManager = requireProcessManager(getProcessManager);
+			const activeProcess = processManager.getAll().find((process) => process.sessionId === agentId);
+
+			if (!activeProcess) {
+				logger.warn('No active process found for interactive agent input', LOG_CONTEXT, { agentId });
+				return false;
+			}
+
+			if (activeProcess.toolType !== 'gemini-cli') {
+				logger.warn('Interactive agent input is currently only supported for Gemini CLI', LOG_CONTEXT, {
+					agentId,
+					toolType: activeProcess.toolType,
+				});
+				return false;
+			}
+
+			logger.info('Sending interactive input to Gemini process', LOG_CONTEXT, {
+				agentId,
+				messageLength: message.length,
+			});
+			return processManager.write(agentId, `${message}\n`);
+		})
+	);
+
 	// Send SIGINT to a process
 	ipcMain.handle(
 		'process:interrupt',

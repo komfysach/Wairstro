@@ -280,6 +280,7 @@ describe('process IPC handlers', () => {
 			const expectedChannels = [
 				'process:spawn',
 				'process:write',
+				'agent:send-input',
 				'process:interrupt',
 				'process:kill',
 				'process:resize',
@@ -571,6 +572,35 @@ describe('process IPC handlers', () => {
 			const handler = handlers.get('process:write');
 			const result = await handler!({} as any, 'exited-session', 'data');
 
+			expect(result).toBe(false);
+		});
+	});
+
+	describe('agent:send-input', () => {
+		it('writes newline-terminated input to running Gemini process', async () => {
+			mockProcessManager.getAll.mockReturnValue([
+				{ sessionId: 'session-1-ai-tab-1', toolType: 'gemini-cli' },
+			]);
+			mockProcessManager.write.mockReturnValue(true);
+
+			const handler = handlers.get('agent:send-input');
+			const result = await handler!({} as any, 'session-1-ai-tab-1', 'check Login.tsx');
+
+			expect(mockProcessManager.write).toHaveBeenCalledWith(
+				'session-1-ai-tab-1',
+				'check Login.tsx\n'
+			);
+			expect(result).toBe(true);
+		});
+
+		it('returns false when target process is not Gemini', async () => {
+			mockProcessManager.getAll.mockReturnValue([{ sessionId: 'session-1-ai-tab-1', toolType: 'codex' }]);
+			mockProcessManager.write.mockReturnValue(true);
+
+			const handler = handlers.get('agent:send-input');
+			const result = await handler!({} as any, 'session-1-ai-tab-1', 'test');
+
+			expect(mockProcessManager.write).not.toHaveBeenCalled();
 			expect(result).toBe(false);
 		});
 	});

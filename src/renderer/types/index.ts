@@ -50,7 +50,7 @@ import type { AgentError } from '../../shared/types';
 
 export type SessionState = 'idle' | 'busy' | 'waiting_input' | 'connecting' | 'error';
 export type FileChangeType = 'modified' | 'added' | 'deleted';
-export type RightPanelTab = 'files' | 'history' | 'autorun' | 'sprint';
+export type RightPanelTab = 'files' | 'history' | 'autorun' | 'sprint-planning' | 'kanban-flow';
 export type SettingsTab = 'general' | 'shortcuts' | 'theme' | 'notifications' | 'aicommands';
 // Note: ScratchPadMode was removed as part of the Scratchpad → Auto Run migration
 export type FocusArea = 'sidebar' | 'main' | 'right';
@@ -244,7 +244,7 @@ export interface HistoryEntry extends BaseHistoryEntry {
 
 // Renderer-specific WorktreeConfig extends the shared base with UI-specific fields
 export interface WorktreeConfig extends BaseWorktreeConfig {
-	ghPath?: string; // Custom path to gh CLI binary (optional, UI-specific)
+	workItemId?: string; // Optional ADO work item ID to link during PR creation
 }
 
 // Worktree path validation state (used by useWorktreeValidation hook)
@@ -263,6 +263,12 @@ export interface WorktreeValidationState {
 export interface GhCliStatus {
 	installed: boolean; // gh CLI is installed
 	authenticated: boolean; // gh CLI is authenticated
+}
+
+export interface AdoCliStatus {
+	installed: boolean; // az CLI is installed
+	authenticated: boolean; // az CLI has an active account (az account show)
+	error?: string;
 }
 
 // Configuration for starting a batch run

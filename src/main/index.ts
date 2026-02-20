@@ -55,6 +55,7 @@ import {
 	registerWakatimeHandlers,
 	registerMfeHandlers,
 	registerAdoHandlers,
+	registerMcpHandlers,
 	setupLoggerEventForwarding,
 	cleanupAllGroomingSessions,
 	getActiveGroomingSessionCount,
@@ -115,6 +116,7 @@ import {
 import { setupProcessListeners as setupProcessListenersModule } from './process-listeners';
 import { setupWakaTimeListener } from './process-listeners/wakatime-listener';
 import { WakaTimeManager } from './wakatime-manager';
+import { McpClientService } from './services/McpClientService';
 
 // ============================================================================
 // Data Directory Configuration (MUST happen before any Store initialization)
@@ -173,6 +175,7 @@ if (!installationId) {
 
 // Initialize WakaTime heartbeat manager
 const wakatimeManager = new WakaTimeManager(store);
+const mcpClientService = new McpClientService();
 
 // Auto-install WakaTime CLI on startup if enabled
 if (store.get('wakatimeEnabled', false)) {
@@ -673,6 +676,12 @@ function setupIpcHandlers() {
 
 	// Register WakaTime handlers (CLI check, API key validation)
 	registerWakatimeHandlers(wakatimeManager);
+
+	// Register MCP handlers (Figma MCP and generic MCP tool bridge)
+	registerMcpHandlers({
+		settingsStore: store,
+		mcpClientService,
+	});
 }
 
 // Handle process output streaming (set up after initialization)

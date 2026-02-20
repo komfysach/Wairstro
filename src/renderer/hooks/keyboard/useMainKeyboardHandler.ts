@@ -131,6 +131,9 @@ export function useMainKeyboardHandler(): UseMainKeyboardHandlerReturn {
 					e.altKey && (e.metaKey || e.ctrlKey) && !e.shiftKey && codeKeyLower === 't';
 				// Allow toggleMode (Cmd+J) to switch to terminal view from file preview
 				const isToggleModeShortcut = ctx.isShortcut(e, 'toggleMode');
+				// Ctrl+N quick-add should work globally.
+				const isKanbanQuickAddShortcut =
+					e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey && keyLower === 'n';
 
 				if (ctx.hasOpenModal()) {
 					// TRUE MODAL is open - block most shortcuts from App.tsx
@@ -142,7 +145,8 @@ export function useMainKeyboardHandler(): UseMainKeyboardHandlerReturn {
 						!isSystemUtilShortcut &&
 						!isSessionJumpShortcut &&
 						!isJumpToBottomShortcut &&
-						!isMarkdownToggleShortcut
+						!isMarkdownToggleShortcut &&
+						!isKanbanQuickAddShortcut
 					) {
 						return;
 					}
@@ -163,7 +167,8 @@ export function useMainKeyboardHandler(): UseMainKeyboardHandlerReturn {
 						!isMarkdownToggleShortcut &&
 						!isTabManagementShortcut &&
 						!isTabSwitcherShortcut &&
-						!isToggleModeShortcut
+						!isToggleModeShortcut &&
+						!isKanbanQuickAddShortcut
 					) {
 						return;
 					}
@@ -200,6 +205,12 @@ export function useMainKeyboardHandler(): UseMainKeyboardHandlerReturn {
 			};
 
 			// General shortcuts
+			if (e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'n') {
+				e.preventDefault();
+				window.dispatchEvent(new CustomEvent('maestro:kanbanQuickAddRequest'));
+				return;
+			}
+
 			// Only allow collapsing left sidebar when there are sessions (prevent collapse on empty state)
 			if (ctx.isShortcut(e, 'toggleSidebar')) {
 				if (ctx.sessions.length > 0 || !ctx.leftSidebarOpen) {

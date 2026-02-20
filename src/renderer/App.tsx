@@ -144,7 +144,14 @@ import { ToastContainer } from './components/Toast';
 import { gitService } from './services/git';
 import { getSpeckitCommands } from './services/speckit';
 import { getOpenSpecCommands } from './services/openspec';
-import { adoService, buildAgentPayload, type AdoSprintWorkItem } from './services/ado';
+import { adoService, buildAgentPayload, type AdoBoardItem, type AdoSprintWorkItem } from './services/ado';
+import { routeAgentForTags } from '../shared/task-routing';
+import { mfeService } from './services/mfe';
+import {
+	emitKanbanLifecycleEvent,
+	emitPrCompletedEvent,
+	emitPrCreatedEvent,
+} from './services/KanbanController';
 
 // Import prompts and synopsis parsing
 import { autorunSynopsisPrompt, maestroSystemPrompt } from '../prompts';
@@ -1483,6 +1490,40 @@ function MaestroConsoleInner() {
 			})
 			.catch(() => {
 				setGhCliAvailable(false);
+			});
+	}, []);
+
+	// Check Azure CLI availability/authentication for ADO Git workflows
+	useEffect(() => {
+		const gitApi = window.maestro?.git;
+		if (!gitApi?.checkAdoCli) return;
+
+		gitApi
+			.checkAdoCli()
+			.then((status) => {
+				if (!status.installed) {
+					notifyToast({
+						type: 'warning',
+						title: 'Azure CLI Required',
+						message:
+							'Install Azure CLI (`az`) and sign in with `az login` to enable ADO pull requests.',
+					});
+					return;
+				}
+				if (!status.authenticated) {
+					notifyToast({
+						type: 'warning',
+						title: 'Azure CLI Not Authenticated',
+						message: 'Run `az login` in your terminal to enable ADO pull requests.',
+					});
+				}
+			})
+			.catch(() => {
+				notifyToast({
+					type: 'warning',
+					title: 'Azure CLI Check Failed',
+					message: 'Run `az --version` and `az login` to enable ADO pull requests.',
+				});
 			});
 	}, []);
 
@@ -5294,7 +5335,7 @@ You are taking over this conversation. Based on the context above, provide a bri
 				// PR created successfully - show success toast with PR URL
 				notifyToast({
 					type: 'success',
-					title: 'PR Created',
+					title: 'ADO PR Created',
 					message: info.prUrl || 'Pull request created successfully',
 					group: groupName,
 					project: info.sessionName,
@@ -5304,8 +5345,8 @@ You are taking over this conversation. Based on the context above, provide a bri
 				// PR creation failed - show warning (not error, since the auto-run itself succeeded)
 				notifyToast({
 					type: 'warning',
-					title: 'PR Creation Failed',
-					message: info.error || 'Failed to create pull request',
+					title: 'ADO PR Creation Failed',
+					message: info.error || 'Failed to create Azure DevOps pull request',
 					group: groupName,
 					project: info.sessionName,
 					sessionId: info.sessionId,
@@ -8854,7 +8895,13 @@ You are taking over this conversation. Based on the context above, provide a bri
 
 			switch (type) {
 				case 'setRightTab':
-					if (value === 'files' || value === 'history' || value === 'autorun') {
+					if (
+						value === 'files' ||
+						value === 'history' ||
+						value === 'autorun' ||
+						value === 'sprint-planning' ||
+						value === 'kanban-flow'
+					) {
 						setActiveRightTab(value as RightPanelTab);
 					}
 					break;
@@ -8873,6 +8920,23 @@ You are taking over this conversation. Based on the context above, provide a bri
 		window.addEventListener('tour:action', handleTourAction);
 		return () => window.removeEventListener('tour:action', handleTourAction);
 	}, []);
+
+	useEffect(() => {
+		const handleKanbanQuickAddRequest = () => {
+			setRightPanelOpen(true);
+			setActiveRightTab('kanban-flow');
+			setActiveFocus('right');
+			window.requestAnimationFrame(() => {
+				window.dispatchEvent(new CustomEvent('maestro:kanbanQuickAddFocus'));
+			});
+			window.setTimeout(() => {
+				window.dispatchEvent(new CustomEvent('maestro:kanbanQuickAddFocus'));
+			}, 120);
+		};
+		window.addEventListener('maestro:kanbanQuickAddRequest', handleKanbanQuickAddRequest);
+		return () =>
+			window.removeEventListener('maestro:kanbanQuickAddRequest', handleKanbanQuickAddRequest);
+	}, [setActiveFocus, setActiveRightTab, setRightPanelOpen]);
 
 	// Process a queued item - delegates to agentStore action
 	const processQueuedItem = async (sessionId: string, item: QueuedItem) => {
@@ -9352,6 +9416,78 @@ You are taking over this conversation. Based on the context above, provide a bri
 			}
 		}
 	};
+
+	const handleSendAgentInput = useCallback(
+		async (message: string) => {
+			if (
+				!activeSession ||
+				String(activeSession.toolType) !== 'gemini-cli' ||
+				activeSession.inputMode !== 'ai'
+			) {
+				return;
+			}
+			if (activeSession.state !== 'busy' && activeSession.state !== 'waiting_input') {
+				return;
+			}
+
+			const activeTab = getActiveTab(activeSession);
+			if (!activeTab) return;
+
+			const trimmedMessage = message.trim();
+			if (!trimmedMessage) return;
+
+			const targetSessionId = `${activeSession.id}-ai-${activeTab.id || 'default'}`;
+			const interventionText = `[USER INTERVENTION]: ${trimmedMessage}`;
+
+			setSessions((prev) =>
+				prev.map((session) => {
+					if (session.id !== activeSession.id) return session;
+					return {
+						...session,
+						aiTabs: session.aiTabs.map((tab) =>
+							tab.id === activeTab.id
+								? {
+										...tab,
+										logs: [
+											...tab.logs,
+											{
+												id: generateId(),
+												timestamp: Date.now(),
+												source: 'user',
+												text: interventionText,
+											},
+										],
+									}
+								: tab
+						),
+					};
+				})
+			);
+
+			try {
+				await window.maestro.process.sendAgentInput(targetSessionId, trimmedMessage);
+			} catch (error) {
+				const errorLog: LogEntry = {
+					id: generateId(),
+					timestamp: Date.now(),
+					source: 'system',
+					text: `Error: Failed to send interactive input - ${(error as Error).message}`,
+				};
+				setSessions((prev) =>
+					prev.map((session) => {
+						if (session.id !== activeSession.id) return session;
+						return {
+							...session,
+							aiTabs: session.aiTabs.map((tab) =>
+								tab.id === activeTab.id ? { ...tab, logs: [...tab.logs, errorLog] } : tab
+							),
+						};
+					})
+				);
+			}
+		},
+		[activeSession, getActiveTab, setSessions]
+	);
 
 	const handleInputKeyDown = (e: React.KeyboardEvent) => {
 		// Cmd+F opens output search from input field - handle first, before any modal logic
@@ -10252,21 +10388,32 @@ You are taking over this conversation. Based on the context above, provide a bri
 			const session = createPRSession || activeSession;
 			notifyToast({
 				type: 'success',
-				title: 'Pull Request Created',
+				title: 'ADO PR Created',
 				message: prDetails.title,
 				actionUrl: prDetails.url,
 				actionLabel: prDetails.url,
 			});
 			// Add history entry with PR details
 			if (session) {
+				if (prDetails.workItemId) {
+					const ticketId = Number(prDetails.workItemId);
+					if (Number.isFinite(ticketId) && ticketId > 0) {
+						emitPrCreatedEvent({
+							ticketId,
+							prUrl: prDetails.url,
+							prId: prDetails.prId,
+						});
+					}
+				}
 				await window.maestro.history.add({
 					id: generateId(),
 					type: 'USER',
 					timestamp: Date.now(),
-					summary: `Created PR: ${prDetails.title}`,
+					summary: `Created ADO PR: ${prDetails.title}`,
 					fullResponse: [
-						`**Pull Request:** [${prDetails.title}](${prDetails.url})`,
+						`**ADO Pull Request:** [${prDetails.title}](${prDetails.url})`,
 						`**Branch:** ${prDetails.sourceBranch} → ${prDetails.targetBranch}`,
+						prDetails.workItemId ? `**Work Item:** #${prDetails.workItemId}` : '',
 						prDetails.description ? `**Description:** ${prDetails.description}` : '',
 					]
 						.filter(Boolean)
@@ -11356,6 +11503,7 @@ You are taking over this conversation. Based on the context above, provide a bri
 		toggleInputMode,
 		processInput,
 		handleInterrupt,
+		handleSendAgentInput,
 		handleInputKeyDown,
 		handlePaste,
 		handleDrop,
@@ -11366,6 +11514,7 @@ You are taking over this conversation. Based on the context above, provide a bri
 		handleDeleteLog,
 		handleRemoveQueuedItem,
 		handleOpenQueueBrowser,
+		handleOpenMfeDashboard: handleQuickActionsOpenMfeDashboard,
 
 		// Tab management handlers
 		handleTabSelect,
@@ -11700,14 +11849,35 @@ You are taking over this conversation. Based on the context above, provide a bri
 				throw new Error('Assigned agent session could not be found.');
 			}
 
+			let figmaLink: string | undefined;
+			let figmaNodeName: string | undefined;
+			try {
+				const rawDesignContext = (await window.maestro.settings.get(
+					'kanbanDesignContextByTicket'
+				)) as
+					| Record<string, { url?: string; verifiedNodeName?: string }>
+					| undefined;
+				const designEntry = rawDesignContext?.[String(workItem.id)];
+				figmaLink = typeof designEntry?.url === 'string' ? designEntry.url.trim() : undefined;
+				figmaNodeName =
+					typeof designEntry?.verifiedNodeName === 'string'
+						? designEntry.verifiedNodeName.trim()
+						: undefined;
+			} catch {
+				// Optional context only; task execution proceeds without Figma metadata.
+			}
+
 			const newSessionId = generateId();
 			const newTabId = generateId();
+			const routedAgent = routeAgentForTags(workItem.tags || []);
 			const initialPrompt = buildAgentPayload(
 				{
 					ticketId: workItem.id,
 					adoTitle: workItem.title,
 					adoDescription: workItem.description,
 					adoAcceptanceCriteria: workItem.acceptanceCriteria,
+					figmaLink,
+					figmaNodeName,
 				},
 				{
 					mfeName: packageName,
@@ -11800,17 +11970,20 @@ You are taking over this conversation. Based on the context above, provide a bri
 			setSessions((prev) => [...prev, routedSession]);
 
 			try {
+				const canReuseTemplateOverrides = routedAgent === templateSession.toolType;
 				const execution = await adoService.runAgentTask({
 					sessionId: newSessionId,
 					tabId: newTabId,
-					assignedAgent: templateSession.toolType,
+					assignedAgent: routedAgent,
 					templateSession: {
 						cwd: templateSession.cwd,
-						customPath: templateSession.customPath,
-						customArgs: templateSession.customArgs,
-						customEnvVars: templateSession.customEnvVars,
-						customModel: templateSession.customModel,
-						customContextWindow: templateSession.customContextWindow,
+						customPath: canReuseTemplateOverrides ? templateSession.customPath : undefined,
+						customArgs: canReuseTemplateOverrides ? templateSession.customArgs : undefined,
+						customEnvVars: canReuseTemplateOverrides ? templateSession.customEnvVars : undefined,
+						customModel: canReuseTemplateOverrides ? templateSession.customModel : undefined,
+						customContextWindow: canReuseTemplateOverrides
+							? templateSession.customContextWindow
+							: undefined,
 						sessionSshRemoteConfig: templateSession.sessionSshRemoteConfig,
 					},
 					task: {
@@ -11818,6 +11991,10 @@ You are taking over this conversation. Based on the context above, provide a bri
 						adoTitle: workItem.title,
 						adoDescription: workItem.description,
 						adoAcceptanceCriteria: workItem.acceptanceCriteria,
+						attachedContextPaths: workItem.attachedContextPaths,
+						figmaLink,
+						figmaNodeName,
+						tags: workItem.tags,
 						prompt: initialPrompt,
 					},
 					mfeConfig: {
@@ -11849,10 +12026,10 @@ You are taking over this conversation. Based on the context above, provide a bri
 						session.id === newSessionId
 							? {
 									...session,
-									cwd: execution.packageCwd,
-									fullPath: execution.packageCwd,
-									projectRoot: execution.packageCwd,
-									shellCwd: execution.packageCwd,
+									cwd: execution.worktreePath,
+									fullPath: execution.worktreePath,
+									projectRoot: execution.worktreePath,
+									shellCwd: execution.worktreePath,
 									worktreeBranch: execution.worktreeBranch,
 									gitBranches,
 									gitTags,
@@ -11867,7 +12044,7 @@ You are taking over this conversation. Based on the context above, provide a bri
 															id: generateId(),
 															timestamp: Date.now(),
 															source: 'system',
-															text: `Execution started in ${execution.packageCwd}.`,
+															text: `Execution started in ${execution.worktreePath}.`,
 														},
 													],
 												}
@@ -11878,12 +12055,37 @@ You are taking over this conversation. Based on the context above, provide a bri
 					)
 				);
 
+				try {
+					const rawPreviewContext = (await window.maestro.settings.get(
+						'kanbanPreviewContextByTicket'
+					)) as
+						| Record<string, { worktreePath?: string; mfeName?: string; updatedAt?: number }>
+						| undefined;
+					const nextPreviewContext = {
+						...(rawPreviewContext && typeof rawPreviewContext === 'object' ? rawPreviewContext : {}),
+						[String(workItem.id)]: {
+							worktreePath: execution.packageCwd,
+							mfeName: packageName,
+							updatedAt: Date.now(),
+						},
+					};
+					await window.maestro.settings.set('kanbanPreviewContextByTicket', nextPreviewContext);
+				} catch {
+					// Preview context persistence is optional for ticket execution.
+				}
+
 				notifyToast({
 					type: 'success',
 					title: 'Execution Routed',
 					message: `#${workItem.id} started for ${packageName}`,
 					sessionId: newSessionId,
 					tabId: newTabId,
+				});
+				emitKanbanLifecycleEvent({
+					type: 'agent:started',
+					ticketId: workItem.id,
+					sessionId: newSessionId,
+					processSessionId: execution.processSessionId,
 				});
 
 				return { sessionId: newSessionId, tabId: newTabId };
@@ -11927,6 +12129,350 @@ You are taking over this conversation. Based on the context above, provide a bri
 			}
 		},
 		[defaultSaveToHistory, defaultShowThinking, sessions, setSessions]
+	);
+
+	const handleEnsureMfeWorkerAgent = useCallback(
+		async ({
+			packageName,
+			packagePath,
+			suggestedName,
+			suggestedType,
+			existingSessionId,
+		}: {
+			packageName: string;
+			packagePath: string;
+			action: 'reuse' | 'create';
+			suggestedName: string;
+			suggestedType: string;
+			existingSessionId?: string;
+		}): Promise<{ sessionId: string; name: string }> => {
+			const packagePathNormalized = packagePath.replace(/\\/g, '/').replace(/\/+$/, '');
+
+			const explicitExisting = existingSessionId
+				? sessions.find((session) => session.id === existingSessionId)
+				: null;
+			if (explicitExisting) {
+				return { sessionId: explicitExisting.id, name: explicitExisting.name };
+			}
+
+			const reusable = sessions.find((session) => {
+				if (session.parentSessionId || session.state !== 'idle') return false;
+				const candidatePath = (session.projectRoot || session.cwd || '')
+					.replace(/\\/g, '/')
+					.replace(/\/+$/, '');
+				return candidatePath === packagePathNormalized;
+			});
+			if (reusable) {
+				return { sessionId: reusable.id, name: reusable.name };
+			}
+
+			const supportedTypes: Array<ToolType | 'gemini-cli'> = [
+				'claude-code',
+				'codex',
+				'opencode',
+				'factory-droid',
+				'gemini-cli',
+			];
+			const typedSuggestion = supportedTypes.includes(suggestedType as ToolType | 'gemini-cli')
+				? (suggestedType as ToolType | 'gemini-cli')
+				: 'codex';
+			let resolvedType: ToolType | 'gemini-cli' = typedSuggestion;
+			const suggestedConfig = await window.maestro.agents.get(typedSuggestion).catch(() => null);
+			if (!suggestedConfig?.available) {
+				for (const fallback of supportedTypes) {
+					const fallbackConfig = await window.maestro.agents.get(fallback).catch(() => null);
+					if (fallbackConfig?.available) {
+						resolvedType = fallback;
+						break;
+					}
+				}
+			}
+
+			const newSessionId = generateId();
+			const newTabId = generateId();
+			const workerName = suggestedName || `Agent-${packageName}`;
+
+			const workerSession: Session = {
+				id: newSessionId,
+				name: workerName,
+				groupId: activeSession?.groupId,
+				toolType: resolvedType as ToolType,
+				state: 'idle',
+				cwd: packagePath,
+				fullPath: packagePath,
+				projectRoot: packagePath,
+				isGitRepo: true,
+				gitBranches: [],
+				gitTags: [],
+				gitRefsCacheTime: Date.now(),
+				parentSessionId: undefined,
+				worktreeBranch: undefined,
+				aiLogs: [],
+				shellLogs: [],
+				workLog: [],
+				contextUsage: 0,
+				inputMode: 'ai',
+				aiPid: 0,
+				terminalPid: 0,
+				port: 3000 + Math.floor(Math.random() * 100),
+				isLive: false,
+				changedFiles: [],
+				fileTree: [],
+				fileExplorerExpanded: [],
+				fileExplorerScrollPos: 0,
+				fileTreeAutoRefreshInterval: activeSession?.fileTreeAutoRefreshInterval,
+				shellCwd: packagePath,
+				aiCommandHistory: [],
+				shellCommandHistory: [],
+				executionQueue: [],
+				activeTimeMs: 0,
+				aiTabs: [
+					{
+						id: newTabId,
+						agentSessionId: null,
+						name: null,
+						starred: false,
+						logs: [
+							{
+								id: generateId(),
+								timestamp: Date.now(),
+								source: 'system',
+								text: `Worker initialized for ${packageName}.`,
+							},
+						],
+						inputValue: '',
+						stagedImages: [],
+						createdAt: Date.now(),
+						state: 'idle',
+						saveToHistory: defaultSaveToHistory,
+						showThinking: defaultShowThinking,
+					},
+				],
+				activeTabId: newTabId,
+				closedTabHistory: [],
+				filePreviewTabs: [],
+				activeFileTabId: null,
+				unifiedTabOrder: [{ type: 'ai', id: newTabId }],
+				unifiedClosedTabHistory: [],
+				customPath: activeSession?.customPath,
+				customArgs: activeSession?.customArgs,
+				customEnvVars: activeSession?.customEnvVars,
+				customModel: activeSession?.customModel,
+				customContextWindow: activeSession?.customContextWindow,
+				customProviderPath: activeSession?.customProviderPath,
+				nudgeMessage: activeSession?.nudgeMessage,
+				autoRunFolderPath: activeSession?.autoRunFolderPath,
+				sessionSshRemoteConfig: activeSession?.sessionSshRemoteConfig,
+			};
+
+			setSessions((prev) => [...prev, workerSession]);
+			notifyToast({
+				type: 'success',
+				title: 'Worker Agent Created',
+				message: `${workerName} scoped to ${packageName}`,
+			});
+
+			return { sessionId: newSessionId, name: workerName };
+		},
+		[
+			activeSession,
+			defaultSaveToHistory,
+			defaultShowThinking,
+			sessions,
+			setSessions,
+		]
+	);
+
+	const handleRunKanbanTicket = useCallback(
+		async (item: AdoBoardItem): Promise<void> => {
+			const waitForSessionReady = async (sessionId: string, timeoutMs = 5000): Promise<void> => {
+				const startedAt = Date.now();
+				while (Date.now() - startedAt < timeoutMs) {
+					const found = useSessionStore
+						.getState()
+						.sessions.some((session) => session.id === sessionId);
+					if (found) return;
+					await new Promise((resolve) => window.setTimeout(resolve, 50));
+				}
+				throw new Error(`Timed out waiting for worker agent session (${sessionId}) to initialize.`);
+			};
+
+			const monorepoRoot = (activeSession?.projectRoot || activeSession?.cwd || '').trim();
+			if (!monorepoRoot) {
+				throw new Error('Select an active agent workspace before running Kanban ticket orchestration.');
+			}
+
+			const scan = await mfeService.scanWorkspace(monorepoRoot);
+			if (!scan.packages.length) {
+				throw new Error('No microfrontend packages were detected in the active workspace.');
+			}
+
+			const ticketText = [item.title, item.description, item.acceptanceCriteria]
+				.filter(Boolean)
+				.join(' ')
+				.toLowerCase();
+			const tagText = (item.tags || []).join(' ').toLowerCase();
+			const scoredPackages = scan.packages.map((pkg) => {
+				const name = pkg.name.toLowerCase();
+				const rootPath = pkg.rootPath.toLowerCase();
+				let score = 0;
+				if (ticketText.includes(name)) score += 6;
+				if (tagText.includes(name)) score += 8;
+				if (tagText && rootPath.split('/').some((segment) => segment && tagText.includes(segment))) {
+					score += 3;
+				}
+				if (pkg.role === 'shared' && /(shared|common|ui|types|design system)/.test(ticketText)) {
+					score += 2;
+				}
+				return { pkg, score };
+			});
+
+			const topScore = Math.max(...scoredPackages.map((entry) => entry.score));
+			const selectedPackages =
+				topScore > 0
+					? scoredPackages.filter((entry) => entry.score === topScore).map((entry) => entry.pkg)
+					: [scan.packages[0]];
+
+			const sessionByPackagePath: Record<string, string> = {};
+			const routedAgent = routeAgentForTags(item.tags || []);
+			for (const pkg of selectedPackages) {
+				const ensured = await handleEnsureMfeWorkerAgent({
+					packageName: pkg.name,
+					packagePath: pkg.rootPath,
+					action: 'create',
+					suggestedName: `Agent-${pkg.name}`,
+					suggestedType: routedAgent,
+				});
+				await waitForSessionReady(ensured.sessionId);
+				sessionByPackagePath[pkg.rootPath] = ensured.sessionId;
+			}
+
+			await Promise.all(
+				selectedPackages.map(async (pkg) => {
+					const agentId = sessionByPackagePath[pkg.rootPath];
+					if (!agentId) {
+						throw new Error(`No worker agent available for ${pkg.name}.`);
+					}
+					await handleExecuteMfeWorkItem({
+						packageName: pkg.name,
+						packagePath: pkg.rootPath,
+						agentId,
+						workItem: item,
+					});
+				})
+			);
+		},
+		[activeSession, handleEnsureMfeWorkerAgent, handleExecuteMfeWorkItem]
+	);
+
+	const handleQuickPrKanbanTicket = useCallback(
+		async (item: AdoBoardItem): Promise<void> => {
+			const normalizeBranch = (value: string): string =>
+				value
+					.replace(/^refs\/heads\//, '')
+					.replace(/^origin\//, '')
+					.trim();
+
+			const activeRepoPath = (activeSession?.projectRoot || activeSession?.cwd || '').trim();
+			if (!activeRepoPath) {
+				throw new Error('Select an active workspace before creating a quick PR.');
+			}
+
+			const preferredBranch = `feat/ado-${item.id}`;
+			const worktreeSession =
+				sessions.find((session) => session.worktreeBranch === preferredBranch) ||
+				sessions.find((session) => session.worktreeBranch?.includes(`ado-${item.id}`));
+			if (!worktreeSession?.cwd) {
+				throw new Error(
+					`No active worktree session found for ${preferredBranch}. Run the ticket first before creating a quick PR.`
+				);
+			}
+			const sourceBranch = normalizeBranch(worktreeSession.worktreeBranch || preferredBranch);
+
+			const branchStatus = await gitService.getStatus(activeRepoPath);
+			const targetBranch = normalizeBranch(branchStatus.branch || '');
+			if (!targetBranch) {
+				throw new Error('Unable to determine the current target branch from the active session.');
+			}
+			if (targetBranch === sourceBranch) {
+				throw new Error('Current branch matches the ticket branch. Switch to a different target branch first.');
+			}
+
+			const cleanedDescription = (item.description || item.acceptanceCriteria || '')
+				.replace(/<[^>]*>/g, ' ')
+				.replace(/\s+/g, ' ')
+				.trim();
+			const body = cleanedDescription
+				? `## Work Item Context\n${cleanedDescription}\n\nQuick PR created from Kanban.`
+				: 'Quick PR created from Kanban.';
+			const result = await window.maestro.git.createPR(
+				worktreeSession.cwd,
+				targetBranch,
+				`#${item.id} ${item.title}`,
+				body
+			);
+			if (!result.success || !result.prUrl) {
+				const rawError = result.error || 'Failed to create quick PR.';
+				if (rawError.includes('dangerous Request.Path')) {
+					throw new Error(
+						`Quick PR failed due to Azure path validation. Verify ADO org/project settings and branch names (source: ${sourceBranch}, target: ${targetBranch}) contain no unsupported characters.`
+					);
+				}
+				throw new Error(rawError);
+			}
+
+			window.maestro.shell.openExternal(result.prUrl);
+			emitPrCreatedEvent({
+				ticketId: item.id,
+				prUrl: result.prUrl,
+				prId: result.prId,
+			});
+		},
+		[activeSession, sessions]
+	);
+
+	const handleMergeCompleteKanbanTicket = useCallback(
+		async (item: AdoBoardItem, prId?: number): Promise<void> => {
+			const normalizeBranch = (value: string): string =>
+				value
+					.replace(/^refs\/heads\//, '')
+					.replace(/^origin\//, '')
+					.trim();
+
+			const preferredBranch = `feat/ado-${item.id}`;
+			const worktreeSession =
+				sessions.find((session) => session.worktreeBranch === preferredBranch) ||
+				sessions.find((session) => session.worktreeBranch?.includes(`ado-${item.id}`));
+			if (!worktreeSession?.cwd) {
+				throw new Error(
+					`No active worktree session found for ${preferredBranch}. Unable to clean up merged worktree.`
+				);
+			}
+
+			const sourceBranch = normalizeBranch(worktreeSession.worktreeBranch || preferredBranch);
+			let resolvedPrId = prId;
+			if (!Number.isInteger(resolvedPrId) || (resolvedPrId ?? 0) <= 0) {
+				const status = await window.maestro.git.getPrStatus(worktreeSession.cwd, sourceBranch);
+				if (!status.exists || !status.prId) {
+					throw new Error(
+						`Unable to resolve an active PR id for ticket #${item.id}. Open the PR and ensure it is still active.`
+					);
+				}
+				resolvedPrId = status.prId;
+			}
+
+			const completionResult = await window.maestro.git.completeAdoPrAndCleanup({
+				prId: resolvedPrId!,
+				branchName: sourceBranch,
+				worktreePath: worktreeSession.cwd,
+			});
+			if (!completionResult.success) {
+				throw new Error(completionResult.error || 'Failed to complete PR and clean up worktree.');
+			}
+
+			emitPrCompletedEvent({ ticketId: item.id });
+		},
+		[sessions]
 	);
 
 	const handleViewMfeTaskTerminal = useCallback(
@@ -12964,6 +13510,7 @@ You are taking over this conversation. Based on the context above, provide a bri
 											message: `#${workItem.id} linked to ${packageName}. Click Execute to start.`,
 										});
 									}}
+									onEnsureWorkerAgent={handleEnsureMfeWorkerAgent}
 									onExecuteTask={handleExecuteMfeWorkItem}
 									onViewAgentTerminal={handleViewMfeTaskTerminal}
 									onClose={() => setMfeDashboardOpen(false)}
@@ -12978,7 +13525,13 @@ You are taking over this conversation. Based on the context above, provide a bri
 				{/* --- RIGHT PANEL (hidden in mobile landscape, when no sessions, group chat is active, or log viewer is open) --- */}
 				{!isMobileLandscape && sessions.length > 0 && !activeGroupChatId && !logViewerOpen && (
 					<ErrorBoundary>
-						<RightPanel ref={rightPanelRef} {...rightPanelProps} />
+						<RightPanel
+							ref={rightPanelRef}
+							{...rightPanelProps}
+							onRunKanbanTicket={handleRunKanbanTicket}
+							onQuickPrKanbanTicket={handleQuickPrKanbanTicket}
+							onMergeCompleteKanbanTicket={handleMergeCompleteKanbanTicket}
+						/>
 					</ErrorBoundary>
 				)}
 
